@@ -13,9 +13,12 @@ interface LoginFormProps {
 }
 
 const LoginForm = ({ onLogin }: LoginFormProps) => {
+  const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -26,26 +29,66 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
 
     // Simulate authentication
     setTimeout(() => {
-      if (email && password && role) {
-        const userName = email.split('@')[0];
-        onLogin({ 
-          email, 
-          role, 
-          name: userName.charAt(0).toUpperCase() + userName.slice(1) 
-        });
+      if (isSignUp) {
+        // Sign up validation
+        if (!email || !password || !confirmPassword || !name || !role) {
+          toast({
+            title: "Sign Up Failed",
+            description: "Please fill in all fields",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        if (password !== confirmPassword) {
+          toast({
+            title: "Sign Up Failed",
+            description: "Passwords do not match",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Simulate successful signup
+        onLogin({ email, role, name });
         toast({
-          title: "Login Successful",
-          description: `Welcome to F3-Engine, ${userName}!`,
+          title: "Account Created Successfully",
+          description: `Welcome to F3-Engine, ${name}!`,
         });
       } else {
-        toast({
-          title: "Login Failed",
-          description: "Please fill in all fields",
-          variant: "destructive",
-        });
+        // Sign in validation
+        if (email && password && role) {
+          const userName = name || email.split('@')[0];
+          onLogin({ 
+            email, 
+            role, 
+            name: userName.charAt(0).toUpperCase() + userName.slice(1) 
+          });
+          toast({
+            title: "Login Successful",
+            description: `Welcome back to F3-Engine!`,
+          });
+        } else {
+          toast({
+            title: "Login Failed",
+            description: "Please fill in all fields",
+            variant: "destructive",
+          });
+        }
       }
       setIsLoading(false);
     }, 1000);
+  };
+
+  const toggleAuthMode = () => {
+    setIsSignUp(!isSignUp);
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setName('');
+    setRole('');
   };
 
   return (
@@ -66,14 +109,33 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
 
         <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Sign In</CardTitle>
+            <CardTitle className="text-2xl font-bold text-center">
+              {isSignUp ? 'Create Account' : 'Sign In'}
+            </CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to access the system
+              {isSignUp 
+                ? 'Enter your details to create a new account' 
+                : 'Enter your credentials to access the system'
+              }
             </CardDescription>
           </CardHeader>
           
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -113,6 +175,22 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
                 </div>
               </div>
 
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
                 <Select value={role} onValueChange={setRole} required>
@@ -129,13 +207,28 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
               </div>
             </CardContent>
             
-            <CardFooter>
+            <CardFooter className="flex flex-col space-y-4">
               <Button 
                 type="submit" 
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700" 
                 disabled={isLoading}
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {isLoading 
+                  ? (isSignUp ? "Creating Account..." : "Signing in...") 
+                  : (isSignUp ? "Create Account" : "Sign In")
+                }
+              </Button>
+              
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={toggleAuthMode}
+                className="w-full"
+              >
+                {isSignUp 
+                  ? "Already have an account? Sign In" 
+                  : "Don't have an account? Sign Up"
+                }
               </Button>
             </CardFooter>
           </form>
