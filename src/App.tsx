@@ -9,6 +9,12 @@ import LoginForm from './components/auth/LoginForm';
 import Sidebar from './components/layout/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
+import Printing from './pages/Printing';
+import Packing from './pages/Packing';
+import Tracking from './pages/Tracking';
+import Analytics from './pages/Analytics';
+import Users from './pages/Users';
+import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -49,12 +55,12 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders" element={<Orders />} />
-                <Route path="/printing" element={<div className="p-6 text-center text-gray-500">Printing Stage - Coming Soon</div>} />
-                <Route path="/packing" element={<div className="p-6 text-center text-gray-500">Packing Stage - Coming Soon</div>} />
-                <Route path="/tracking" element={<div className="p-6 text-center text-gray-500">Tracking Stage - Coming Soon</div>} />
-                <Route path="/analytics" element={<div className="p-6 text-center text-gray-500">Analytics - Coming Soon</div>} />
-                <Route path="/users" element={<div className="p-6 text-center text-gray-500">User Management - Coming Soon</div>} />
-                <Route path="/settings" element={<div className="p-6 text-center text-gray-500">Settings - Coming Soon</div>} />
+                <Route path="/printing" element={<Printing />} />
+                <Route path="/packing" element={<Packing />} />
+                <Route path="/tracking" element={<Tracking />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/users" element={<Users />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
