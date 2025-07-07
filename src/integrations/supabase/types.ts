@@ -14,7 +14,269 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      addresses: {
+        Row: {
+          address_line_1: string
+          address_line_2: string | null
+          city: string
+          country: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          is_default: boolean | null
+          postal_code: string | null
+          state: string | null
+        }
+        Insert: {
+          address_line_1: string
+          address_line_2?: string | null
+          city: string
+          country?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          is_default?: boolean | null
+          postal_code?: string | null
+          state?: string | null
+        }
+        Update: {
+          address_line_1?: string
+          address_line_2?: string | null
+          city?: string
+          country?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          is_default?: boolean | null
+          postal_code?: string | null
+          state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          shopify_customer_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          shopify_customer_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          shopify_customer_id?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string | null
+          packed: boolean | null
+          price: number | null
+          product_id: string | null
+          quantity: number
+          shopify_variant_id: number | null
+          sku: string | null
+          title: string
+          total: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          packed?: boolean | null
+          price?: number | null
+          product_id?: string | null
+          quantity?: number
+          shopify_variant_id?: number | null
+          sku?: string | null
+          title: string
+          total?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          packed?: boolean | null
+          price?: number | null
+          product_id?: string | null
+          quantity?: number
+          shopify_variant_id?: number | null
+          sku?: string | null
+          title?: string
+          total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          carrier: Database["public"]["Enums"]["carrier_type"] | null
+          created_at: string
+          currency: string | null
+          customer_id: string | null
+          delivered_at: string | null
+          id: string
+          order_number: string
+          packed_at: string | null
+          printed_at: string | null
+          shipped_at: string | null
+          shipping_address_id: string | null
+          shopify_order_id: number | null
+          stage: Database["public"]["Enums"]["order_stage"] | null
+          total_amount: number | null
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: Database["public"]["Enums"]["carrier_type"] | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          delivered_at?: string | null
+          id?: string
+          order_number: string
+          packed_at?: string | null
+          printed_at?: string | null
+          shipped_at?: string | null
+          shipping_address_id?: string | null
+          shopify_order_id?: number | null
+          stage?: Database["public"]["Enums"]["order_stage"] | null
+          total_amount?: number | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: Database["public"]["Enums"]["carrier_type"] | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          delivered_at?: string | null
+          id?: string
+          order_number?: string
+          packed_at?: string | null
+          printed_at?: string | null
+          shipped_at?: string | null
+          shipping_address_id?: string | null
+          shopify_order_id?: number | null
+          stage?: Database["public"]["Enums"]["order_stage"] | null
+          total_amount?: number | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_shipping_address_id_fkey"
+            columns: ["shipping_address_id"]
+            isOneToOne: false
+            referencedRelation: "addresses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          created_at: string
+          id: string
+          price: number | null
+          shopify_product_id: number | null
+          sku: string | null
+          title: string
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price?: number | null
+          shopify_product_id?: number | null
+          sku?: string | null
+          title: string
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price?: number | null
+          shopify_product_id?: number | null
+          sku?: string | null
+          title?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      system_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +285,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      carrier_type: "frenchexpress" | "delhivery" | "other"
+      order_stage:
+        | "pending"
+        | "printing"
+        | "packing"
+        | "tracking"
+        | "shipped"
+        | "delivered"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +419,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      carrier_type: ["frenchexpress", "delhivery", "other"],
+      order_stage: [
+        "pending",
+        "printing",
+        "packing",
+        "tracking",
+        "shipped",
+        "delivered",
+      ],
+    },
   },
 } as const

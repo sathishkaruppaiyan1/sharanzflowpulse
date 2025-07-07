@@ -1,3 +1,5 @@
+// Legacy mock service - keeping for backward compatibility
+// New implementations should use supabaseOrderService
 
 export interface Order {
   id: string;
@@ -30,7 +32,7 @@ export interface OrderItem {
   image?: string;
 }
 
-// Simulate order data that would come from Shopify API
+// Generate mock data for fallback
 const generateMockOrders = (): Order[] => {
   const customers = [
     { name: 'John Doe', email: 'john.doe@example.com', phone: '+91-9876543210' },
@@ -110,24 +112,20 @@ const generateMockOrders = (): Order[] => {
   });
 };
 
-// Simulate API calls
+// Keep mock orders for backward compatibility
 let mockOrders = generateMockOrders();
 
 export const orderService = {
-  // Fetch all orders (simulates Shopify API)
   fetchOrders: async (): Promise<Order[]> => {
-    // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     return mockOrders;
   },
 
-  // Fetch orders by status
   fetchOrdersByStatus: async (status: Order['status']): Promise<Order[]> => {
     await new Promise(resolve => setTimeout(resolve, 500));
     return mockOrders.filter(order => order.status === status);
   },
 
-  // Update order status
   updateOrderStatus: async (orderId: string, status: Order['status']): Promise<Order> => {
     await new Promise(resolve => setTimeout(resolve, 300));
     const orderIndex = mockOrders.findIndex(order => order.id === orderId);
@@ -138,9 +136,7 @@ export const orderService = {
     throw new Error('Order not found');
   },
 
-  // Simulate new orders coming in (like webhook)
   getNewOrders: async (): Promise<Order[]> => {
-    // Randomly add new orders to simulate real-time updates
     if (Math.random() > 0.7) {
       const newOrder = generateMockOrders().slice(0, 1)[0];
       newOrder.id = `#${Date.now()}`;
@@ -152,7 +148,6 @@ export const orderService = {
     return [];
   },
 
-  // Search orders
   searchOrders: async (query: string): Promise<Order[]> => {
     await new Promise(resolve => setTimeout(resolve, 300));
     const lowercaseQuery = query.toLowerCase();
