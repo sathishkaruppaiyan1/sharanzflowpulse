@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users, Shield, Clock } from 'lucide-react';
+import { Users as UsersIcon, Shield, Clock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/layout/Header';
 
@@ -14,7 +14,7 @@ const Users = () => {
           <Card className="shadow-lg border-0 bg-white">
             <CardHeader className="text-center pb-4">
               <div className="mx-auto mb-4 w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                <Users className="h-8 w-8 text-indigo-600" />
+                <UsersIcon className="h-8 w-8 text-indigo-600" />
               </div>
               <CardTitle className="text-3xl font-bold text-gray-900">
                 User Management
@@ -35,7 +35,7 @@ const Users = () => {
                 </div>
                 
                 <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
-                  <Users className="h-5 w-5 text-gray-500 mt-1" />
+                  <UsersIcon className="h-5 w-5 text-gray-500 mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900">Team Overview</h3>
                     <p className="text-sm text-gray-600">Monitor team activity and performance</p>
