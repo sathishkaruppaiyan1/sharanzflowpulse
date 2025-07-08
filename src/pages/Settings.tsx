@@ -1,11 +1,11 @@
-
 import React from 'react';
-import { Settings as SettingsIcon, Database, TestTube, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Database, TestTube, Loader2, Api } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/layout/Header';
 import SystemConfiguration from '@/components/settings/SystemConfiguration';
+import ApiConfiguration from '@/components/settings/ApiConfiguration';
 import { useCreateSampleOrders } from '@/hooks/useOrders';
 
 const Settings = () => {
@@ -32,14 +32,19 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="system" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="system">System</TabsTrigger>
+              <TabsTrigger value="api">API</TabsTrigger>
               <TabsTrigger value="database">Database</TabsTrigger>
               <TabsTrigger value="testing">Testing</TabsTrigger>
             </TabsList>
             
             <TabsContent value="system" className="space-y-6">
               <SystemConfiguration />
+            </TabsContent>
+            
+            <TabsContent value="api" className="space-y-6">
+              <ApiConfiguration />
             </TabsContent>
             
             <TabsContent value="database" className="space-y-6">
