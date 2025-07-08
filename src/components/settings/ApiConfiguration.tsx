@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Api, Eye, EyeOff, Save } from 'lucide-react';
+import { Settings, Eye, EyeOff, Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,7 +75,7 @@ const ApiConfiguration = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Api className="h-5 w-5 text-green-600" />
+              <Settings className="h-5 w-5 text-green-600" />
               <CardTitle>Shopify Integration</CardTitle>
             </div>
             <Switch
@@ -154,7 +154,7 @@ const ApiConfiguration = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Api className="h-5 w-5 text-green-500" />
+              <Settings className="h-5 w-5 text-green-500" />
               <CardTitle>WhatsApp Business API</CardTitle>
             </div>
             <Switch
@@ -245,7 +245,7 @@ const ApiConfiguration = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <Api className="h-5 w-5 text-blue-600" />
+            <Settings className="h-5 w-5 text-blue-600" />
             <CardTitle>Delivery Partners</CardTitle>
           </div>
           <CardDescription>

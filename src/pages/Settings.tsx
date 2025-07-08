@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Settings as SettingsIcon, Database, TestTube, Loader2, Api } from 'lucide-react';
+import { Settings as SettingsIcon, Database, TestTube, Loader2, Cog } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
