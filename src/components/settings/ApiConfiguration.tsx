@@ -1,44 +1,17 @@
 
 import React, { useState } from 'react';
-import { Settings, Eye, EyeOff, Save } from 'lucide-react';
+import { Settings, Eye, EyeOff, Save, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
+import { useApiConfigs } from '@/hooks/useApiConfigs';
 
 const ApiConfiguration = () => {
-  const { toast } = useToast();
+  const { apiConfigs, setApiConfigs, saveConfigs, loading, saving } = useApiConfigs();
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-  const [apiConfigs, setApiConfigs] = useState({
-    shopify: {
-      enabled: false,
-      shop_url: '',
-      access_token: '',
-      webhook_secret: ''
-    },
-    whatsapp: {
-      enabled: false,
-      phone_number_id: '',
-      access_token: '',
-      verify_token: '',
-      app_secret: ''
-    },
-    delivery: {
-      frenchexpress: {
-        enabled: false,
-        api_key: '',
-        secret_key: ''
-      },
-      delhivery: {
-        enabled: false,
-        api_key: '',
-        staging_mode: true
-      }
-    }
-  });
 
   const toggleSecretVisibility = (key: string) => {
     setShowSecrets(prev => ({
@@ -60,13 +33,17 @@ const ApiConfiguration = () => {
   };
 
   const handleSaveConfig = () => {
-    // Here you would typically save to your backend/Supabase
-    console.log('Saving API configurations:', apiConfigs);
-    toast({
-      title: "Success",
-      description: "API configurations saved successfully",
-    });
+    saveConfigs(apiConfigs);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading API configurations...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -365,9 +342,22 @@ const ApiConfiguration = () => {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSaveConfig} className="flex items-center space-x-2">
-          <Save className="h-4 w-4" />
-          <span>Save All Configurations</span>
+        <Button 
+          onClick={handleSaveConfig} 
+          disabled={saving}
+          className="flex items-center space-x-2"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              <span>Save All Configurations</span>
+            </>
+          )}
         </Button>
       </div>
     </div>
