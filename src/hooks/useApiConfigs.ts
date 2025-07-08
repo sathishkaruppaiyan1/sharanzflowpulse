@@ -71,15 +71,18 @@ export const useApiConfigs = () => {
       const { data, error } = await supabase
         .from('system_settings')
         .select('*')
-        .in('key', ['api_configs']);
+        .eq('key', 'api_configs')
+        .single();
 
       if (error) {
-        console.error('Error loading API configs:', error);
+        if (error.code !== 'PGRST116') { // Not found error
+          console.error('Error loading API configs:', error);
+        }
         return;
       }
 
-      if (data && data.length > 0) {
-        const configData = data[0].value as ApiConfigs;
+      if (data && data.value) {
+        const configData = data.value as unknown as ApiConfigs;
         setApiConfigs(configData);
       }
     } catch (error) {
@@ -97,7 +100,7 @@ export const useApiConfigs = () => {
         .from('system_settings')
         .upsert({
           key: 'api_configs',
-          value: configs,
+          value: configs as any,
           updated_at: new Date().toISOString()
         });
 
