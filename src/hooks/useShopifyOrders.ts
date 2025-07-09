@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useApiConfigs } from './useApiConfigs';
 
 export interface ShopifyOrder {
@@ -22,6 +23,7 @@ export const useShopifyOrders = () => {
   const fetchShopifyOrders = async () => {
     if (!apiConfigs.shopify.enabled || !apiConfigs.shopify.shop_url || !apiConfigs.shopify.access_token) {
       setError('Shopify API not configured');
+      setOrders([]);
       return;
     }
 
@@ -29,45 +31,22 @@ export const useShopifyOrders = () => {
     setError(null);
 
     try {
-      // In a real implementation, this would call your backend API or Shopify directly
-      // For now, we'll simulate some sample data
-      const mockOrders: ShopifyOrder[] = [
-        {
-          id: '1001',
-          order_number: '#1001',
-          customer_name: 'John Doe',
-          total_amount: '99.99',
-          currency: 'USD',
-          created_at: new Date().toISOString(),
-          financial_status: 'paid',
-          fulfillment_status: 'unfulfilled'
-        },
-        {
-          id: '1002',
-          order_number: '#1002',
-          customer_name: 'Jane Smith',
-          total_amount: '149.50',
-          currency: 'USD',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          financial_status: 'paid',
-          fulfillment_status: 'partial'
-        },
-        {
-          id: '1003',
-          order_number: '#1003',
-          customer_name: 'Bob Johnson',
-          total_amount: '79.25',
-          currency: 'USD',
-          created_at: new Date(Date.now() - 172800000).toISOString(),
-          financial_status: 'pending',
-          fulfillment_status: 'unfulfilled'
-        }
-      ];
+      const { data, error: functionError } = await supabase.functions.invoke('fetch-shopify-orders');
 
-      setOrders(mockOrders);
+      if (functionError) {
+        throw new Error(functionError.message);
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setOrders(data.orders || []);
     } catch (err) {
-      setError('Failed to fetch Shopify orders');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Shopify orders';
+      setError(errorMessage);
       console.error('Error fetching Shopify orders:', err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -76,6 +55,9 @@ export const useShopifyOrders = () => {
   useEffect(() => {
     if (apiConfigs.shopify.enabled) {
       fetchShopifyOrders();
+    } else {
+      setOrders([]);
+      setError(null);
     }
   }, [apiConfigs.shopify.enabled, apiConfigs.shopify.shop_url, apiConfigs.shopify.access_token]);
 
