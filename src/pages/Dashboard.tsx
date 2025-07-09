@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StageCard from '@/components/dashboard/StageCard';
+import ShopifyOrdersCard from '@/components/dashboard/ShopifyOrdersCard';
 import Header from '@/components/layout/Header';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,35 +83,12 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* Quick Stats */}
+          {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Today's Performance</CardTitle>
-                <CardDescription>Order processing metrics for today</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Orders Processed</span>
-                    <span className="text-xl font-bold text-green-600">247</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Labels Printed</span>
-                    <span className="text-xl font-bold text-blue-600">198</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Packages Shipped</span>
-                    <span className="text-xl font-bold text-purple-600">164</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Processing Rate</span>
-                    <span className="text-xl font-bold text-orange-600">89%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Shopify Orders */}
+            <ShopifyOrdersCard />
 
+            {/* System Status */}
             <Card>
               <CardHeader>
                 <CardTitle>System Status</CardTitle>
@@ -143,6 +120,34 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Today's Performance */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Today's Performance</CardTitle>
+              <CardDescription>Order processing metrics for today</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Orders Processed</span>
+                  <span className="text-xl font-bold text-green-600">247</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Labels Printed</span>
+                  <span className="text-xl font-bold text-blue-600">198</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Packages Shipped</span>
+                  <span className="text-xl font-bold text-purple-600">164</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Processing Rate</span>
+                  <span className="text-xl font-bold text-orange-600">89%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

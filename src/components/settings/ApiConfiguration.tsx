@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
-import { Settings, Eye, EyeOff, Save, Loader2 } from 'lucide-react';
+import { Settings, Eye, EyeOff, Save, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 
 const ApiConfiguration = () => {
@@ -36,6 +35,35 @@ const ApiConfiguration = () => {
     saveConfigs(apiConfigs);
   };
 
+  const isConfigured = (config: any) => {
+    if (typeof config === 'object' && config !== null) {
+      return Object.values(config).some(value => 
+        typeof value === 'string' ? value.trim() !== '' : Boolean(value)
+      );
+    }
+    return false;
+  };
+
+  const ConnectionStatus = ({ connected, label }: { connected: boolean; label: string }) => (
+    <div className="flex items-center space-x-2">
+      {connected ? (
+        <>
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            Connected
+          </Badge>
+        </>
+      ) : (
+        <>
+          <XCircle className="h-4 w-4 text-red-600" />
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+            Not Connected
+          </Badge>
+        </>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -55,9 +83,9 @@ const ApiConfiguration = () => {
               <Settings className="h-5 w-5 text-green-600" />
               <CardTitle>Shopify Integration</CardTitle>
             </div>
-            <Switch
-              checked={apiConfigs.shopify.enabled}
-              onCheckedChange={(checked) => handleInputChange('shopify', 'enabled', checked)}
+            <ConnectionStatus 
+              connected={isConfigured(apiConfigs.shopify)} 
+              label="Shopify" 
             />
           </div>
           <CardDescription>
@@ -73,7 +101,6 @@ const ApiConfiguration = () => {
                 placeholder="your-shop.myshopify.com"
                 value={apiConfigs.shopify.shop_url}
                 onChange={(e) => handleInputChange('shopify', 'shop_url', e.target.value)}
-                disabled={!apiConfigs.shopify.enabled}
               />
             </div>
             
@@ -86,7 +113,6 @@ const ApiConfiguration = () => {
                   placeholder="shpat_xxxxxxxxxxxxxxxx"
                   value={apiConfigs.shopify.access_token}
                   onChange={(e) => handleInputChange('shopify', 'access_token', e.target.value)}
-                  disabled={!apiConfigs.shopify.enabled}
                 />
                 <Button
                   type="button"
@@ -110,7 +136,6 @@ const ApiConfiguration = () => {
                 placeholder="Webhook verification secret"
                 value={apiConfigs.shopify.webhook_secret}
                 onChange={(e) => handleInputChange('shopify', 'webhook_secret', e.target.value)}
-                disabled={!apiConfigs.shopify.enabled}
               />
               <Button
                 type="button"
@@ -134,9 +159,9 @@ const ApiConfiguration = () => {
               <Settings className="h-5 w-5 text-green-500" />
               <CardTitle>WhatsApp Business API</CardTitle>
             </div>
-            <Switch
-              checked={apiConfigs.whatsapp.enabled}
-              onCheckedChange={(checked) => handleInputChange('whatsapp', 'enabled', checked)}
+            <ConnectionStatus 
+              connected={isConfigured(apiConfigs.whatsapp)} 
+              label="WhatsApp" 
             />
           </div>
           <CardDescription>
@@ -152,7 +177,6 @@ const ApiConfiguration = () => {
                 placeholder="123456789012345"
                 value={apiConfigs.whatsapp.phone_number_id}
                 onChange={(e) => handleInputChange('whatsapp', 'phone_number_id', e.target.value)}
-                disabled={!apiConfigs.whatsapp.enabled}
               />
             </div>
             
@@ -165,7 +189,6 @@ const ApiConfiguration = () => {
                   placeholder="EAAxxxxxxxxxx"
                   value={apiConfigs.whatsapp.access_token}
                   onChange={(e) => handleInputChange('whatsapp', 'access_token', e.target.value)}
-                  disabled={!apiConfigs.whatsapp.enabled}
                 />
                 <Button
                   type="button"
@@ -188,7 +211,6 @@ const ApiConfiguration = () => {
                 placeholder="your-verify-token"
                 value={apiConfigs.whatsapp.verify_token}
                 onChange={(e) => handleInputChange('whatsapp', 'verify_token', e.target.value)}
-                disabled={!apiConfigs.whatsapp.enabled}
               />
             </div>
             
@@ -201,7 +223,6 @@ const ApiConfiguration = () => {
                   placeholder="App secret for webhook verification"
                   value={apiConfigs.whatsapp.app_secret}
                   onChange={(e) => handleInputChange('whatsapp', 'app_secret', e.target.value)}
-                  disabled={!apiConfigs.whatsapp.enabled}
                 />
                 <Button
                   type="button"
@@ -234,9 +255,9 @@ const ApiConfiguration = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium">French Express</h4>
-              <Switch
-                checked={apiConfigs.delivery.frenchexpress.enabled}
-                onCheckedChange={(checked) => handleInputChange('delivery', 'enabled', checked, 'frenchexpress')}
+              <ConnectionStatus 
+                connected={isConfigured(apiConfigs.delivery.frenchexpress)} 
+                label="French Express" 
               />
             </div>
             
@@ -250,7 +271,6 @@ const ApiConfiguration = () => {
                     placeholder="French Express API Key"
                     value={apiConfigs.delivery.frenchexpress.api_key}
                     onChange={(e) => handleInputChange('delivery', 'api_key', e.target.value, 'frenchexpress')}
-                    disabled={!apiConfigs.delivery.frenchexpress.enabled}
                   />
                   <Button
                     type="button"
@@ -273,7 +293,6 @@ const ApiConfiguration = () => {
                     placeholder="French Express Secret Key"
                     value={apiConfigs.delivery.frenchexpress.secret_key}
                     onChange={(e) => handleInputChange('delivery', 'secret_key', e.target.value, 'frenchexpress')}
-                    disabled={!apiConfigs.delivery.frenchexpress.enabled}
                   />
                   <Button
                     type="button"
@@ -295,9 +314,9 @@ const ApiConfiguration = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium">Delhivery</h4>
-              <Switch
-                checked={apiConfigs.delivery.delhivery.enabled}
-                onCheckedChange={(checked) => handleInputChange('delivery', 'enabled', checked, 'delhivery')}
+              <ConnectionStatus 
+                connected={isConfigured(apiConfigs.delivery.delhivery)} 
+                label="Delhivery" 
               />
             </div>
             
@@ -311,7 +330,6 @@ const ApiConfiguration = () => {
                     placeholder="Delhivery API Key"
                     value={apiConfigs.delivery.delhivery.api_key}
                     onChange={(e) => handleInputChange('delivery', 'api_key', e.target.value, 'delhivery')}
-                    disabled={!apiConfigs.delivery.delhivery.enabled}
                   />
                   <Button
                     type="button"
@@ -330,7 +348,6 @@ const ApiConfiguration = () => {
                   <Switch
                     checked={apiConfigs.delivery.delhivery.staging_mode}
                     onCheckedChange={(checked) => handleInputChange('delivery', 'staging_mode', checked, 'delhivery')}
-                    disabled={!apiConfigs.delivery.delhivery.enabled}
                   />
                   <Label>Staging Mode</Label>
                 </div>
