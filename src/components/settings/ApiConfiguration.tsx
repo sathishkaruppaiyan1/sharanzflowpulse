@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Settings, Eye, EyeOff, Save, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 
 const ApiConfiguration = () => {
