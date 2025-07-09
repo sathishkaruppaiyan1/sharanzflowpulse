@@ -9,97 +9,84 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Filter, RefreshCw, Eye, Package, Clock } from 'lucide-react';
-import { orderService, Order } from '@/services/orderService';
+import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useToast } from '@/hooks/use-toast';
 
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const { toast } = useToast();
-
-  // Fetch orders using React Query
+  
+  // Use Shopify orders instead of mock orders
   const { 
-    data: orders = [], 
-    isLoading, 
+    orders: shopifyOrders = [], 
+    loading: isLoading, 
     error, 
     refetch 
-  } = useQuery({
-    queryKey: ['orders', statusFilter],
-    queryFn: () => {
-      if (statusFilter === 'all') {
-        return orderService.fetchOrders();
-      }
-      return orderService.fetchOrdersByStatus(statusFilter as Order['status']);
-    },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
-  });
+  } = useShopifyOrders();
 
   // Auto-check for new orders
   useEffect(() => {
     const checkNewOrders = async () => {
       try {
-        const newOrders = await orderService.getNewOrders();
-        if (newOrders.length > 0) {
-          toast({
-            title: "New Orders Received",
-            description: `${newOrders.length} new order(s) added to the system`,
-          });
-          refetch(); // Refresh the orders list
-        }
+        await refetch();
+        // Note: In a real implementation, you'd compare with previous state
+        // to detect new orders and show toast notifications
       } catch (error) {
         console.error('Error checking new orders:', error);
       }
     };
 
-    const interval = setInterval(checkNewOrders, 15000); // Check every 15 seconds
+    const interval = setInterval(checkNewOrders, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
-  }, [toast, refetch]);
+  }, [refetch]);
 
-  // Filter orders based on search term
-  const filteredOrders = orders.filter(order => {
+  // Filter orders based on search term and status
+  const filteredOrders = shopifyOrders.filter(order => {
+    // Status filter
+    if (statusFilter !== 'all') {
+      const statusMap = {
+        'new': 'unfulfilled',
+        'processing': 'partial',
+        'shipped': 'fulfilled'
+      };
+      if (order.fulfillment_status !== statusMap[statusFilter as keyof typeof statusMap]) {
+        return false;
+      }
+    }
+
+    // Search filter
     if (!searchTerm) return true;
     const lowercaseSearch = searchTerm.toLowerCase();
     return (
-      order.id.toLowerCase().includes(lowercaseSearch) ||
-      order.customerName.toLowerCase().includes(lowercaseSearch) ||
-      order.email.toLowerCase().includes(lowercaseSearch) ||
-      order.items.some(item => 
-        item.name.toLowerCase().includes(lowercaseSearch) ||
-        item.sku.toLowerCase().includes(lowercaseSearch)
-      )
+      order.order_number.toLowerCase().includes(lowercaseSearch) ||
+      order.customer_name.toLowerCase().includes(lowercaseSearch) ||
+      order.id.toLowerCase().includes(lowercaseSearch)
     );
   });
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      new: { variant: 'default' as const, label: 'New', color: 'bg-blue-100 text-blue-800' },
-      processing: { variant: 'secondary' as const, label: 'Processing', color: 'bg-yellow-100 text-yellow-800' },
-      printed: { variant: 'outline' as const, label: 'Printed', color: 'bg-purple-100 text-purple-800' },
-      packed: { variant: 'outline' as const, label: 'Packed', color: 'bg-green-100 text-green-800' },
-      shipped: { variant: 'outline' as const, label: 'Shipped', color: 'bg-indigo-100 text-indigo-800' },
-      delivered: { variant: 'outline' as const, label: 'Delivered', color: 'bg-green-100 text-green-800' },
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.new;
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
-      </span>
-    );
-  };
+  const getStatusBadge = (fulfillmentStatus: string, financialStatus: string) => {
+    let status = 'new';
+    let color = 'bg-blue-100 text-blue-800';
+    let label = 'New';
 
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      urgent: { variant: 'destructive' as const, label: 'Urgent', color: 'bg-red-100 text-red-800' },
-      high: { variant: 'destructive' as const, label: 'High', color: 'bg-orange-100 text-orange-800' },
-      normal: { variant: 'outline' as const, label: 'Normal', color: 'bg-gray-100 text-gray-800' },
-      low: { variant: 'secondary' as const, label: 'Low', color: 'bg-gray-100 text-gray-600' },
-    };
-    
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.normal;
+    if (fulfillmentStatus === 'fulfilled') {
+      status = 'shipped';
+      color = 'bg-green-100 text-green-800';
+      label = 'Shipped';
+    } else if (fulfillmentStatus === 'partial') {
+      status = 'processing';
+      color = 'bg-yellow-100 text-yellow-800';
+      label = 'Processing';
+    } else if (financialStatus === 'paid') {
+      status = 'processing';
+      color = 'bg-yellow-100 text-yellow-800';
+      label = 'Processing';
+    }
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
+        {label}
       </span>
     );
   };
@@ -128,7 +115,7 @@ const Orders = () => {
           <div className="text-center">
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load orders</h3>
-            <p className="text-gray-500 mb-4">There was an error fetching your orders.</p>
+            <p className="text-gray-500 mb-4">There was an error fetching your Shopify orders.</p>
             <Button onClick={handleSyncFromShopify}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
@@ -138,6 +125,12 @@ const Orders = () => {
       </div>
     );
   }
+
+  // Calculate stats from Shopify orders
+  const totalOrders = shopifyOrders.length;
+  const newOrders = shopifyOrders.filter(o => o.fulfillment_status === 'unfulfilled' && o.financial_status === 'pending').length;
+  const processingOrders = shopifyOrders.filter(o => o.fulfillment_status === 'partial' || (o.fulfillment_status === 'unfulfilled' && o.financial_status === 'paid')).length;
+  const shippedOrders = shopifyOrders.filter(o => o.fulfillment_status === 'fulfilled').length;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -152,7 +145,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Orders</p>
-                    <p className="text-2xl font-bold">{orders.length}</p>
+                    <p className="text-2xl font-bold">{totalOrders}</p>
                   </div>
                   <Package className="h-8 w-8 text-blue-500" />
                 </div>
@@ -163,9 +156,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">New Orders</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {orders.filter(o => o.status === 'new').length}
-                    </p>
+                    <p className="text-2xl font-bold text-blue-600">{newOrders}</p>
                   </div>
                   <Clock className="h-8 w-8 text-blue-500" />
                 </div>
@@ -176,9 +167,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Processing</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {orders.filter(o => o.status === 'processing').length}
-                    </p>
+                    <p className="text-2xl font-bold text-yellow-600">{processingOrders}</p>
                   </div>
                   <RefreshCw className="h-8 w-8 text-yellow-500" />
                 </div>
@@ -189,9 +178,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Shipped</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {orders.filter(o => o.status === 'shipped').length}
-                    </p>
+                    <p className="text-2xl font-bold text-green-600">{shippedOrders}</p>
                   </div>
                   <Package className="h-8 w-8 text-green-500" />
                 </div>
@@ -210,7 +197,7 @@ const Orders = () => {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Search by order ID, customer name, email, or SKU..."
+                      placeholder="Search by order number, customer name, or order ID..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -226,8 +213,6 @@ const Orders = () => {
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="new">New Orders</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="printed">Printed</SelectItem>
-                    <SelectItem value="packed">Packed</SelectItem>
                     <SelectItem value="shipped">Shipped</SelectItem>
                   </SelectContent>
                 </Select>
@@ -250,7 +235,7 @@ const Orders = () => {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Orders ({filteredOrders.length})</CardTitle>
+                <CardTitle>Shopify Orders ({filteredOrders.length})</CardTitle>
                 <Button onClick={handleSyncFromShopify}>
                   Sync from Shopify
                 </Button>
@@ -259,14 +244,14 @@ const Orders = () => {
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <LoadingSpinner text="Loading orders..." />
+                  <LoadingSpinner text="Loading Shopify orders..." />
                 </div>
               ) : filteredOrders.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
                   <p className="text-gray-500">
-                    {searchTerm ? 'No orders match your search criteria.' : 'No orders available.'}
+                    {searchTerm ? 'No orders match your search criteria.' : 'No Shopify orders available.'}
                   </p>
                 </div>
               ) : (
@@ -274,12 +259,11 @@ const Orders = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium">Order ID</th>
+                        <th className="text-left py-3 px-4 font-medium">Order Number</th>
                         <th className="text-left py-3 px-4 font-medium">Customer</th>
-                        <th className="text-left py-3 px-4 font-medium">Items</th>
                         <th className="text-left py-3 px-4 font-medium">Total</th>
                         <th className="text-left py-3 px-4 font-medium">Status</th>
-                        <th className="text-left py-3 px-4 font-medium">Priority</th>
+                        <th className="text-left py-3 px-4 font-medium">Financial</th>
                         <th className="text-left py-3 px-4 font-medium">Date</th>
                         <th className="text-left py-3 px-4 font-medium">Actions</th>
                       </tr>
@@ -287,27 +271,28 @@ const Orders = () => {
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order.id} className="border-b hover:bg-gray-50 transition-colors">
-                          <td className="py-3 px-4 font-mono text-sm font-medium">{order.id}</td>
+                          <td className="py-3 px-4 font-mono text-sm font-medium">{order.order_number}</td>
                           <td className="py-3 px-4">
-                            <div>
-                              <div className="font-medium">{order.customerName}</div>
-                              <div className="text-sm text-gray-500">{order.email}</div>
-                              <div className="text-sm text-gray-500">{order.phone}</div>
-                            </div>
+                            <div className="font-medium">{order.customer_name}</div>
+                          </td>
+                          <td className="py-3 px-4 font-medium">{order.currency} {order.total_amount}</td>
+                          <td className="py-3 px-4">
+                            {getStatusBadge(order.fulfillment_status, order.financial_status)}
                           </td>
                           <td className="py-3 px-4">
-                            <div>
-                              <div className="font-medium">{order.items.length} items</div>
-                              <div className="text-sm text-gray-500">
-                                {order.items.slice(0, 2).map(item => item.name).join(', ')}
-                                {order.items.length > 2 && '...'}
-                              </div>
-                            </div>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              order.financial_status === 'paid' 
+                                ? 'bg-green-100 text-green-800' 
+                                : order.financial_status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {order.financial_status}
+                            </span>
                           </td>
-                          <td className="py-3 px-4 font-medium">{order.total}</td>
-                          <td className="py-3 px-4">{getStatusBadge(order.status)}</td>
-                          <td className="py-3 px-4">{getPriorityBadge(order.priority)}</td>
-                          <td className="py-3 px-4 text-sm text-gray-500">{order.date}</td>
+                          <td className="py-3 px-4 text-sm text-gray-500">
+                            {new Date(order.created_at).toLocaleDateString()}
+                          </td>
                           <td className="py-3 px-4">
                             <Button variant="outline" size="sm">
                               <Eye className="h-4 w-4 mr-1" />
