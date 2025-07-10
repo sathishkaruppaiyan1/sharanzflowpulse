@@ -17,7 +17,7 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from '@/components/ui/pagination';
-import { Search, Filter, RefreshCw, Eye, Package, Clock } from 'lucide-react';
+import { Search, RefreshCw, Eye, Package, Clock } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +26,7 @@ const ORDERS_PER_PAGE = 25;
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   
@@ -37,32 +38,26 @@ const Orders = () => {
     refetch 
   } = useShopifyOrders();
 
-  // Auto-check for new orders
-  useEffect(() => {
-    const checkNewOrders = async () => {
-      try {
-        await refetch();
-        // Note: In a real implementation, you'd compare with previous state
-        // to detect new orders and show toast notifications
-      } catch (error) {
-        console.error('Error checking new orders:', error);
-      }
-    };
-
-    const interval = setInterval(checkNewOrders, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, [refetch]);
-
-  // Filter orders based on search term and status
+  // Filter orders based on search term, status, and date
   const filteredOrders = shopifyOrders.filter(order => {
-    // Status filter
+    // Status filter - fix the logic
     if (statusFilter !== 'all') {
-      const statusMap = {
-        'new': 'unfulfilled',
-        'processing': 'partial',
-        'shipped': 'fulfilled'
-      };
-      if (order.fulfillment_status !== statusMap[statusFilter as keyof typeof statusMap]) {
+      if (statusFilter === 'new' && order.fulfillment_status !== 'unfulfilled') {
+        return false;
+      }
+      if (statusFilter === 'processing' && !(order.fulfillment_status === 'partial' || (order.fulfillment_status === 'unfulfilled' && order.financial_status === 'paid'))) {
+        return false;
+      }
+      if (statusFilter === 'shipped' && order.fulfillment_status !== 'fulfilled') {
+        return false;
+      }
+    }
+
+    // Date filter
+    if (dateFilter) {
+      const orderDate = new Date(order.created_at).toDateString();
+      const filterDate = new Date(dateFilter).toDateString();
+      if (orderDate !== filterDate) {
         return false;
       }
     }
@@ -87,7 +82,7 @@ const Orders = () => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, dateFilter]);
 
   const getStatusBadge = (fulfillmentStatus: string, financialStatus: string) => {
     let status = 'new';
@@ -240,7 +235,7 @@ const Orders = () => {
 
   // Calculate stats from Shopify orders
   const totalOrdersCount = shopifyOrders.length;
-  const newOrders = shopifyOrders.filter(o => o.fulfillment_status === 'unfulfilled' && o.financial_status === 'pending').length;
+  const newOrders = shopifyOrders.filter(o => o.fulfillment_status === 'unfulfilled').length;
   const processingOrders = shopifyOrders.filter(o => o.fulfillment_status === 'partial' || (o.fulfillment_status === 'unfulfilled' && o.financial_status === 'paid')).length;
   const shippedOrders = shopifyOrders.filter(o => o.fulfillment_status === 'fulfilled').length;
 
@@ -329,16 +324,18 @@ const Orders = () => {
                   </SelectContent>
                 </Select>
 
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    More Filters
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleSyncFromShopify}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
+                <Input
+                  type="date"
+                  placeholder="Filter by date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full md:w-48"
+                />
+
+                <Button variant="outline" size="sm" onClick={handleSyncFromShopify}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -365,7 +362,7 @@ const Orders = () => {
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
                   <p className="text-gray-500">
-                    {searchTerm ? 'No orders match your search criteria.' : 'No Shopify orders available.'}
+                    {searchTerm || dateFilter || statusFilter !== 'all' ? 'No orders match your search criteria.' : 'No Shopify orders available.'}
                   </p>
                 </div>
               ) : (
