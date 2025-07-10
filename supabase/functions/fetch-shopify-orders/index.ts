@@ -63,11 +63,15 @@ serve(async (req) => {
 
       while (hasMoreOrders && allOrders.length < 10000) {
         // Build URL with proper pagination
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&order=created_at+asc&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        // Note: Cannot use 'order' parameter with 'since_id' - Shopify API restriction
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
         
         // Add since_id for pagination if we have it
         if (sinceId) {
           url += `&since_id=${sinceId}`
+        } else {
+          // Only add order parameter for the first request (when no since_id)
+          url += `&order=created_at+asc`
         }
         
         console.log(`Fetching batch with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}`)
