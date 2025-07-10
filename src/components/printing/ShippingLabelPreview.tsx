@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ShippingLabelPreviewProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface ShippingLabelPreviewProps {
 
 const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }: ShippingLabelPreviewProps) => {
   const updateOrderStage = useUpdateOrderStage();
+  const queryClient = useQueryClient();
   
   const isBulkPrint = orders && orders.length > 0;
   const ordersToProcess = isBulkPrint ? orders : [order].filter(Boolean);
@@ -355,6 +357,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           }
         }
         console.log('Order sync and stage updates completed');
+        
+        // Refresh all order queries to update the UI
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        console.log('Invalidated order queries for UI refresh');
+        
       } catch (stageError) {
         console.warn('Order stage update process failed (but printing succeeded):', stageError);
         toast({
