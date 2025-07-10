@@ -56,9 +56,11 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
 export const useShopifyOrders = () => {
   const { apiConfigs } = useApiConfigs();
   
-  const isConfigured = apiConfigs.shopify.enabled && 
-                      apiConfigs.shopify.shop_url && 
-                      apiConfigs.shopify.access_token;
+  const isConfigured = Boolean(
+    apiConfigs?.shopify?.enabled && 
+    apiConfigs?.shopify?.shop_url && 
+    apiConfigs?.shopify?.access_token
+  );
 
   const {
     data: orders = [],
@@ -67,11 +69,11 @@ export const useShopifyOrders = () => {
     refetch,
     isRefetching
   } = useQuery({
-    queryKey: ['shopify-orders', apiConfigs.shopify.shop_url, apiConfigs.shopify.access_token],
-    queryFn: () => fetchShopifyOrders(apiConfigs.shopify),
+    queryKey: ['shopify-orders', apiConfigs?.shopify?.shop_url, apiConfigs?.shopify?.access_token],
+    queryFn: () => fetchShopifyOrders(apiConfigs?.shopify),
     enabled: isConfigured,
     staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
-    cacheTime: 10 * 60 * 1000, // Cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Cache for 10 minutes
     refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
