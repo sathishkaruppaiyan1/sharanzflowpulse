@@ -14,7 +14,11 @@ interface ShippingLabelPreviewProps {
 const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: ShippingLabelPreviewProps) => {
   if (!order) return null;
 
-  const trackingNumber = `BD${Math.random().toString().slice(2, 11)}IN`;
+  // Use the actual order number from Shopify, with fallback
+  const orderNumber = order.order_number || order.name || `#${order.id}`;
+  
+  // Generate tracking number based on order number for consistency
+  const trackingNumber = `BD${orderNumber.toString().replace('#', '')}IN`;
   
   // Generate a proper looking barcode pattern using Code 128 style
   const generateBarcode = (text: string) => {
@@ -48,7 +52,7 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
         printWindow.document.write(`
           <html>
             <head>
-              <title>Shipping Label - ${order.order_number || order.name}</title>
+              <title>Shipping Label - ${orderNumber}</title>
               <style>
                 body { 
                   margin: 0; 
@@ -103,9 +107,6 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
     order.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
 
   const totalWeight = order.total_weight ? `${order.total_weight}g` : '750g';
-  
-  // Get the correct order number
-  const orderNumber = order.order_number || order.name || `#${order.id}`;
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
