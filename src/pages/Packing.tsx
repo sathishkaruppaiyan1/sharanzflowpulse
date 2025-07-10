@@ -152,29 +152,29 @@ const Packing = () => {
                   </div>
                 )}
 
-                {/* Product SKU Scanner */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">Product SKU Scanner</label>
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Scan product SKU"
-                      value={skuScanInput}
-                      onChange={(e) => setSkuScanInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSkuScan()}
-                      className="flex-1"
-                      disabled={!currentOrder}
-                    />
-                    <Button 
-                      onClick={handleSkuScan}
-                      size="sm"
-                      variant="outline"
-                      className="px-3"
-                      disabled={!currentOrder}
-                    >
-                      <Package className="h-4 w-4" />
-                    </Button>
+                {/* Product SKU Scanner - Only show when order is loaded */}
+                {currentOrder && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-700">Product SKU Scanner</label>
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Scan product SKU"
+                        value={skuScanInput}
+                        onChange={(e) => setSkuScanInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSkuScan()}
+                        className="flex-1"
+                      />
+                      <Button 
+                        onClick={handleSkuScan}
+                        size="sm"
+                        variant="outline"
+                        className="px-3"
+                      >
+                        <Package className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
