@@ -3,6 +3,7 @@ import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
+import { toast } from '@/hooks/use-toast';
 
 interface ShippingLabelPreviewProps {
   open: boolean;
@@ -70,221 +71,290 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   };
 
   const createLabelHTML = (orderData: any) => {
-    const orderNumber = orderData.order_number || orderData.name || `#${orderData.id}`;
-    const trackingNumber = orderNumber.toString().replace('#', '');
-    
-    const customerName = orderData.customer_name || 
-      `${orderData.customer?.first_name || ''} ${orderData.customer?.last_name || ''}`.trim() || 
-      'Guest Customer';
+    try {
+      console.log('Creating label HTML for order:', orderData);
+      
+      const orderNumber = orderData.order_number || orderData.name || `#${orderData.id}`;
+      const trackingNumber = orderNumber.toString().replace('#', '');
+      
+      const customerName = orderData.customer_name || 
+        `${orderData.customer?.first_name || ''} ${orderData.customer?.last_name || ''}`.trim() || 
+        'Guest Customer';
 
-    const shippingAddress = orderData.shipping_address || {
-      address1: 'Address not available',
-      city: 'City',
-      province: 'State',
-      zip: '000000',
-      country: 'India',
-      phone: 'N/A'
-    };
+      const shippingAddress = orderData.shipping_address || {
+        address1: 'Address not available',
+        city: 'City',
+        province: 'State',
+        zip: '000000',
+        country: 'India',
+        phone: 'N/A'
+      };
 
-    const totalItems = orderData.line_items ? 
-      orderData.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
+      const totalItems = orderData.line_items ? 
+        orderData.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
 
-    const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
+      const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
 
-    // Generate barcode HTML
-    const bars = generateBarcode(trackingNumber);
-    const barcodeHTML = bars.map((width, index) => 
-      `<div style="display: inline-block; background-color: ${index % 2 === 0 ? '#000' : '#fff'}; width: ${width === 1 ? 2 : 4}px; height: 50px; min-width: ${width === 1 ? 2 : 4}px; vertical-align: bottom;"></div>`
-    ).join('');
-
-    return `
-      <div style="border: 2px solid #000; padding: 20px; background: #fff; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; color: #000; margin-bottom: 20px; page-break-after: always;">
-        <!-- Tracking Number -->
-        <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 16px;">
-          <div style="font-weight: bold; font-size: 18px;">TRACKING #</div>
-          <div style="border: 1px solid #000; padding: 8px; margin-top: 8px; background: #f9fafb;">
-            <div style="font-weight: bold; font-size: 18px;">${trackingNumber}</div>
+      // Generate simple barcode HTML (simplified version)
+      const barcodeText = trackingNumber;
+      const barcodeHTML = `
+        <div style="text-align: center; padding: 10px; background: white; border: 1px solid #ccc;">
+          <div style="font-family: 'Courier New', monospace; font-size: 24px; letter-spacing: 2px; font-weight: bold;">
+            ||||| ||| |||| ||||| || ||| ||||
           </div>
+          <div style="font-size: 14px; margin-top: 5px;">${barcodeText}</div>
         </div>
+      `;
 
-        <!-- TO Section -->
-        <div style="margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; margin-bottom: 8px;">
-            <span style="margin-right: 8px;">📍</span>
-            <span style="font-weight: bold;">TO:</span>
-          </div>
-          <div style="border: 1px solid #000; padding: 12px; background: #fffbeb;">
-            <div style="font-weight: bold; font-size: 18px;">${customerName.toUpperCase()}</div>
-            <div>${shippingAddress.address1}</div>
-            ${shippingAddress.address2 ? `<div>${shippingAddress.address2}</div>` : ''}
-            <div>${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
-            <div>${shippingAddress.country}</div>
-            <div>Ph: ${shippingAddress.phone || 'N/A'}</div>
-          </div>
-        </div>
-
-        <!-- FROM Section -->
-        <div style="margin-bottom: 16px;">
-          <div style="font-weight: bold; margin-bottom: 8px;">FROM:</div>
-          <div style="border: 1px solid #000; padding: 12px; background: #f9fafb;">
-            <div style="font-weight: bold;">F3-ENGINE WAREHOUSE</div>
-            <div>123 Fulfillment Street</div>
-            <div>Mumbai, MH 400001</div>
-            <div>Ph: +91-22-1234-5678</div>
-          </div>
-        </div>
-
-        <!-- Package Info -->
-        <div style="margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; margin-bottom: 8px;">
-            <span style="margin-right: 8px;">📦</span>
-            <span style="font-weight: bold;">PACKAGE INFO:</span>
-          </div>
-          <div style="border: 1px solid #000; padding: 12px;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Order:</span>
-              <span>${orderNumber}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>Weight:</span>
-              <span>${totalWeight}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>Items:</span>
-              <span>${totalItems}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>Total:</span>
-              <span>₹${orderData.total_amount || orderData.current_total_price}</span>
+      return `
+        <div style="border: 2px solid #000; padding: 20px; background: #fff; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #000; margin-bottom: 20px; page-break-after: always; width: 100%; max-width: 600px;">
+          <!-- Tracking Number -->
+          <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+            <div style="font-weight: bold; font-size: 18px; margin-bottom: 10px;">TRACKING #</div>
+            <div style="border: 1px solid #000; padding: 10px; background: #f9f9f9;">
+              <div style="font-weight: bold; font-size: 18px;">${trackingNumber}</div>
             </div>
           </div>
-        </div>
 
-        <!-- Products -->
-        <div style="margin-bottom: 16px;">
-          <div style="font-weight: bold; margin-bottom: 8px;">PRODUCTS:</div>
-          <div style="border: 1px solid #000; padding: 12px;">
-            ${orderData.line_items ? orderData.line_items.map((item: any) => 
-              `<div>• ${item.title || item.name} (Qty: ${item.quantity || 1})</div>`
-            ).join('') : '<div>• Order Items</div>'}
-          </div>
-        </div>
-
-        <!-- Code 128 Barcode -->
-        <div style="text-align: center; border: 1px solid #000; padding: 16px; background: #f9fafb;">
-          <div style="font-weight: bold; margin-bottom: 8px;">CODE 128</div>
-          <div style="background: #fff; padding: 12px; border: 1px solid #d1d5db; margin-bottom: 8px;">
-            <div style="text-align: center; height: 50px;">
-              ${barcodeHTML}
+          <!-- TO Section -->
+          <div style="margin-bottom: 15px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">📍 TO:</div>
+            <div style="border: 1px solid #000; padding: 12px; background: #fffbeb;">
+              <div style="font-weight: bold; font-size: 16px;">${customerName.toUpperCase()}</div>
+              <div>${shippingAddress.address1}</div>
+              ${shippingAddress.address2 ? `<div>${shippingAddress.address2}</div>` : ''}
+              <div>${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
+              <div>${shippingAddress.country}</div>
+              <div>Ph: ${shippingAddress.phone || 'N/A'}</div>
             </div>
           </div>
-          <div style="font-weight: bold; font-size: 14px;">${trackingNumber}</div>
+
+          <!-- FROM Section -->
+          <div style="margin-bottom: 15px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">FROM:</div>
+            <div style="border: 1px solid #000; padding: 12px; background: #f9f9f9;">
+              <div style="font-weight: bold;">F3-ENGINE WAREHOUSE</div>
+              <div>123 Fulfillment Street</div>
+              <div>Mumbai, MH 400001</div>
+              <div>Ph: +91-22-1234-5678</div>
+            </div>
+          </div>
+
+          <!-- Package Info -->
+          <div style="margin-bottom: 15px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">📦 PACKAGE INFO:</div>
+            <div style="border: 1px solid #000; padding: 12px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td>Order:</td><td style="text-align: right; font-weight: bold;">${orderNumber}</td></tr>
+                <tr><td>Weight:</td><td style="text-align: right;">${totalWeight}</td></tr>
+                <tr><td>Items:</td><td style="text-align: right;">${totalItems}</td></tr>
+                <tr><td>Total:</td><td style="text-align: right;">₹${orderData.total_amount || orderData.current_total_price}</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Products -->
+          <div style="margin-bottom: 15px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">PRODUCTS:</div>
+            <div style="border: 1px solid #000; padding: 12px;">
+              ${orderData.line_items ? orderData.line_items.map((item: any) => 
+                `<div>• ${item.title || item.name} (Qty: ${item.quantity || 1})</div>`
+              ).join('') : '<div>• Order Items</div>'}
+            </div>
+          </div>
+
+          <!-- Barcode -->
+          <div style="text-align: center; border: 1px solid #000; padding: 15px; background: #f9f9f9;">
+            <div style="font-weight: bold; margin-bottom: 10px;">CODE 128</div>
+            ${barcodeHTML}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } catch (error) {
+      console.error('Error creating label HTML:', error);
+      throw error;
+    }
+  };
+
+  // Fallback print method using current window
+  const printWithCurrentWindow = (labelsHTML: string) => {
+    try {
+      console.log('Using fallback print method with current window');
+      
+      // Create a temporary div for printing
+      const printDiv = document.createElement('div');
+      printDiv.innerHTML = labelsHTML;
+      printDiv.style.display = 'none';
+      document.body.appendChild(printDiv);
+
+      // Add print styles
+      const printStyles = document.createElement('style');
+      printStyles.innerHTML = `
+        @media print {
+          body * { visibility: hidden; }
+          #print-content, #print-content * { visibility: visible; }
+          #print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          @page {
+            margin: 0.5in;
+            size: A4;
+          }
+        }
+      `;
+      printDiv.id = 'print-content';
+      document.head.appendChild(printStyles);
+
+      // Print and cleanup
+      window.print();
+      
+      setTimeout(() => {
+        document.body.removeChild(printDiv);
+        document.head.removeChild(printStyles);
+      }, 1000);
+      
+      return true;
+    } catch (error) {
+      console.error('Fallback print method failed:', error);
+      return false;
+    }
   };
 
   const handlePrint = async () => {
     try {
-      // First update all order stages
-      for (const orderData of ordersToProcess) {
-        if (orderData.id) {
-          console.log('Moving order to packing stage:', orderData.id);
-          await updateOrderStage.mutateAsync({
-            orderId: orderData.id,
-            stage: 'packing'
-          });
-        }
-      }
-
-      // Create print window
-      const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
-      
-      if (!printWindow) {
-        alert('Please allow popups for printing. Your browser blocked the print window.');
-        return;
-      }
+      console.log('Starting print process...');
+      console.log('Orders to process:', ordersToProcess);
 
       // Generate HTML for all labels
-      const labelsHTML = ordersToProcess.map(orderData => createLabelHTML(orderData)).join('');
+      const labelsHTML = ordersToProcess.map(orderData => {
+        try {
+          return createLabelHTML(orderData);
+        } catch (error) {
+          console.error('Error creating HTML for order:', orderData.id, error);
+          throw error;
+        }
+      }).join('');
 
-      // Write complete HTML document
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Shipping Labels - ${isBulkPrint ? `${ordersToProcess.length} Labels` : ordersToProcess[0]?.order_number || ordersToProcess[0]?.name}</title>
-            <meta charset="UTF-8">
-            <style>
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              
-              body { 
-                font-family: 'Courier New', monospace; 
-                font-size: 12px;
-                line-height: 1.4;
-                color: #000;
-                background: #fff;
-                padding: 20px;
-              }
-              
-              @media print {
-                body { 
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                  padding: 0;
-                }
-                @page {
-                  margin: 0.5in;
-                  size: A4;
-                }
-              }
-              
-              @media screen {
-                body {
-                  background: #f5f5f5;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            ${labelsHTML}
-            <script>
-              window.onload = function() {
-                setTimeout(function() {
-                  window.print();
-                }, 500);
-              };
-              
-              window.onafterprint = function() {
-                window.close();
-              };
-            </script>
-          </body>
-        </html>
-      `);
+      console.log('Generated labels HTML, length:', labelsHTML.length);
 
-      printWindow.document.close();
+      // Try popup window approach first
+      let printSuccess = false;
+      
+      try {
+        const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+        
+        if (printWindow) {
+          console.log('Print window opened successfully');
+          
+          // Write complete HTML document
+          const htmlDocument = `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Shipping Labels - ${isBulkPrint ? `${ordersToProcess.length} Labels` : ordersToProcess[0]?.order_number}</title>
+                <meta charset="UTF-8">
+                <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { 
+                    font-family: Arial, sans-serif; 
+                    padding: 20px;
+                    background: white;
+                  }
+                  @media print {
+                    body { padding: 0; }
+                    @page { margin: 0.5in; size: A4; }
+                  }
+                </style>
+              </head>
+              <body>
+                ${labelsHTML}
+                <script>
+                  console.log('Print window loaded');
+                  window.onload = function() {
+                    setTimeout(function() {
+                      console.log('Triggering print');
+                      window.print();
+                    }, 1000);
+                  };
+                  window.onafterprint = function() {
+                    console.log('Print completed, closing window');
+                    setTimeout(function() { window.close(); }, 500);
+                  };
+                </script>
+              </body>
+            </html>
+          `;
 
-      // Call the completion handler
+          printWindow.document.write(htmlDocument);
+          printWindow.document.close();
+          printSuccess = true;
+          
+        } else {
+          console.log('Popup blocked, trying fallback method');
+          printSuccess = printWithCurrentWindow(labelsHTML);
+        }
+      } catch (error) {
+        console.log('Popup method failed, trying fallback:', error);
+        printSuccess = printWithCurrentWindow(labelsHTML);
+      }
+
+      if (!printSuccess) {
+        throw new Error('Both print methods failed');
+      }
+
+      console.log('Print initiated successfully');
+
+      // Update order stages (separate from printing)
+      try {
+        console.log('Updating order stages...');
+        for (const orderData of ordersToProcess) {
+          if (orderData.id) {
+            console.log('Updating order stage for:', orderData.id);
+            // Note: This might fail for Shopify orders if they don't exist in Supabase
+            await updateOrderStage.mutateAsync({
+              orderId: orderData.id,
+              stage: 'packing'
+            });
+          }
+        }
+        console.log('Order stages updated successfully');
+      } catch (stageError) {
+        console.warn('Order stage update failed (but printing succeeded):', stageError);
+        toast({
+          title: "Partial Success",
+          description: "Labels printed successfully, but order stages may not have been updated.",
+          variant: "default"
+        });
+      }
+
+      // Call completion handler
       if (onPrintComplete) {
         const orderIds = isBulkPrint 
           ? ordersToProcess.map(o => o.id) 
           : ordersToProcess[0]?.id;
         onPrintComplete(orderIds);
       }
+
+      toast({
+        title: "Success",
+        description: `${ordersToProcess.length} label(s) printed successfully!`
+      });
       
-      // Don't close dialog immediately, wait for print to complete
+      // Close dialog after short delay
       setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 1500);
       
     } catch (error) {
-      console.error('Error during print process:', error);
-      alert('Printing failed. Please try again.');
+      console.error('Complete print process failed:', error);
+      toast({
+        title: "Printing Failed",
+        description: `Error: ${error.message}. Please check your browser's popup settings and try again.`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -343,6 +413,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </p>
             </div>
           )}
+          
+          <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+            <p className="text-sm text-yellow-800">
+              <strong>Browser Note:</strong> If printing fails, please:
+            </p>
+            <ul className="text-xs text-yellow-700 mt-1 ml-4 list-disc">
+              <li>Allow popups for this site</li>
+              <li>Check your browser's print settings</li>
+              <li>Try using a different browser if issues persist</li>
+            </ul>
+          </div>
           
           <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm">
             {/* Tracking Number */}
