@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PrintQueue from '@/components/printing/PrintQueue';
@@ -13,7 +13,6 @@ import { toast } from '@/hooks/use-toast';
 
 const Printing = () => {
   const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -21,7 +20,8 @@ const Printing = () => {
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
 
-  React.useEffect(() => {
+  // Process and filter orders without causing re-renders
+  const getFilteredOrders = useCallback(() => {
     let readyToPrintOrders = shopifyOrders.filter(order => 
       order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
     );
@@ -46,11 +46,14 @@ const Printing = () => {
       });
     }
     
-    setFilteredOrders(readyToPrintOrders);
+    return readyToPrintOrders;
   }, [shopifyOrders, searchQuery]);
 
+  const filteredOrders = getFilteredOrders();
+
   const handleFilterChange = (filtered: any[]) => {
-    setFilteredOrders(filtered);
+    // This will be handled by the PrintingFilters component internally
+    console.log('Filter changed:', filtered.length);
   };
 
   const handleSelectedCountChange = (count: number, selectedIds: Set<string>) => {
