@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useUpdateOrderStage } from '@/hooks/useOrders';
 
 interface ShippingLabelPreviewProps {
   open: boolean;
@@ -11,6 +13,8 @@ interface ShippingLabelPreviewProps {
 }
 
 const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: ShippingLabelPreviewProps) => {
+  const updateOrderStage = useUpdateOrderStage();
+
   if (!order) return null;
 
   // Use the actual order number from Shopify, with fallback
@@ -70,51 +74,105 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
     );
   };
 
-  const handlePrint = () => {
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
+  const handlePrint = async () => {
+    try {
+      // Get the print content
       const printContent = document.querySelector('.print-content');
-      if (printContent) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Shipping Label - ${orderNumber}</title>
-              <style>
-                body { 
-                  margin: 0; 
-                  padding: 20px; 
-                  font-family: monospace; 
-                  font-size: 12px;
-                }
-                .print-content { 
-                  border: 2px solid black; 
-                  padding: 20px; 
-                  background: white;
-                }
-                @media print {
-                  body { margin: 0; padding: 0; }
-                  .print-content { border: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              ${printContent.outerHTML}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-        printWindow.close();
+      if (!printContent) {
+        console.error('Print content not found');
+        return;
       }
+
+      // Create print styles
+      const printStyles = `
+        <style>
+          @media print {
+            body { 
+              margin: 0; 
+              padding: 0; 
+              font-family: monospace; 
+              font-size: 12px;
+            }
+            .print-content { 
+              border: 2px solid black; 
+              padding: 20px; 
+              background: white;
+              page-break-inside: avoid;
+            }
+            @page {
+              margin: 0.5in;
+              size: A4;
+            }
+          }
+          body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: monospace; 
+            font-size: 12px;
+          }
+          .print-content { 
+            border: 2px solid black; 
+            padding: 20px; 
+            background: white;
+          }
+        </style>
+      `;
+
+      // Create the print document
+      const printDocument = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Shipping Label - ${orderNumber}</title>
+            ${printStyles}
+          </head>
+          <body>
+            ${printContent.outerHTML}
+          </body>
+        </html>
+      `;
+
+      // Open print window
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (printWindow) {
+        printWindow.document.write(printDocument);
+        printWindow.document.close();
+        
+        // Wait for content to load, then print
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+          
+          // Close print window after printing
+          printWindow.onafterprint = () => {
+            printWindow.close();
+          };
+        };
+      } else {
+        // Fallback: direct print
+        window.print();
+      }
+
+      // Move order to packing stage after successful print
+      if (order.id) {
+        console.log('Moving order to packing stage:', order.id);
+        await updateOrderStage.mutateAsync({
+          orderId: order.id,
+          stage: 'packing'
+        });
+      }
+      
+      // Call the completion handler
+      if (onPrintComplete) {
+        onPrintComplete(order.id);
+      }
+      
+      // Close the preview dialog
+      onClose();
+      
+    } catch (error) {
+      console.error('Error during print process:', error);
     }
-    
-    // Call the completion handler to move order to next stage
-    if (onPrintComplete) {
-      onPrintComplete(order.id);
-    }
-    
-    onClose();
   };
 
   const customerName = order.customer_name || 
@@ -141,9 +199,13 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Print Preview - 1 Labels</DialogTitle>
           <div className="flex items-center space-x-2">
-            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button 
+              onClick={handlePrint} 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={updateOrderStage.isPending}
+            >
               <Printer className="h-4 w-4 mr-2" />
-              Print Labels
+              {updateOrderStage.isPending ? 'Processing...' : 'Print Labels'}
             </Button>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
