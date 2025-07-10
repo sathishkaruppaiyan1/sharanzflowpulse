@@ -1,13 +1,11 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import OrderDetails from '@/components/orders/OrderDetails';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Pagination, 
@@ -270,6 +268,23 @@ const Orders = () => {
     return items;
   }, [currentPage, paginationData.totalPages]);
 
+  // Calculate stats from Shopify orders - memoized
+  const orderStats = useMemo(() => {
+    const totalOrdersCount = shopifyOrders.length;
+    const newOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'unfulfilled').length;
+    const processingOrders = shopifyOrders.filter(o => {
+      const fulfillment = o.fulfillment_status || '';
+      const financial = o.financial_status || '';
+      return fulfillment === 'partial' || (fulfillment === 'unfulfilled' && financial === 'paid');
+    }).length;
+    const shippedOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'fulfilled').length;
+    
+    return { totalOrdersCount, newOrders, processingOrders, shippedOrders };
+  }, [shopifyOrders]);
+
+  const { totalOrders, totalPages, startIndex, endIndex, currentOrders } = paginationData;
+
+  // Handle error state
   if (error) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -288,22 +303,6 @@ const Orders = () => {
       </div>
     );
   }
-
-  // Calculate stats from Shopify orders - memoized
-  const orderStats = useMemo(() => {
-    const totalOrdersCount = shopifyOrders.length;
-    const newOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'unfulfilled').length;
-    const processingOrders = shopifyOrders.filter(o => {
-      const fulfillment = o.fulfillment_status || '';
-      const financial = o.financial_status || '';
-      return fulfillment === 'partial' || (fulfillment === 'unfulfilled' && financial === 'paid');
-    }).length;
-    const shippedOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'fulfilled').length;
-    
-    return { totalOrdersCount, newOrders, processingOrders, shippedOrders };
-  }, [shopifyOrders]);
-
-  const { totalOrders, totalPages, startIndex, endIndex, currentOrders } = paginationData;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
