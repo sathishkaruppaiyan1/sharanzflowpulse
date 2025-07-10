@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,13 +12,26 @@ interface PrintQueueProps {
   orders: any[];
   isShopifyOrders?: boolean;
   onSelectedCountChange?: (count: number, selectedIds: Set<string>) => void;
+  selectedOrderIds?: Set<string>;
+  onSelectAll?: () => void;
 }
 
-const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: PrintQueueProps) => {
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+const PrintQueue = ({ 
+  orders, 
+  isShopifyOrders = false, 
+  onSelectedCountChange,
+  selectedOrderIds = new Set(),
+  onSelectAll
+}: PrintQueueProps) => {
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
   const [previewOrder, setPreviewOrder] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Update local state when external selectedOrderIds changes
+  useEffect(() => {
+    setSelectedOrders(selectedOrderIds);
+  }, [selectedOrderIds]);
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -38,9 +51,18 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
   };
 
   const handlePrintComplete = (orderId: string) => {
-    // Move order to next stage (packing) after printing
+    // Remove from selected orders after successful print
+    const newSelected = new Set(selectedOrders);
+    if (Array.isArray(orderId)) {
+      orderId.forEach(id => newSelected.delete(id));
+    } else {
+      newSelected.delete(orderId);
+    }
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
+
     toast({
-      title: "Success",
+      title: "Success", 
       description: "Label printed successfully! Order moved to packing stage."
     });
     console.log('Moving order to packing stage:', orderId);

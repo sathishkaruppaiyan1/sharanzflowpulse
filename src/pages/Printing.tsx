@@ -1,11 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PrintQueue from '@/components/printing/PrintQueue';
 import PrintingFilters from '@/components/printing/PrintingFilters';
 import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
+import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +14,29 @@ import { toast } from '@/hooks/use-toast';
 
 const Printing = () => {
   const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
+  const { data: packingOrders = [] } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
+  const [todayPrintedCount, setTodayPrintedCount] = useState(0);
+
+  // Calculate today's printed orders count
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayPrinted = packingOrders.filter(order => {
+      if (!order.printed_at) return false;
+      const printedDate = new Date(order.printed_at);
+      printedDate.setHours(0, 0, 0, 0);
+      return printedDate.getTime() === today.getTime();
+    });
+    
+    setTodayPrintedCount(todayPrinted.length);
+  }, [packingOrders]);
 
   // Process and filter orders without causing re-renders
   const getFilteredOrders = useCallback(() => {
@@ -61,6 +79,12 @@ const Printing = () => {
     setSelectedOrderIds(selectedIds);
   };
 
+  const handleSelectAll = () => {
+    const allIds = new Set(filteredOrders.map(order => order.id));
+    setSelectedOrderIds(allIds);
+    setSelectedCount(allIds.size);
+  };
+
   const handleBulkPrint = () => {
     if (selectedCount === 0) {
       toast({
@@ -79,10 +103,15 @@ const Printing = () => {
 
   const handleBulkPrintComplete = (orderIds: string | string[]) => {
     const count = Array.isArray(orderIds) ? orderIds.length : 1;
+    
+    // Update today's printed count
+    setTodayPrintedCount(prev => prev + count);
+    
     toast({
       title: "Success",
       description: `${count} labels printed successfully! Orders moved to packing stage.`
     });
+    
     setShowBulkPreview(false);
     setBulkOrders([]);
     setSelectedOrderIds(new Set());
@@ -129,8 +158,7 @@ const Printing = () => {
     );
   }
 
-  const todayPrinted = 0;
-  const readyForPacking = 2;
+  const readyForPacking = packingOrders.length;
 
   return (
     <div className="flex flex-col h-full">
@@ -180,7 +208,7 @@ const Printing = () => {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-green-600">{todayPrinted}</div>
+                <div className="text-3xl font-bold text-green-600">{todayPrintedCount}</div>
                 <p className="text-xs text-gray-500">Labels printed today</p>
               </CardContent>
             </Card>
@@ -281,11 +309,7 @@ const Printing = () => {
                   variant="ghost"
                   size="sm"
                   className="text-gray-600 hover:text-gray-900"
-                  onClick={() => {
-                    const allIds = new Set(filteredOrders.map(order => order.id));
-                    setSelectedOrderIds(allIds);
-                    setSelectedCount(allIds.size);
-                  }}
+                  onClick={handleSelectAll}
                 >
                   Select All
                 </Button>
@@ -296,6 +320,8 @@ const Printing = () => {
                 orders={filteredOrders} 
                 isShopifyOrders={true}
                 onSelectedCountChange={handleSelectedCountChange}
+                selectedOrderIds={selectedOrderIds}
+                onSelectAll={handleSelectAll}
               />
             </CardContent>
           </Card>
@@ -307,7 +333,7 @@ const Printing = () => {
         <ShippingLabelPreview
           open={showBulkPreview}
           onClose={() => setShowBulkPreview(false)}
-          orders={bulkOrders} // Pass all orders for bulk printing
+          orders={bulkOrders}
           onPrintComplete={handleBulkPrintComplete}
         />
       )}
