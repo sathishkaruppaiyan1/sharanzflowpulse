@@ -51,15 +51,15 @@ serve(async (req) => {
     // Function to fetch orders with pagination
     const fetchAllOrders = async () => {
       let allOrders: any[] = []
-      let pageInfo = null
-      let hasNextPage = true
+      let sinceId = null
+      let hasMoreOrders = true
 
-      while (hasNextPage) {
-        // Build URL with pagination
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=250&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+      while (hasMoreOrders) {
+        // Build URL with pagination using since_id instead of page_info
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=250&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight&order=created_at+asc`
         
-        if (pageInfo) {
-          url += `&page_info=${pageInfo}`
+        if (sinceId) {
+          url += `&since_id=${sinceId}`
         }
 
         console.log('Fetching orders from:', url)
@@ -72,6 +72,7 @@ serve(async (req) => {
         })
 
         if (!shopifyResponse.ok) {
+          console.error('Shopify API error:', shopifyResponse.status, await shopifyResponse.text())
           throw new Error(`Shopify API error: ${shopifyResponse.status}`)
         }
 
@@ -79,22 +80,18 @@ serve(async (req) => {
         const orders = shopifyData.orders || []
         
         console.log(`Fetched ${orders.length} orders in this batch`)
-        allOrders = allOrders.concat(orders)
-
-        // Check for pagination info in Link header
-        const linkHeader = shopifyResponse.headers.get('Link')
-        if (linkHeader && linkHeader.includes('rel="next"')) {
-          // Extract page_info from Link header
-          const nextLinkMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/)
-          if (nextLinkMatch) {
-            pageInfo = nextLinkMatch[1]
-            console.log('Found next page info:', pageInfo)
-          } else {
-            hasNextPage = false
-          }
+        
+        if (orders.length === 0) {
+          hasMoreOrders = false
         } else {
-          hasNextPage = false
-          console.log('No more pages to fetch')
+          allOrders = allOrders.concat(orders)
+          
+          // Set since_id to the last order's ID for next iteration
+          if (orders.length === 250) { // Full batch, likely more orders
+            sinceId = orders[orders.length - 1].id
+          } else {
+            hasMoreOrders = false // Less than full batch, we're done
+          }
         }
 
         // Safety check to prevent infinite loops
