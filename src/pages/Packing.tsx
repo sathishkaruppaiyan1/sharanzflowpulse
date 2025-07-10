@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Package, Scan, PackageCheck, Truck, Printer, BarChart3 } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import PackingQueue from '@/components/packing/PackingQueue';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +12,18 @@ import { Badge } from '@/components/ui/badge';
 const Packing = () => {
   const { data: packingOrders = [], isLoading: packingLoading } = useOrdersByStage('packing');
   const { data: trackingOrders = [], isLoading: trackingLoading } = useOrdersByStage('tracking');
+  const { data: allOrders = [], isLoading: allOrdersLoading } = useOrdersByStage('pending');
   const { orders: shopifyOrders = [], loading: shopifyLoading } = useShopifyOrders();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [scanInput, setScanInput] = useState('');
 
   const isLoading = packingLoading || trackingLoading || shopifyLoading;
+
+  // Add console logs for debugging
+  console.log('Packing page data:');
+  console.log('- Packing orders:', packingOrders.length, packingOrders);
+  console.log('- Tracking orders:', trackingOrders.length);
+  console.log('- All orders loading states:', { packingLoading, trackingLoading, allOrdersLoading });
 
   // Calculate stats
   const readyToPack = packingOrders.length;
@@ -78,6 +86,25 @@ const Packing = () => {
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
           
+          {/* Debug Information */}
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-yellow-800">Debug Information</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-yellow-700">
+              <p>Packing orders count: {packingOrders.length}</p>
+              <p>Loading states - Packing: {packingLoading ? 'Yes' : 'No'}, Tracking: {trackingLoading ? 'Yes' : 'No'}</p>
+              {packingOrders.length > 0 && (
+                <div className="mt-2">
+                  <p className="font-medium">Order stages:</p>
+                  {packingOrders.map(order => (
+                    <p key={order.id} className="ml-2">• {order.order_number}: {order.stage}</p>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Status Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
@@ -228,64 +255,77 @@ const Packing = () => {
             </div>
 
             {/* Right Column - Orders Ready for Packing */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
-                <p className="text-sm text-gray-600">
-                  {readyToPack} orders waiting to be packed
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {packingOrders.map((order) => {
-                    const priority = getOrderPriority(order);
-                    return (
-                      <div key={order.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <div>
-                              <p className="font-semibold text-sm">{order.order_number}</p>
-                              <p className="text-xs text-gray-600">
-                                {order.customer?.first_name} {order.customer?.last_name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {order.order_items?.length || 0} items
-                              </p>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    {readyToPack} orders waiting to be packed
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {packingOrders.map((order) => {
+                      const priority = getOrderPriority(order);
+                      return (
+                        <div key={order.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3">
+                              <div>
+                                <p className="font-semibold text-sm">{order.order_number}</p>
+                                <p className="text-xs text-gray-600">
+                                  {order.customer?.first_name} {order.customer?.last_name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {order.order_items?.length || 0} items • Stage: {order.stage}
+                                </p>
+                              </div>
                             </div>
                           </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Badge 
+                              className={priority === 'urgent' 
+                                ? 'bg-red-100 text-red-800 border-red-200' 
+                                : 'bg-blue-100 text-blue-800 border-blue-200'
+                              }
+                              variant="outline"
+                            >
+                              {priority}
+                            </Badge>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleSelectOrder(order)}
+                            >
+                              Select
+                            </Button>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            className={priority === 'urgent' 
-                              ? 'bg-red-100 text-red-800 border-red-200' 
-                              : 'bg-blue-100 text-blue-800 border-blue-200'
-                            }
-                            variant="outline"
-                          >
-                            {priority}
-                          </Badge>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleSelectOrder(order)}
-                          >
-                            Select
-                          </Button>
-                        </div>
+                      );
+                    })}
+                    
+                    {packingOrders.length === 0 && (
+                      <div className="text-center py-8">
+                        <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No orders ready for packing</p>
+                        <p className="text-gray-400 text-xs mt-1">Orders will appear here after printing</p>
                       </div>
-                    );
-                  })}
-                  
-                  {packingOrders.length === 0 && (
-                    <div className="text-center py-8">
-                      <Package className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                      <p className="text-gray-500 text-sm">No orders ready for packing</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Packing Queue Component */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Packing Queue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PackingQueue orders={packingOrders} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
