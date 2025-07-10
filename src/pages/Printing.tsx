@@ -4,10 +4,12 @@ import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PrintQueue from '@/components/printing/PrintQueue';
 import PrintingFilters from '@/components/printing/PrintingFilters';
+import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
 
 const Printing = () => {
   const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
@@ -15,6 +17,9 @@ const Printing = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [showBulkPreview, setShowBulkPreview] = useState(false);
+  const [bulkOrders, setBulkOrders] = useState<any[]>([]);
 
   React.useEffect(() => {
     let readyToPrintOrders = shopifyOrders.filter(order => 
@@ -48,8 +53,36 @@ const Printing = () => {
     setFilteredOrders(filtered);
   };
 
-  const handleSelectedCountChange = (count: number) => {
+  const handleSelectedCountChange = (count: number, selectedIds: Set<string>) => {
     setSelectedCount(count);
+    setSelectedOrderIds(selectedIds);
+  };
+
+  const handleBulkPrint = () => {
+    if (selectedCount === 0) {
+      toast({
+        title: "No Orders Selected",
+        description: "Please select orders to print labels for.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get selected orders
+    const ordersToProcess = filteredOrders.filter(order => selectedOrderIds.has(order.id));
+    setBulkOrders(ordersToProcess);
+    setShowBulkPreview(true);
+  };
+
+  const handleBulkPrintComplete = () => {
+    toast({
+      title: "Success",
+      description: `${selectedCount} labels printed successfully!`
+    });
+    setShowBulkPreview(false);
+    setBulkOrders([]);
+    setSelectedOrderIds(new Set());
+    setSelectedCount(0);
   };
 
   if (isLoading) {
@@ -117,6 +150,7 @@ const Printing = () => {
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-white"
               disabled={selectedCount === 0}
+              onClick={handleBulkPrint}
             >
               <Printer className="h-4 w-4 mr-2" />
               Print Selected Labels ({selectedCount})
@@ -127,7 +161,7 @@ const Printing = () => {
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto">
-          {/* Stats Section matching screenshot */}
+          {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardHeader className="pb-3">
@@ -242,6 +276,7 @@ const Printing = () => {
                   className="text-gray-600 hover:text-gray-900"
                   onClick={() => {
                     const allIds = new Set(filteredOrders.map(order => order.id));
+                    setSelectedOrderIds(allIds);
                     setSelectedCount(allIds.size);
                   }}
                 >
@@ -259,6 +294,16 @@ const Printing = () => {
           </Card>
         </div>
       </div>
+
+      {/* Bulk Print Preview */}
+      {showBulkPreview && bulkOrders.length > 0 && (
+        <ShippingLabelPreview
+          open={showBulkPreview}
+          onClose={() => setShowBulkPreview(false)}
+          order={bulkOrders[0]} // Show first order as preview
+          onPrintComplete={handleBulkPrintComplete}
+        />
+      )}
     </div>
   );
 };

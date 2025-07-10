@@ -16,33 +16,67 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
 
   const trackingNumber = `BD${Math.random().toString().slice(2, 11)}IN`;
   
-  // Proper Code 128 barcode representation
-  const generateCode128Barcode = (text: string) => {
-    // Create a more realistic barcode pattern
-    const patterns = ['█', '██', '███', '████'];
-    const spaces = [' ', '  ', '   '];
+  // Generate a proper looking barcode pattern using Code 128 style
+  const generateBarcode = (text: string) => {
+    const patterns = [
+      '█ █',
+      '██ █',
+      '█ ██',
+      '██ ██',
+      '███ █',
+      '█ ███',
+      '██ ███',
+      '███ ██',
+      '████ █',
+      '█ ████'
+    ];
     
     let barcode = '';
-    for (let i = 0; i < text.length * 3; i++) {
-      // Create alternating bars and spaces
-      if (i % 2 === 0) {
-        // Add bars
-        const charCode = text.charCodeAt(i % text.length);
-        const patternIndex = charCode % patterns.length;
-        barcode += patterns[patternIndex];
-      } else {
-        // Add spaces
-        const charCode = text.charCodeAt(i % text.length);
-        const spaceIndex = charCode % spaces.length;
-        barcode += spaces[spaceIndex];
-      }
+    for (let i = 0; i < 30; i++) {
+      const patternIndex = (text.charCodeAt(i % text.length) + i) % patterns.length;
+      barcode += patterns[patternIndex] + ' ';
     }
     return barcode;
   };
 
   const handlePrint = () => {
-    // Trigger browser print dialog
-    window.print();
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const printContent = document.querySelector('.print-content');
+      if (printContent) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Shipping Label - ${order.order_number || order.name}</title>
+              <style>
+                body { 
+                  margin: 0; 
+                  padding: 20px; 
+                  font-family: monospace; 
+                  font-size: 12px;
+                }
+                .print-content { 
+                  border: 2px solid black; 
+                  padding: 20px; 
+                  background: white;
+                }
+                @media print {
+                  body { margin: 0; padding: 0; }
+                  .print-content { border: 0; }
+                }
+              </style>
+            </head>
+            <body>
+              ${printContent.outerHTML}
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+        printWindow.close();
+      }
+    }
     
     // Call the completion handler to move order to next stage
     if (onPrintComplete) {
@@ -70,6 +104,9 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
 
   const totalWeight = order.total_weight ? `${order.total_weight}g` : '750g';
   
+  // Get the correct order number
+  const orderNumber = order.order_number || order.name || `#${order.id}`;
+  
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -87,7 +124,7 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
         </DialogHeader>
         
         <div className="mt-4 print:mt-0">
-          <div className="border-2 border-black bg-white p-6 font-mono text-sm print:border-0">
+          <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm print:border-0">
             {/* Tracking Number */}
             <div className="text-center border-b-2 border-black pb-2 mb-4">
               <div className="font-bold text-lg">TRACKING #</div>
@@ -134,7 +171,7 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
               <div className="border border-black p-3">
                 <div className="flex justify-between">
                   <span>Order:</span>
-                  <span>#{order.order_number || order.name}</span>
+                  <span>{orderNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Weight:</span>
@@ -163,13 +200,15 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
               </div>
             </div>
 
-            {/* Code 128 Barcode */}
+            {/* Improved Barcode */}
             <div className="text-center border border-black p-4 bg-gray-50">
-              <div className="font-bold mb-2">CODE 128</div>
-              <div className="font-mono text-xs mb-2 overflow-hidden" style={{ letterSpacing: '0.5px', lineHeight: '20px' }}>
-                {generateCode128Barcode(order.order_number || order.name || 'ORDER')}
+              <div className="font-bold mb-2">CODE 128 BARCODE</div>
+              <div className="bg-white p-2 border border-gray-300 mb-2">
+                <div className="font-mono text-lg leading-4 tracking-tighter" style={{ letterSpacing: '-1px' }}>
+                  {generateBarcode(orderNumber)}
+                </div>
               </div>
-              <div className="font-bold">#{order.order_number || order.name}</div>
+              <div className="font-bold text-sm">{orderNumber}</div>
             </div>
           </div>
         </div>

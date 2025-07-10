@@ -11,7 +11,7 @@ import ShippingLabelPreview from './ShippingLabelPreview';
 interface PrintQueueProps {
   orders: any[];
   isShopifyOrders?: boolean;
-  onSelectedCountChange?: (count: number) => void;
+  onSelectedCountChange?: (count: number, selectedIds: Set<string>) => void;
 }
 
 const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: PrintQueueProps) => {
@@ -28,7 +28,7 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
       newSelected.delete(orderId);
     }
     setSelectedOrders(newSelected);
-    onSelectedCountChange?.(newSelected.size);
+    onSelectedCountChange?.(newSelected.size, newSelected);
   };
 
   const handlePrintSingle = (order: any) => {
@@ -62,7 +62,7 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
                   className="mt-0.5"
                 />
                 <div>
-                  <h3 className="font-semibold text-sm">#{order.order_number}</h3>
+                  <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
                   <p className="text-gray-600 text-xs">
                     {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
                   </p>
