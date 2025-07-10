@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { useApiConfigs } from '@/hooks/useApiConfigs';
-import { Package, MessageSquare, Whatsapp, Truck } from 'lucide-react';
+import { Package, MessageSquare, Truck } from 'lucide-react';
 
 const ApiConfiguration = () => {
   const { apiConfigs, setApiConfigs, saveConfigs, saving } = useApiConfigs();
@@ -98,7 +98,7 @@ const ApiConfiguration = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center space-x-2">
-            <Whatsapp className="h-5 w-5" />
+            <MessageSquare className="h-5 w-5" />
             <CardTitle>WhatsApp Integration</CardTitle>
           </div>
           <CardDescription>
