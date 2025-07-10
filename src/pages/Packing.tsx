@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, Scan, PackageCheck, Truck, Printer, BarChart3 } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -29,12 +28,12 @@ const Packing = () => {
   const handleScanOrder = () => {
     if (!scanInput.trim()) return;
     
-    // Try to find order by order number or ID
+    // Try to find order by order number or ID - fix type comparison
     const order = packingOrders.find(o => 
       o.order_number === scanInput || 
       o.id === scanInput ||
       o.order_number === `#${scanInput}` ||
-      o.id === parseInt(scanInput)
+      o.id === scanInput.toString()
     );
     
     if (order) {
