@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,8 +16,8 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
   // Use the actual order number from Shopify, with fallback
   const orderNumber = order.order_number || order.name || `#${order.id}`;
   
-  // Generate tracking number based on order number for consistency
-  const trackingNumber = `BD${orderNumber.toString().replace('#', '')}IN`;
+  // Use the order number directly as tracking number
+  const trackingNumber = orderNumber.toString().replace('#', '');
   
   // Generate a proper looking barcode pattern using Code 128 style
   const generateBarcode = (text: string) => {
