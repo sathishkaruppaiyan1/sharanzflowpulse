@@ -1,57 +1,44 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Package, User } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { X, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Order } from '@/types/database';
+import { Input } from '@/components/ui/input';
 
 interface PrintingFiltersProps {
-  orders: Order[];
-  onFilterChange: (filteredOrders: Order[]) => void;
+  orders: any[];
+  onFilterChange: (filteredOrders: any[]) => void;
 }
 
 const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   const [filters, setFilters] = useState({
-    stage: 'all',
-    dateRange: 'all',
-    customer: 'all'
+    filterType: 'all',
+    product: 'all',
+    variation: 'all',
+    orderDate: ''
   });
 
   const applyFilters = () => {
     let filtered = [...orders];
 
-    // Filter by stage
-    if (filters.stage !== 'all') {
-      filtered = filtered.filter(order => order.stage === filters.stage);
+    // Apply filters based on current filter state
+    if (filters.filterType !== 'all') {
+      // Add filter type logic here
     }
 
-    // Filter by date range
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      const filterDate = new Date();
-      
-      switch (filters.dateRange) {
-        case 'today':
-          filterDate.setHours(0, 0, 0, 0);
-          filtered = filtered.filter(order => 
-            new Date(order.created_at) >= filterDate
-          );
-          break;
-        case 'week':
-          filterDate.setDate(now.getDate() - 7);
-          filtered = filtered.filter(order => 
-            new Date(order.created_at) >= filterDate
-          );
-          break;
-        case 'month':
-          filterDate.setMonth(now.getMonth() - 1);
-          filtered = filtered.filter(order => 
-            new Date(order.created_at) >= filterDate
-          );
-          break;
-      }
+    if (filters.product !== 'all') {
+      // Add product filter logic here
+    }
+
+    if (filters.variation !== 'all') {
+      // Add variation filter logic here
+    }
+
+    if (filters.orderDate) {
+      const filterDate = new Date(filters.orderDate);
+      filtered = filtered.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate.toDateString() === filterDate.toDateString();
+      });
     }
 
     onFilterChange(filtered);
@@ -59,113 +46,90 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
 
   const clearFilters = () => {
     setFilters({
-      stage: 'all',
-      dateRange: 'all',
-      customer: 'all'
+      filterType: 'all',
+      product: 'all',
+      variation: 'all',
+      orderDate: ''
     });
   };
 
   useEffect(() => {
     applyFilters();
-  }, [filters]);
-
-  const activeFiltersCount = Object.values(filters).filter(value => value !== 'all').length;
+  }, [filters, orders]);
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center space-x-2">
-            <Package className="h-5 w-5" />
-            <span>Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFiltersCount} active
-              </Badge>
-            )}
-          </CardTitle>
-          {activeFiltersCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Clear all
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-              <Package className="h-4 w-4" />
-              <span>Order Stage</span>
-            </label>
-            <Select
-              value={filters.stage}
-              onValueChange={(value) => setFilters({ ...filters, stage: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select stage" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="printing">Printing</SelectItem>
-                <SelectItem value="packing">Packing</SelectItem>
-                <SelectItem value="tracking">Tracking</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">Filter Type</label>
+        <Select
+          value={filters.filterType}
+          onValueChange={(value) => setFilters({ ...filters, filterType: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Contains Product" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="contains">Contains Product</SelectItem>
+            <SelectItem value="exact">Exact Match</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-              <Calendar className="h-4 w-4" />
-              <span>Date Range</span>
-            </label>
-            <Select
-              value={filters.dateRange}
-              onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Last 7 Days</SelectItem>
-                <SelectItem value="month">Last 30 Days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">Select Product</label>
+        <Select
+          value={filters.product}
+          onValueChange={(value) => setFilters({ ...filters, product: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a product" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Products</SelectItem>
+            <SelectItem value="headphones">Wireless Bluetooth Headphones</SelectItem>
+            <SelectItem value="phone-case">Phone Case</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-              <User className="h-4 w-4" />
-              <span>Priority</span>
-            </label>
-            <Select
-              value={filters.customer}
-              onValueChange={(value) => setFilters({ ...filters, customer: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Orders</SelectItem>
-                <SelectItem value="urgent">Urgent (24h+)</SelectItem>
-                <SelectItem value="recent">Recent (Today)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">Product Variation</label>
+        <Select
+          value={filters.variation}
+          onValueChange={(value) => setFilters({ ...filters, variation: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose variation" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Variations</SelectItem>
+            <SelectItem value="black">Black</SelectItem>
+            <SelectItem value="iphone-14-pro">iPhone 14 Pro</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-700">Order Date</label>
+        <div className="flex space-x-2">
+          <Input
+            type="date"
+            value={filters.orderDate}
+            onChange={(e) => setFilters({ ...filters, orderDate: e.target.value })}
+            placeholder="dd-mm-yyyy"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+            className="whitespace-nowrap"
+          >
+            Clear Filters
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
