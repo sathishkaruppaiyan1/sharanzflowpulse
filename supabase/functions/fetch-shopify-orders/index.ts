@@ -27,6 +27,7 @@ serve(async (req) => {
       .single()
 
     if (configError) {
+      console.error('Failed to fetch API configurations:', configError)
       throw new Error('Failed to fetch API configurations')
     }
 
@@ -43,61 +44,75 @@ serve(async (req) => {
       )
     }
 
-    // Extract shop name from URL (remove http/https and .myshopify.com)
-    const shopName = shopifyConfig.shop_url
+    // Clean and extract shop name from URL
+    let shopName = shopifyConfig.shop_url
       .replace(/^https?:\/\//, '')
       .replace('.myshopify.com', '')
+      .replace(/\/$/, '')
 
-    // Function to fetch orders with pagination
+    console.log('Using shop name:', shopName)
+
+    // Function to fetch orders with simple pagination
     const fetchAllOrders = async () => {
       let allOrders: any[] = []
-      let sinceId = null
+      let limit = 250
+      let page = 1
       let hasMoreOrders = true
 
-      while (hasMoreOrders) {
-        // Build URL with pagination using since_id instead of page_info
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=250&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight&order=created_at+asc`
+      while (hasMoreOrders && allOrders.length < 10000) {
+        // Use simple page-based pagination which is more reliable
+        const url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&page=${page}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
         
-        if (sinceId) {
-          url += `&since_id=${sinceId}`
-        }
+        console.log(`Fetching page ${page}:`, url)
 
-        console.log('Fetching orders from:', url)
+        try {
+          const shopifyResponse = await fetch(url, {
+            headers: {
+              'X-Shopify-Access-Token': shopifyConfig.access_token,
+              'Content-Type': 'application/json',
+            },
+          })
 
-        const shopifyResponse = await fetch(url, {
-          headers: {
-            'X-Shopify-Access-Token': shopifyConfig.access_token,
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!shopifyResponse.ok) {
-          console.error('Shopify API error:', shopifyResponse.status, await shopifyResponse.text())
-          throw new Error(`Shopify API error: ${shopifyResponse.status}`)
-        }
-
-        const shopifyData = await shopifyResponse.json()
-        const orders = shopifyData.orders || []
-        
-        console.log(`Fetched ${orders.length} orders in this batch`)
-        
-        if (orders.length === 0) {
-          hasMoreOrders = false
-        } else {
-          allOrders = allOrders.concat(orders)
+          console.log('Response status:', shopifyResponse.status)
           
-          // Set since_id to the last order's ID for next iteration
-          if (orders.length === 250) { // Full batch, likely more orders
-            sinceId = orders[orders.length - 1].id
-          } else {
-            hasMoreOrders = false // Less than full batch, we're done
+          if (!shopifyResponse.ok) {
+            const errorText = await shopifyResponse.text()
+            console.error('Shopify API error response:', errorText)
+            
+            // If it's a 429 (rate limit), wait and retry
+            if (shopifyResponse.status === 429) {
+              console.log('Rate limited, waiting 2 seconds...')
+              await new Promise(resolve => setTimeout(resolve, 2000))
+              continue // Retry the same page
+            }
+            
+            throw new Error(`Shopify API error: ${shopifyResponse.status} - ${errorText}`)
           }
-        }
 
-        // Safety check to prevent infinite loops
-        if (allOrders.length > 10000) {
-          console.log('Reached safety limit of 10,000 orders')
-          break
+          const shopifyData = await shopifyResponse.json()
+          const orders = shopifyData.orders || []
+          
+          console.log(`Page ${page}: Fetched ${orders.length} orders`)
+          
+          if (orders.length === 0) {
+            hasMoreOrders = false
+          } else {
+            allOrders = allOrders.concat(orders)
+            
+            // If we got less than the limit, we're on the last page
+            if (orders.length < limit) {
+              hasMoreOrders = false
+            } else {
+              page++
+            }
+          }
+
+          // Add small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+        } catch (fetchError) {
+          console.error('Error fetching page', page, ':', fetchError)
+          throw fetchError
         }
       }
 
@@ -137,7 +152,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error fetching Shopify orders:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.toString()
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
