@@ -11,7 +11,7 @@ interface PrintingFiltersProps {
 
 const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   const [filters, setFilters] = useState({
-    filterType: 'all',
+    filterType: 'contains',
     product: 'all',
     variation: 'all',
     orderDate: ''
@@ -75,29 +75,27 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       });
     }
 
-    // Apply filter type (priority/urgency filters)
-    if (filters.filterType === 'urgent') {
-      filtered = filtered.filter(order => {
-        const createdDate = new Date(order.created_at);
-        const hoursSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60);
-        return hoursSinceCreated > 24;
-      });
-    } else if (filters.filterType === 'today') {
-      const today = new Date().toDateString();
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at);
-        return orderDate.toDateString() === today;
-      });
-    } else if (filters.filterType === 'contains') {
-      // This is handled by the product filter above
+    // Apply filter type 
+    if (filters.filterType === 'only_has') {
+      // Only show orders that have ONLY the selected product (and variations of it)
+      if (filters.product !== 'all') {
+        filtered = filtered.filter(order => {
+          if (!order.line_items) return false;
+          // Check if ALL items in the order are the selected product
+          return order.line_items.every((item: any) => 
+            (item.title || item.name) === filters.product
+          );
+        });
+      }
     }
+    // For 'contains', filtering is already handled by the product filter above
 
     onFilterChange(filtered);
   };
 
   const clearFilters = () => {
     setFilters({
-      filterType: 'all',
+      filterType: 'contains',
       product: 'all',
       variation: 'all',
       orderDate: ''
@@ -120,10 +118,8 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
             <SelectValue placeholder="All Orders" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Orders</SelectItem>
-            <SelectItem value="urgent">Urgent Orders (24h+)</SelectItem>
-            <SelectItem value="today">Today's Orders</SelectItem>
             <SelectItem value="contains">Contains Product</SelectItem>
+            <SelectItem value="only_has">Only Has Product</SelectItem>
           </SelectContent>
         </Select>
       </div>

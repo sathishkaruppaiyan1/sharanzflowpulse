@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import OrderDetails from '@/components/orders/OrderDetails';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,8 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
   const { toast } = useToast();
   
   // Debounce search term to avoid filtering on every keystroke
@@ -170,6 +173,11 @@ const Orders = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleViewOrder = (order: any) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
   };
 
   // Memoized pagination function
@@ -466,7 +474,7 @@ const Orders = () => {
                               {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                             </td>
                             <td className="py-3 px-4">
-                              <Button variant="outline" size="sm">
+                              <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)}>
                                 <Eye className="h-4 w-4 mr-1" />
                                 View
                               </Button>
@@ -511,6 +519,12 @@ const Orders = () => {
           </Card>
         </div>
       </main>
+
+      <OrderDetails
+        open={showOrderDetails}
+        onClose={() => setShowOrderDetails(false)}
+        order={selectedOrder}
+      />
     </div>
   );
 };

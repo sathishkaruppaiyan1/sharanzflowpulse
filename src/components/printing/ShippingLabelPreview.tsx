@@ -18,19 +18,26 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
   
   // Proper Code 128 barcode representation
   const generateCode128Barcode = (text: string) => {
-    // Code 128 uses bars and spaces with specific widths (1-4 units)
-    // This is a simplified visual representation
-    const barPattern = [];
-    for (let i = 0; i < text.length; i++) {
-      const char = text.charCodeAt(i);
-      // Generate alternating thick and thin bars based on character code
-      if (char % 2 === 0) {
-        barPattern.push('████', '█', '███', '██');
+    // Create a more realistic barcode pattern
+    const patterns = ['█', '██', '███', '████'];
+    const spaces = [' ', '  ', '   '];
+    
+    let barcode = '';
+    for (let i = 0; i < text.length * 3; i++) {
+      // Create alternating bars and spaces
+      if (i % 2 === 0) {
+        // Add bars
+        const charCode = text.charCodeAt(i % text.length);
+        const patternIndex = charCode % patterns.length;
+        barcode += patterns[patternIndex];
       } else {
-        barPattern.push('██', '████', '█', '███');
+        // Add spaces
+        const charCode = text.charCodeAt(i % text.length);
+        const spaceIndex = charCode % spaces.length;
+        barcode += spaces[spaceIndex];
       }
     }
-    return barPattern.join(' ');
+    return barcode;
   };
 
   const handlePrint = () => {
