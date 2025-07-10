@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Printer, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Printer, Clock, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Order } from '@/types/database';
 
@@ -11,6 +11,7 @@ interface PrintingStatsProps {
 const PrintingStats = ({ orders }: PrintingStatsProps) => {
   const pendingOrders = orders.filter(order => order.stage === 'pending');
   const printingOrders = orders.filter(order => order.stage === 'printing');
+  const readyToPrintOrders = [...pendingOrders, ...printingOrders];
   
   const todaysOrders = orders.filter(order => 
     new Date(order.created_at).toDateString() === new Date().toDateString()
@@ -25,14 +26,14 @@ const PrintingStats = ({ orders }: PrintingStatsProps) => {
   const totalItems = orders.reduce((sum, order) => sum + (order.order_items?.length || 0), 0);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Ready to Print</CardTitle>
           <Printer className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{pendingOrders.length + printingOrders.length}</div>
+          <div className="text-2xl font-bold">{readyToPrintOrders.length}</div>
           <CardDescription className="text-xs text-muted-foreground">
             orders available
           </CardDescription>
@@ -74,6 +75,19 @@ const PrintingStats = ({ orders }: PrintingStatsProps) => {
           <div className="text-2xl font-bold text-red-600">{urgentOrders.length}</div>
           <CardDescription className="text-xs text-muted-foreground">
             over 24h old
+          </CardDescription>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+          <FileText className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{orders.length}</div>
+          <CardDescription className="text-xs text-muted-foreground">
+            in current view
           </CardDescription>
         </CardContent>
       </Card>

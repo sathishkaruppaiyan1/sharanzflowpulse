@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Clock, Package, ArrowRight, CheckCircle, Printer } from 'lucide-react';
+import { Clock, Package, ArrowRight, CheckCircle, Printer, Truck, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,14 +35,28 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
   };
 
   const handlePrintSingle = (orderId: string) => {
+    console.log('Printing single order:', orderId);
     updateOrderStage.mutate({ orderId, stage: 'packing' });
   };
 
   const handlePrintBulk = () => {
+    console.log('Printing bulk orders:', Array.from(selectedOrders));
     selectedOrders.forEach(orderId => {
       updateOrderStage.mutate({ orderId, stage: 'packing' });
     });
     setSelectedOrders(new Set());
+  };
+
+  const handleShippingLabelSingle = (orderId: string) => {
+    console.log('Generating shipping label for order:', orderId);
+    // TODO: Implement shipping label generation
+    alert(`Shipping label generated for order ${orderId}`);
+  };
+
+  const handleShippingLabelBulk = () => {
+    console.log('Generating shipping labels for orders:', Array.from(selectedOrders));
+    // TODO: Implement bulk shipping label generation
+    alert(`Shipping labels generated for ${selectedOrders.size} orders`);
   };
 
   const getOrderStageColor = (stage: string) => {
@@ -78,14 +92,26 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
             </span>
           </div>
           {selectedOrders.size > 0 && (
-            <Button
-              onClick={handlePrintBulk}
-              disabled={updateOrderStage.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print Selected ({selectedOrders.size})
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={handleShippingLabelBulk}
+                variant="outline"
+                size="sm"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Shipping Labels ({selectedOrders.size})
+              </Button>
+              <Button
+                onClick={handlePrintBulk}
+                disabled={updateOrderStage.isPending}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Selected ({selectedOrders.size})
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -143,16 +169,27 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
                 <span>{order.order_items?.length || 0} items ready for printing</span>
               </div>
               
-              <Button 
-                onClick={() => handlePrintSingle(order.id)}
-                disabled={updateOrderStage.isPending}
-                size="sm"
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Print & Move to Packing
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  onClick={() => handleShippingLabelSingle(order.id)}
+                  size="sm"
+                  variant="outline"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Label
+                </Button>
+                <Button 
+                  onClick={() => handlePrintSingle(order.id)}
+                  disabled={updateOrderStage.isPending}
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Print & Move to Packing
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -164,7 +201,7 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <CardTitle className="text-gray-600 mb-2">No Orders Available</CardTitle>
             <CardDescription>
-              No orders found in the system
+              No orders found matching your current filters
             </CardDescription>
           </CardContent>
         </Card>
