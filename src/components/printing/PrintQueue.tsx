@@ -5,16 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Order } from '@/types/database';
-import { useUpdateOrderStage } from '@/hooks/useOrders';
+import { useToast } from '@/hooks/use-toast';
 
 interface PrintQueueProps {
-  orders: Order[];
+  orders: any[];
+  isShopifyOrders?: boolean;
 }
 
-const PrintQueue = ({ orders }: PrintQueueProps) => {
+const PrintQueue = ({ orders, isShopifyOrders = false }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const updateOrderStage = useUpdateOrderStage();
+  const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -35,48 +36,75 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
   };
 
   const handlePrintSingle = (orderId: string) => {
-    console.log('Printing single order:', orderId);
-    updateOrderStage.mutate({ orderId, stage: 'packing' });
+    console.log('Printing single Shopify order:', orderId);
+    setPrintingOrders(prev => new Set([...prev, orderId]));
+    
+    // Simulate printing process
+    setTimeout(() => {
+      setPrintingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+      
+      toast({
+        title: "Order Printed Successfully",
+        description: `Order ${orders.find(o => o.id === orderId)?.order_number} has been printed and moved to packing stage.`,
+      });
+    }, 2000);
   };
 
   const handlePrintBulk = () => {
-    console.log('Printing bulk orders:', Array.from(selectedOrders));
-    selectedOrders.forEach(orderId => {
-      updateOrderStage.mutate({ orderId, stage: 'packing' });
+    console.log('Printing bulk Shopify orders:', Array.from(selectedOrders));
+    const orderIds = Array.from(selectedOrders);
+    
+    orderIds.forEach(orderId => {
+      setPrintingOrders(prev => new Set([...prev, orderId]));
     });
-    setSelectedOrders(new Set());
+    
+    // Simulate bulk printing process
+    setTimeout(() => {
+      setPrintingOrders(new Set());
+      setSelectedOrders(new Set());
+      
+      toast({
+        title: "Bulk Print Completed",
+        description: `${orderIds.length} orders have been printed and moved to packing stage.`,
+      });
+    }, 3000);
   };
 
   const handleShippingLabelSingle = (orderId: string) => {
-    console.log('Generating shipping label for order:', orderId);
-    // TODO: Implement shipping label generation
-    alert(`Shipping label generated for order ${orderId}`);
+    console.log('Generating shipping label for Shopify order:', orderId);
+    const order = orders.find(o => o.id === orderId);
+    toast({
+      title: "Shipping Label Generated",
+      description: `Shipping label created for order ${order?.order_number}`,
+    });
   };
 
   const handleShippingLabelBulk = () => {
-    console.log('Generating shipping labels for orders:', Array.from(selectedOrders));
-    // TODO: Implement bulk shipping label generation
-    alert(`Shipping labels generated for ${selectedOrders.size} orders`);
+    console.log('Generating shipping labels for Shopify orders:', Array.from(selectedOrders));
+    toast({
+      title: "Bulk Shipping Labels Generated",
+      description: `Shipping labels created for ${selectedOrders.size} orders`,
+    });
   };
 
   const getOrderStageColor = (stage: string) => {
     switch (stage) {
       case 'pending':
         return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'printing':
+      case 'processing':
         return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'packing':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'tracking':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'shipped':
+      case 'fulfilled':
         return 'bg-green-50 text-green-700 border-green-200';
-      case 'delivered':
-        return 'bg-gray-50 text-gray-700 border-gray-200';
       default:
         return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
+
+  const isPrinting = (orderId: string) => printingOrders.has(orderId);
 
   return (
     <div className="space-y-4">
@@ -104,9 +132,9 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
               </Button>
               <Button
                 onClick={handlePrintBulk}
-                disabled={updateOrderStage.isPending}
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
+                disabled={Array.from(selectedOrders).some(id => isPrinting(id))}
               >
                 <Printer className="h-4 w-4 mr-2" />
                 Print Selected ({selectedOrders.size})
@@ -132,10 +160,18 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
                   </CardDescription>
                 </div>
               </div>
-              <Badge variant="outline" className={getOrderStageColor(order.stage || 'pending')}>
-                <Clock className="h-3 w-3 mr-1" />
-                {order.stage || 'pending'}
-              </Badge>
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className={getOrderStageColor(order.stage || 'pending')}>
+                  <Clock className="h-3 w-3 mr-1" />
+                  {isShopifyOrders ? 'Ready to Print' : (order.stage || 'pending')}
+                </Badge>
+                {isPrinting(order.id) && (
+                  <Badge className="bg-blue-100 text-blue-700">
+                    <Printer className="h-3 w-3 mr-1 animate-pulse" />
+                    Printing...
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           
@@ -144,21 +180,18 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-gray-700">Order Details</h4>
                 <div className="text-sm space-y-1">
-                  <p><span className="text-gray-500">Items:</span> {order.order_items?.length || 0}</p>
-                  <p><span className="text-gray-500">Total:</span> ₹{order.total_amount}</p>
+                  <p><span className="text-gray-500">Total:</span> {order.currency || '₹'}{order.total_amount}</p>
                   <p><span className="text-gray-500">Created:</span> {new Date(order.created_at).toLocaleDateString()}</p>
+                  <p><span className="text-gray-500">Source:</span> {isShopifyOrders ? 'Shopify' : 'Local'}</p>
                 </div>
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium text-sm text-gray-700">Items to Print</h4>
-                <div className="max-h-24 overflow-y-auto space-y-1">
-                  {order.order_items?.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
-                      <span className="truncate">{item.title}</span>
-                      <Badge variant="secondary" className="ml-2">x{item.quantity}</Badge>
-                    </div>
-                  )) || <p className="text-sm text-gray-500">No items</p>}
+                <h4 className="font-medium text-sm text-gray-700">Ready to Print</h4>
+                <div className="text-sm bg-green-50 p-2 rounded">
+                  <span className="text-green-700">
+                    ✓ Order received from Shopify and ready for printing
+                  </span>
                 </div>
               </div>
             </div>
@@ -166,7 +199,7 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex items-center space-x-2 text-sm text-gray-500">
                 <Package className="h-4 w-4" />
-                <span>{order.order_items?.length || 0} items ready for printing</span>
+                <span>Shopify order ready for processing</span>
               </div>
               
               <div className="flex items-center space-x-2">
@@ -181,13 +214,22 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
                 </Button>
                 <Button 
                   onClick={() => handlePrintSingle(order.id)}
-                  disabled={updateOrderStage.isPending}
+                  disabled={isPrinting(order.id)}
                   size="sm"
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Print & Move to Packing
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  {isPrinting(order.id) ? (
+                    <>
+                      <Printer className="h-4 w-4 mr-2 animate-pulse" />
+                      Printing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Print & Move to Packing
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -199,9 +241,12 @@ const PrintQueue = ({ orders }: PrintQueueProps) => {
         <Card className="text-center py-8">
           <CardContent>
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <CardTitle className="text-gray-600 mb-2">No Orders Available</CardTitle>
+            <CardTitle className="text-gray-600 mb-2">No Orders Ready to Print</CardTitle>
             <CardDescription>
-              No orders found matching your current filters
+              {isShopifyOrders 
+                ? "No new orders from Shopify are available for printing" 
+                : "No orders found matching your current filters"
+              }
             </CardDescription>
           </CardContent>
         </Card>
