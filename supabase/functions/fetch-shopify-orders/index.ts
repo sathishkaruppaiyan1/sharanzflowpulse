@@ -52,23 +52,25 @@ serve(async (req) => {
 
     console.log('Using shop name:', shopName)
 
-    // Function to fetch orders using cursor-based pagination (recommended by Shopify)
+    // Function to fetch all orders using proper REST API pagination
     const fetchAllOrders = async () => {
       let allOrders: any[] = []
-      let limit = 250
+      const limit = 250 // Maximum allowed by Shopify
       let hasMoreOrders = true
-      let pageInfo = null
+      let sinceId = null
+
+      console.log('Starting to fetch all orders from Shopify...')
 
       while (hasMoreOrders && allOrders.length < 10000) {
-        // Build URL with cursor-based pagination
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        // Build URL with proper pagination
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&order=created_at+asc&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
         
-        // Add cursor pagination if we have page info
-        if (pageInfo) {
-          url += `&since_id=${pageInfo}`
+        // Add since_id for pagination if we have it
+        if (sinceId) {
+          url += `&since_id=${sinceId}`
         }
         
-        console.log(`Fetching orders with URL:`, url)
+        console.log(`Fetching batch with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}`)
 
         try {
           const shopifyResponse = await fetch(url, {
@@ -86,8 +88,8 @@ serve(async (req) => {
             
             // If it's a 429 (rate limit), wait and retry
             if (shopifyResponse.status === 429) {
-              console.log('Rate limited, waiting 2 seconds...')
-              await new Promise(resolve => setTimeout(resolve, 2000))
+              console.log('Rate limited, waiting 3 seconds...')
+              await new Promise(resolve => setTimeout(resolve, 3000))
               continue // Retry the same request
             }
             
@@ -100,22 +102,26 @@ serve(async (req) => {
           console.log(`Fetched ${orders.length} orders in this batch`)
           
           if (orders.length === 0) {
+            console.log('No more orders to fetch')
             hasMoreOrders = false
           } else {
+            // Add orders to our collection
             allOrders = allOrders.concat(orders)
             
-            // If we got less than the limit, we're done
+            // If we got fewer than the limit, we're done
             if (orders.length < limit) {
+              console.log('Last batch - got fewer orders than limit')
               hasMoreOrders = false
             } else {
-              // Set the page info for next iteration using the last order's ID
+              // Set the since_id to the last order's ID for next iteration
               const lastOrder = orders[orders.length - 1]
-              pageInfo = lastOrder.id
+              sinceId = lastOrder.id
+              console.log(`Next since_id will be: ${sinceId}`)
             }
           }
 
-          // Add small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 200))
+          // Add delay to respect rate limits (2 calls per second max)
+          await new Promise(resolve => setTimeout(resolve, 500))
 
         } catch (fetchError) {
           console.error('Error in fetch request:', fetchError)
@@ -123,13 +129,13 @@ serve(async (req) => {
         }
       }
 
+      console.log(`Finished fetching. Total orders collected: ${allOrders.length}`)
       return allOrders
     }
 
     // Fetch all orders with pagination
-    console.log('Starting to fetch all Shopify orders...')
     const allOrders = await fetchAllOrders()
-    console.log(`Total orders fetched: ${allOrders.length}`)
+    console.log(`Final count - Total orders fetched: ${allOrders.length}`)
     
     // Transform Shopify orders to include detailed information
     const transformedOrders = allOrders.map((order: any) => ({
