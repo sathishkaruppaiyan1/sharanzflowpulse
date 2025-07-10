@@ -12,6 +12,27 @@ export interface ShopifyOrder {
   created_at: string;
   financial_status: string;
   fulfillment_status: string;
+  customer?: {
+    first_name?: string;
+    last_name?: string;
+  };
+  line_items?: Array<{
+    title?: string;
+    name?: string;
+    quantity?: number;
+    variant_title?: string;
+  }>;
+  shipping_address?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    province?: string;
+    zip?: string;
+    country?: string;
+    phone?: string;
+  };
+  total_weight?: number;
+  current_total_price?: string;
 }
 
 export const useShopifyOrders = () => {
