@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
@@ -22,6 +23,32 @@ const Printing = () => {
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
+  const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
+
+  // Fetch synced Shopify order IDs to exclude from printing stage
+  useEffect(() => {
+    const fetchSyncedOrders = async () => {
+      try {
+        const { data: syncedOrders, error } = await supabase
+          .from('orders')
+          .select('shopify_order_id')
+          .not('shopify_order_id', 'is', null);
+          
+        if (error) {
+          console.error('Error fetching synced orders:', error);
+          return;
+        }
+        
+        const syncedIds = new Set(syncedOrders.map(order => order.shopify_order_id).filter(Boolean));
+        setSyncedShopifyOrderIds(syncedIds);
+        console.log('Synced Shopify order IDs:', Array.from(syncedIds));
+      } catch (error) {
+        console.error('Error in fetchSyncedOrders:', error);
+      }
+    };
+
+    fetchSyncedOrders();
+  }, [packingOrders]); // Refetch when packing orders change
 
   // Calculate today's printed orders count
   useEffect(() => {
@@ -40,9 +67,22 @@ const Printing = () => {
 
   // Process and filter orders without causing re-renders
   const getFilteredOrders = useCallback(() => {
-    let readyToPrintOrders = shopifyOrders.filter(order => 
-      order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
-    );
+    console.log('Total Shopify orders:', shopifyOrders.length);
+    console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
+    
+    let readyToPrintOrders = shopifyOrders.filter(order => {
+      // Exclude orders that are already fulfilled
+      const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
+      
+      // Exclude orders that have already been synced to Supabase (already printed)
+      const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
+      
+      console.log(`Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
+      
+      return isUnfulfilled && isNotSynced;
+    });
+
+    console.log('Orders ready for printing after filtering:', readyToPrintOrders.length);
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -65,7 +105,7 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds]);
 
   const filteredOrders = getFilteredOrders();
 
