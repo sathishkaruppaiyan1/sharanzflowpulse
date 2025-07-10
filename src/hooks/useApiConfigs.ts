@@ -88,15 +88,27 @@ export const useApiConfigs = () => {
         if (error.code !== 'PGRST116') { // Not found error
           console.error('Error loading API configs:', error);
         }
-        return;
-      }
-
-      if (data && data.value) {
-        const configData = data.value as unknown as ApiConfigs;
-        setApiConfigs(configData);
+        // Use default configs if not found
+        setApiConfigs(defaultConfigs);
+      } else if (data && data.value) {
+        // Merge with defaults to ensure all properties exist
+        const configData = data.value as unknown as Partial<ApiConfigs>;
+        const mergedConfigs: ApiConfigs = {
+          shopify: { ...defaultConfigs.shopify, ...configData.shopify },
+          whatsapp: { ...defaultConfigs.whatsapp, ...configData.whatsapp },
+          wati: { ...defaultConfigs.wati, ...configData.wati },
+          delivery: {
+            frenchexpress: { ...defaultConfigs.delivery.frenchexpress, ...configData.delivery?.frenchexpress },
+            delhivery: { ...defaultConfigs.delivery.delhivery, ...configData.delivery?.delhivery }
+          }
+        };
+        setApiConfigs(mergedConfigs);
+      } else {
+        setApiConfigs(defaultConfigs);
       }
     } catch (error) {
       console.error('Error loading API configs:', error);
+      setApiConfigs(defaultConfigs);
     } finally {
       setLoading(false);
     }

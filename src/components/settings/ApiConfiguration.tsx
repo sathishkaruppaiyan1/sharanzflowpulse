@@ -5,14 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { useApiConfigs } from '@/hooks/useApiConfigs';
-import { Package, MessageSquare, Truck } from 'lucide-react';
+import { Package, MessageSquare, Truck, Loader2 } from 'lucide-react';
 
 const ApiConfiguration = () => {
-  const { apiConfigs, setApiConfigs, saveConfigs, saving } = useApiConfigs();
+  const { apiConfigs, setApiConfigs, saveConfigs, saving, loading } = useApiConfigs();
 
   const handleSave = async () => {
     await saveConfigs(apiConfigs);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading API configurations...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -30,7 +39,7 @@ const ApiConfiguration = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-2">
             <Switch
-              checked={apiConfigs.shopify.enabled}
+              checked={apiConfigs.shopify?.enabled || false}
               onCheckedChange={(checked) =>
                 setApiConfigs(prev => ({
                   ...prev,
@@ -41,14 +50,14 @@ const ApiConfiguration = () => {
             <Label>Enable Shopify Integration</Label>
           </div>
 
-          {apiConfigs.shopify.enabled && (
+          {apiConfigs.shopify?.enabled && (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="shopify-shop-url">Shop URL</Label>
                 <Input
                   id="shopify-shop-url"
                   placeholder="your-shop-name.myshopify.com"
-                  value={apiConfigs.shopify.shop_url}
+                  value={apiConfigs.shopify.shop_url || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -64,7 +73,7 @@ const ApiConfiguration = () => {
                   id="shopify-access-token"
                   type="password"
                   placeholder="Enter Shopify access token"
-                  value={apiConfigs.shopify.access_token}
+                  value={apiConfigs.shopify.access_token || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -80,7 +89,7 @@ const ApiConfiguration = () => {
                   id="shopify-webhook-secret"
                   type="password"
                   placeholder="Enter Shopify webhook secret"
-                  value={apiConfigs.shopify.webhook_secret}
+                  value={apiConfigs.shopify.webhook_secret || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -108,7 +117,7 @@ const ApiConfiguration = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-2">
             <Switch
-              checked={apiConfigs.whatsapp.enabled}
+              checked={apiConfigs.whatsapp?.enabled || false}
               onCheckedChange={(checked) =>
                 setApiConfigs(prev => ({
                   ...prev,
@@ -119,14 +128,14 @@ const ApiConfiguration = () => {
             <Label>Enable WhatsApp Integration</Label>
           </div>
 
-          {apiConfigs.whatsapp.enabled && (
+          {apiConfigs.whatsapp?.enabled && (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="whatsapp-phone-number-id">Phone Number ID</Label>
                 <Input
                   id="whatsapp-phone-number-id"
                   placeholder="Enter WhatsApp Phone Number ID"
-                  value={apiConfigs.whatsapp.phone_number_id}
+                  value={apiConfigs.whatsapp.phone_number_id || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -142,7 +151,7 @@ const ApiConfiguration = () => {
                   id="whatsapp-access-token"
                   type="password"
                   placeholder="Enter WhatsApp access token"
-                  value={apiConfigs.whatsapp.access_token}
+                  value={apiConfigs.whatsapp.access_token || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -158,7 +167,7 @@ const ApiConfiguration = () => {
                   id="whatsapp-verify-token"
                   type="password"
                   placeholder="Enter WhatsApp verify token"
-                  value={apiConfigs.whatsapp.verify_token}
+                  value={apiConfigs.whatsapp.verify_token || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -174,7 +183,7 @@ const ApiConfiguration = () => {
                   id="whatsapp-app-secret"
                   type="password"
                   placeholder="Enter WhatsApp app secret"
-                  value={apiConfigs.whatsapp.app_secret}
+                  value={apiConfigs.whatsapp.app_secret || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -202,7 +211,7 @@ const ApiConfiguration = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-2">
             <Switch
-              checked={apiConfigs.wati.enabled}
+              checked={apiConfigs.wati?.enabled || false}
               onCheckedChange={(checked) =>
                 setApiConfigs(prev => ({
                   ...prev,
@@ -213,7 +222,7 @@ const ApiConfiguration = () => {
             <Label>Enable WATI Integration</Label>
           </div>
 
-          {apiConfigs.wati.enabled && (
+          {apiConfigs.wati?.enabled && (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="wati-api-key">API Key</Label>
@@ -221,7 +230,7 @@ const ApiConfiguration = () => {
                   id="wati-api-key"
                   type="password"
                   placeholder="Enter WATI API key"
-                  value={apiConfigs.wati.api_key}
+                  value={apiConfigs.wati.api_key || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -236,7 +245,7 @@ const ApiConfiguration = () => {
                 <Input
                   id="wati-base-url"
                   placeholder="https://live-server-6371.wati.io"
-                  value={apiConfigs.wati.base_url}
+                  value={apiConfigs.wati.base_url || ''}
                   onChange={(e) =>
                     setApiConfigs(prev => ({
                       ...prev,
@@ -270,7 +279,7 @@ const ApiConfiguration = () => {
             <h4 className="text-sm font-medium">French Express</h4>
             <div className="flex items-center space-x-2">
               <Switch
-                checked={apiConfigs.delivery.frenchexpress.enabled}
+                checked={apiConfigs.delivery?.frenchexpress?.enabled || false}
                 onCheckedChange={(checked) =>
                   setApiConfigs(prev => ({
                     ...prev,
@@ -284,7 +293,7 @@ const ApiConfiguration = () => {
               <Label>Enable French Express</Label>
             </div>
 
-            {apiConfigs.delivery.frenchexpress.enabled && (
+            {apiConfigs.delivery?.frenchexpress?.enabled && (
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="french-express-api-key">API Key</Label>
@@ -292,7 +301,7 @@ const ApiConfiguration = () => {
                     id="french-express-api-key"
                     type="password"
                     placeholder="Enter French Express API key"
-                    value={apiConfigs.delivery.frenchexpress.api_key}
+                    value={apiConfigs.delivery.frenchexpress.api_key || ''}
                     onChange={(e) =>
                       setApiConfigs(prev => ({
                         ...prev,
@@ -311,7 +320,7 @@ const ApiConfiguration = () => {
                     id="french-express-secret-key"
                     type="password"
                     placeholder="Enter French Express secret key"
-                    value={apiConfigs.delivery.frenchexpress.secret_key}
+                    value={apiConfigs.delivery.frenchexpress.secret_key || ''}
                     onChange={(e) =>
                       setApiConfigs(prev => ({
                         ...prev,
@@ -332,7 +341,7 @@ const ApiConfiguration = () => {
             <h4 className="text-sm font-medium">Delhivery</h4>
             <div className="flex items-center space-x-2">
               <Switch
-                checked={apiConfigs.delivery.delhivery.enabled}
+                checked={apiConfigs.delivery?.delhivery?.enabled || false}
                 onCheckedChange={(checked) =>
                   setApiConfigs(prev => ({
                     ...prev,
@@ -346,7 +355,7 @@ const ApiConfiguration = () => {
               <Label>Enable Delhivery</Label>
             </div>
 
-            {apiConfigs.delivery.delhivery.enabled && (
+            {apiConfigs.delivery?.delhivery?.enabled && (
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="delhivery-api-key">API Key</Label>
@@ -354,7 +363,7 @@ const ApiConfiguration = () => {
                     id="delhivery-api-key"
                     type="password"
                     placeholder="Enter Delhivery API key"
-                    value={apiConfigs.delivery.delhivery.api_key}
+                    value={apiConfigs.delivery.delhivery.api_key || ''}
                     onChange={(e) =>
                       setApiConfigs(prev => ({
                         ...prev,
@@ -369,7 +378,7 @@ const ApiConfiguration = () => {
 
                 <div className="flex items-center space-x-2">
                   <Switch
-                    checked={apiConfigs.delivery.delhivery.staging_mode}
+                    checked={apiConfigs.delivery.delhivery.staging_mode || false}
                     onCheckedChange={(checked) =>
                       setApiConfigs(prev => ({
                         ...prev,
