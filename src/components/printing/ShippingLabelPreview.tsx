@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -76,84 +75,7 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
 
   const handlePrint = async () => {
     try {
-      // Get the print content
-      const printContent = document.querySelector('.print-content');
-      if (!printContent) {
-        console.error('Print content not found');
-        return;
-      }
-
-      // Create print styles
-      const printStyles = `
-        <style>
-          @media print {
-            body { 
-              margin: 0; 
-              padding: 0; 
-              font-family: monospace; 
-              font-size: 12px;
-            }
-            .print-content { 
-              border: 2px solid black; 
-              padding: 20px; 
-              background: white;
-              page-break-inside: avoid;
-            }
-            @page {
-              margin: 0.5in;
-              size: A4;
-            }
-          }
-          body { 
-            margin: 0; 
-            padding: 20px; 
-            font-family: monospace; 
-            font-size: 12px;
-          }
-          .print-content { 
-            border: 2px solid black; 
-            padding: 20px; 
-            background: white;
-          }
-        </style>
-      `;
-
-      // Create the print document
-      const printDocument = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Shipping Label - ${orderNumber}</title>
-            ${printStyles}
-          </head>
-          <body>
-            ${printContent.outerHTML}
-          </body>
-        </html>
-      `;
-
-      // Open print window
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      if (printWindow) {
-        printWindow.document.write(printDocument);
-        printWindow.document.close();
-        
-        // Wait for content to load, then print
-        printWindow.onload = () => {
-          printWindow.focus();
-          printWindow.print();
-          
-          // Close print window after printing
-          printWindow.onafterprint = () => {
-            printWindow.close();
-          };
-        };
-      } else {
-        // Fallback: direct print
-        window.print();
-      }
-
-      // Move order to packing stage after successful print
+      // First update the order stage
       if (order.id) {
         console.log('Moving order to packing stage:', order.id);
         await updateOrderStage.mutateAsync({
@@ -161,7 +83,128 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
           stage: 'packing'
         });
       }
+
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
       
+      if (!printWindow) {
+        console.error('Failed to open print window - popup blocked?');
+        // Fallback to current window print
+        window.print();
+        return;
+      }
+
+      // Get the print content
+      const printContent = document.querySelector('.print-content');
+      if (!printContent) {
+        console.error('Print content not found');
+        printWindow.close();
+        return;
+      }
+
+      // Write the complete HTML document to the print window
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Shipping Label - ${orderNumber}</title>
+            <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              
+              body { 
+                font-family: 'Courier New', monospace; 
+                font-size: 12px;
+                line-height: 1.4;
+                color: #000;
+                background: #fff;
+              }
+              
+              .print-content { 
+                border: 2px solid #000; 
+                padding: 20px; 
+                background: #fff;
+                max-width: 600px;
+                margin: 0 auto;
+              }
+              
+              .font-bold { font-weight: bold; }
+              .text-lg { font-size: 18px; }
+              .text-sm { font-size: 11px; }
+              .text-xs { font-size: 10px; }
+              .text-center { text-align: center; }
+              .mb-1 { margin-bottom: 4px; }
+              .mb-2 { margin-bottom: 8px; }
+              .mb-4 { margin-bottom: 16px; }
+              .mt-1 { margin-top: 4px; }
+              .mt-2 { margin-top: 8px; }
+              .p-2 { padding: 8px; }
+              .p-3 { padding: 12px; }
+              .p-4 { padding: 16px; }
+              .pb-2 { padding-bottom: 8px; }
+              .border { border: 1px solid #000; }
+              .border-b-2 { border-bottom: 2px solid #000; }
+              .border-black { border-color: #000; }
+              .bg-yellow-50 { background-color: #fffbeb; }
+              .bg-gray-50 { background-color: #f9fafb; }
+              .bg-white { background-color: #fff; }
+              .bg-gray-300 { background-color: #d1d5db; }
+              .bg-black { background-color: #000; }
+              .flex { display: flex; }
+              .items-center { align-items: center; }
+              .items-end { align-items: flex-end; }
+              .justify-center { justify-content: center; }
+              .justify-between { justify-content: space-between; }
+              .space-x-0 > * + * { margin-left: 0; }
+              
+              @media print {
+                body { 
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                .print-content {
+                  border: 2px solid #000 !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                @page {
+                  margin: 0.5in;
+                  size: A4;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.outerHTML}
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+
+      // Wait for the content to load, then trigger print
+      printWindow.onload = function() {
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          
+          // Close the print window after printing
+          printWindow.onafterprint = function() {
+            printWindow.close();
+          };
+          
+          // Fallback close after 3 seconds
+          setTimeout(() => {
+            if (!printWindow.closed) {
+              printWindow.close();
+            }
+          }, 3000);
+        }, 500);
+      };
+
       // Call the completion handler
       if (onPrintComplete) {
         onPrintComplete(order.id);
