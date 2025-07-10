@@ -70,7 +70,15 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     );
   };
 
-  const createLabelHTML = (orderData: any) => {
+  // Generate HTML barcode that matches the React component exactly
+  const generateBarcodeHTML = (text: string) => {
+    const bars = generateBarcode(text);
+    return bars.map((width, index) => 
+      `<div style="display: inline-block; background-color: ${index % 2 === 0 ? '#000' : '#fff'}; width: ${width === 1 ? 2 : 4}px; height: 50px; min-width: ${width === 1 ? 2 : 4}px; vertical-align: bottom;"></div>`
+    ).join('');
+  };
+
+  const createLabelHTML = (orderData: any, isLast: boolean = false) => {
     try {
       console.log('Creating label HTML for order:', orderData);
       
@@ -95,33 +103,28 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
 
-      // Generate simple barcode HTML (simplified version)
-      const barcodeText = trackingNumber;
-      const barcodeHTML = `
-        <div style="text-align: center; padding: 10px; background: white; border: 1px solid #ccc;">
-          <div style="font-family: 'Courier New', monospace; font-size: 24px; letter-spacing: 2px; font-weight: bold;">
-            ||||| ||| |||| ||||| || ||| ||||
-          </div>
-          <div style="font-size: 14px; margin-top: 5px;">${barcodeText}</div>
-        </div>
-      `;
+      // Generate exact same barcode as in preview
+      const barcodeHTML = generateBarcodeHTML(trackingNumber);
+
+      // Only add page break if it's not the last item in bulk print, or if it's a single print
+      const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
       return `
-        <div style="border: 2px solid #000; padding: 20px; background: #fff; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #000; margin-bottom: 20px; page-break-after: always; width: 100%; max-width: 600px;">
+        <div style="border: 2px solid #000; padding: 16px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.3; color: #000; margin-bottom: 15px; max-width: 600px; ${pageBreak}">
           <!-- Tracking Number -->
-          <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-            <div style="font-weight: bold; font-size: 18px; margin-bottom: 10px;">TRACKING #</div>
-            <div style="border: 1px solid #000; padding: 10px; background: #f9f9f9;">
-              <div style="font-weight: bold; font-size: 18px;">${trackingNumber}</div>
+          <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
+            <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">TRACKING #</div>
+            <div style="border: 1px solid #000; padding: 8px; background: #f9fafb;">
+              <div style="font-weight: bold; font-size: 16px;">${trackingNumber}</div>
             </div>
           </div>
 
           <!-- TO Section -->
-          <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">📍 TO:</div>
-            <div style="border: 1px solid #000; padding: 12px; background: #fffbeb;">
-              <div style="font-weight: bold; font-size: 16px;">${customerName.toUpperCase()}</div>
-              <div>${shippingAddress.address1}</div>
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 6px;">📍 TO:</div>
+            <div style="border: 1px solid #000; padding: 10px; background: #fffbeb;">
+              <div style="font-weight: bold; font-size: 14px;">${customerName.toUpperCase()}</div>
+              <div style="margin-top: 2px;">${shippingAddress.address1}</div>
               ${shippingAddress.address2 ? `<div>${shippingAddress.address2}</div>` : ''}
               <div>${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
               <div>${shippingAddress.country}</div>
@@ -130,9 +133,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
 
           <!-- FROM Section -->
-          <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">FROM:</div>
-            <div style="border: 1px solid #000; padding: 12px; background: #f9f9f9;">
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 6px;">FROM:</div>
+            <div style="border: 1px solid #000; padding: 10px; background: #f9fafb;">
               <div style="font-weight: bold;">F3-ENGINE WAREHOUSE</div>
               <div>123 Fulfillment Street</div>
               <div>Mumbai, MH 400001</div>
@@ -141,32 +144,37 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
 
           <!-- Package Info -->
-          <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">📦 PACKAGE INFO:</div>
-            <div style="border: 1px solid #000; padding: 12px;">
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr><td>Order:</td><td style="text-align: right; font-weight: bold;">${orderNumber}</td></tr>
-                <tr><td>Weight:</td><td style="text-align: right;">${totalWeight}</td></tr>
-                <tr><td>Items:</td><td style="text-align: right;">${totalItems}</td></tr>
-                <tr><td>Total:</td><td style="text-align: right;">₹${orderData.total_amount || orderData.current_total_price}</td></tr>
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 6px;">📦 PACKAGE INFO:</div>
+            <div style="border: 1px solid #000; padding: 10px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <tr><td style="padding: 1px 0;">Order:</td><td style="text-align: right; font-weight: bold;">${orderNumber}</td></tr>
+                <tr><td style="padding: 1px 0;">Weight:</td><td style="text-align: right;">${totalWeight}</td></tr>
+                <tr><td style="padding: 1px 0;">Items:</td><td style="text-align: right;">${totalItems}</td></tr>
+                <tr><td style="padding: 1px 0;">Total:</td><td style="text-align: right;">₹${orderData.total_amount || orderData.current_total_price}</td></tr>
               </table>
             </div>
           </div>
 
           <!-- Products -->
-          <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 12px;">
+          <div style="margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 6px;">PRODUCTS:</div>
+            <div style="border: 1px solid #000; padding: 10px;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => 
-                `<div>• ${item.title || item.name} (Qty: ${item.quantity || 1})</div>`
+                `<div style="margin-bottom: 2px;">• ${item.title || item.name} (Qty: ${item.quantity || 1})</div>`
               ).join('') : '<div>• Order Items</div>'}
             </div>
           </div>
 
-          <!-- Barcode -->
-          <div style="text-align: center; border: 1px solid #000; padding: 15px; background: #f9f9f9;">
-            <div style="font-weight: bold; margin-bottom: 10px;">CODE 128</div>
-            ${barcodeHTML}
+          <!-- Code 128 Barcode -->
+          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb;">
+            <div style="font-weight: bold; margin-bottom: 8px;">CODE 128</div>
+            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
+              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
+                ${barcodeHTML}
+              </div>
+            </div>
+            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
           </div>
         </div>
       `;
@@ -200,7 +208,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             width: 100%;
           }
           @page {
-            margin: 0.5in;
+            margin: 0.3in;
             size: A4;
           }
         }
@@ -229,9 +237,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       console.log('Orders to process:', ordersToProcess);
 
       // Generate HTML for all labels
-      const labelsHTML = ordersToProcess.map(orderData => {
+      const labelsHTML = ordersToProcess.map((orderData, index) => {
         try {
-          return createLabelHTML(orderData);
+          const isLast = index === ordersToProcess.length - 1;
+          return createLabelHTML(orderData, isLast);
         } catch (error) {
           console.error('Error creating HTML for order:', orderData.id, error);
           throw error;
@@ -259,13 +268,26 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <style>
                   * { margin: 0; padding: 0; box-sizing: border-box; }
                   body { 
-                    font-family: Arial, sans-serif; 
-                    padding: 20px;
+                    font-family: 'Courier New', monospace; 
+                    padding: 15px;
                     background: white;
+                    line-height: 1.3;
                   }
                   @media print {
-                    body { padding: 0; }
-                    @page { margin: 0.5in; size: A4; }
+                    body { 
+                      padding: 0; 
+                      -webkit-print-color-adjust: exact;
+                      print-color-adjust: exact;
+                    }
+                    @page { 
+                      margin: 0.3in; 
+                      size: A4; 
+                    }
+                  }
+                  @media screen {
+                    body {
+                      background: #f5f5f5;
+                    }
                   }
                 </style>
               </head>
@@ -414,15 +436,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           )}
           
-          <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-            <p className="text-sm text-yellow-800">
-              <strong>Browser Note:</strong> If printing fails, please:
+          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800">
+              <strong>Single Page Layout:</strong> {isBulkPrint ? 'Each label on separate page for bulk print' : 'All content fits on one page'}
             </p>
-            <ul className="text-xs text-yellow-700 mt-1 ml-4 list-disc">
-              <li>Allow popups for this site</li>
-              <li>Check your browser's print settings</li>
-              <li>Try using a different browser if issues persist</li>
-            </ul>
+            <p className="text-xs text-green-700 mt-1">
+              Barcode will look exactly the same as preview when printed.
+            </p>
           </div>
           
           <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm">
