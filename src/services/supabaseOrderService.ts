@@ -50,6 +50,129 @@ export const supabaseOrderService = {
     return data || [];
   },
 
+  // Sync Shopify order to Supabase database
+  syncShopifyOrderToSupabase: async (shopifyOrder: any): Promise<string> => {
+    try {
+      console.log('Syncing Shopify order to Supabase:', shopifyOrder.id);
+
+      // Check if order already exists
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('shopify_order_id', parseInt(shopifyOrder.id))
+        .single();
+
+      if (existingOrder) {
+        console.log('Order already exists in Supabase:', existingOrder.id);
+        return existingOrder.id;
+      }
+
+      // Create customer if needed
+      let customerId = null;
+      if (shopifyOrder.customer) {
+        const { data: existingCustomer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('shopify_customer_id', shopifyOrder.customer.id)
+          .single();
+
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          const { data: newCustomer, error: customerError } = await supabase
+            .from('customers')
+            .insert({
+              shopify_customer_id: shopifyOrder.customer.id,
+              first_name: shopifyOrder.customer.first_name || '',
+              last_name: shopifyOrder.customer.last_name || '',
+              email: shopifyOrder.customer.email || null,
+              phone: shopifyOrder.customer.phone || null
+            })
+            .select('id')
+            .single();
+
+          if (customerError) {
+            console.error('Error creating customer:', customerError);
+          } else {
+            customerId = newCustomer.id;
+          }
+        }
+      }
+
+      // Create shipping address if needed
+      let shippingAddressId = null;
+      if (shopifyOrder.shipping_address && customerId) {
+        const { data: newAddress, error: addressError } = await supabase
+          .from('addresses')
+          .insert({
+            customer_id: customerId,
+            address_line_1: shopifyOrder.shipping_address.address1 || 'Address not provided',
+            address_line_2: shopifyOrder.shipping_address.address2 || null,
+            city: shopifyOrder.shipping_address.city || 'Unknown',
+            state: shopifyOrder.shipping_address.province || null,
+            postal_code: shopifyOrder.shipping_address.zip || null,
+            country: shopifyOrder.shipping_address.country || 'India'
+          })
+          .select('id')
+          .single();
+
+        if (addressError) {
+          console.error('Error creating address:', addressError);
+        } else {
+          shippingAddressId = newAddress.id;
+        }
+      }
+
+      // Create order
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          shopify_order_id: parseInt(shopifyOrder.id),
+          order_number: shopifyOrder.order_number || shopifyOrder.name,
+          customer_id: customerId,
+          shipping_address_id: shippingAddressId,
+          stage: 'pending',
+          total_amount: parseFloat(shopifyOrder.total_amount || shopifyOrder.current_total_price || '0'),
+          currency: shopifyOrder.currency || 'INR'
+        })
+        .select('id')
+        .single();
+
+      if (orderError) {
+        console.error('Error creating order:', orderError);
+        throw orderError;
+      }
+
+      // Create order items
+      if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
+        const orderItems = shopifyOrder.line_items.map((item: any) => ({
+          order_id: newOrder.id,
+          shopify_variant_id: item.variant_id || null,
+          title: item.title || item.name || 'Unknown Product',
+          sku: item.sku || null,
+          quantity: item.quantity || 1,
+          price: parseFloat(item.price || '0'),
+          total: parseFloat(item.price || '0') * (item.quantity || 1)
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('Error creating order items:', itemsError);
+        }
+      }
+
+      console.log('Successfully synced order to Supabase:', newOrder.id);
+      return newOrder.id;
+
+    } catch (error) {
+      console.error('Error syncing Shopify order to Supabase:', error);
+      throw error;
+    }
+  },
+
   // Update order stage
   updateOrderStage: async (orderId: string, stage: OrderStage): Promise<Order> => {
     const updates: any = { stage };

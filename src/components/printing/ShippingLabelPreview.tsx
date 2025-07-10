@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { toast } from '@/hooks/use-toast';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 interface ShippingLabelPreviewProps {
   open: boolean;
@@ -329,25 +330,36 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       console.log('Print initiated successfully');
 
-      // Update order stages (separate from printing)
+      // Sync Shopify orders to Supabase and update order stages
       try {
-        console.log('Updating order stages...');
+        console.log('Syncing orders to Supabase and updating stages...');
         for (const orderData of ordersToProcess) {
           if (orderData.id) {
-            console.log('Updating order stage for:', orderData.id);
-            // Note: This might fail for Shopify orders if they don't exist in Supabase
-            await updateOrderStage.mutateAsync({
-              orderId: orderData.id,
-              stage: 'packing'
-            });
+            try {
+              console.log('Syncing Shopify order to Supabase:', orderData.id);
+              // First, sync the Shopify order to Supabase
+              const supabaseOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
+              
+              console.log('Updating order stage for Supabase order:', supabaseOrderId);
+              // Then update the stage using the Supabase order ID
+              await updateOrderStage.mutateAsync({
+                orderId: supabaseOrderId,
+                stage: 'packing'
+              });
+              
+              console.log('Successfully updated stage for order:', orderData.id);
+            } catch (orderError) {
+              console.error('Failed to sync/update order:', orderData.id, orderError);
+              // Continue with other orders even if one fails
+            }
           }
         }
-        console.log('Order stages updated successfully');
+        console.log('Order sync and stage updates completed');
       } catch (stageError) {
-        console.warn('Order stage update failed (but printing succeeded):', stageError);
+        console.warn('Order stage update process failed (but printing succeeded):', stageError);
         toast({
           title: "Partial Success",
-          description: "Labels printed successfully, but order stages may not have been updated.",
+          description: "Labels printed successfully, but some order stages may not have been updated.",
           variant: "default"
         });
       }
