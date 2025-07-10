@@ -19,26 +19,33 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
   // Use the order number directly as tracking number
   const trackingNumber = orderNumber.toString().replace('#', '');
   
-  // Generate a proper looking barcode pattern using Code 128 style
+  // Generate Code 128 style barcode pattern
   const generateBarcode = (text: string) => {
+    // Code 128 patterns using thin/thick bars (simplified representation)
     const patterns = [
-      '█ █',
-      '██ █',
-      '█ ██',
-      '██ ██',
-      '███ █',
-      '█ ███',
-      '██ ███',
-      '███ ██',
-      '████ █',
-      '█ ████'
+      '||  ||  ',  // 0
+      '|| ||   ',  // 1
+      '||   || ',  // 2
+      '|||| |  ',  // 3
+      '|  |||| ',  // 4
+      '|||  || ',  // 5
+      '|  ||| |',  // 6
+      '|| |||  ',  // 7
+      '||||| | ',  // 8
+      '| ||||| ',  // 9
     ];
     
-    let barcode = '';
-    for (let i = 0; i < 30; i++) {
-      const patternIndex = (text.charCodeAt(i % text.length) + i) % patterns.length;
-      barcode += patterns[patternIndex] + ' ';
+    let barcode = '|||  |  '; // Start code B pattern
+    
+    // Generate pattern based on text characters
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i);
+      const patternIndex = charCode % patterns.length;
+      barcode += patterns[patternIndex];
     }
+    
+    barcode += '|  |||  '; // Stop pattern
+    
     return barcode;
   };
 
@@ -200,15 +207,15 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
               </div>
             </div>
 
-            {/* Improved Barcode */}
+            {/* Code 128 Barcode */}
             <div className="text-center border border-black p-4 bg-gray-50">
               <div className="font-bold mb-2">CODE 128 BARCODE</div>
-              <div className="bg-white p-2 border border-gray-300 mb-2">
-                <div className="font-mono text-lg leading-4 tracking-tighter" style={{ letterSpacing: '-1px' }}>
-                  {generateBarcode(orderNumber)}
+              <div className="bg-white p-3 border border-gray-300 mb-2">
+                <div className="font-mono text-sm leading-3 tracking-wide overflow-hidden">
+                  {generateBarcode(trackingNumber)}
                 </div>
               </div>
-              <div className="font-bold text-sm">{orderNumber}</div>
+              <div className="font-bold text-sm">{trackingNumber}</div>
             </div>
           </div>
         </div>
