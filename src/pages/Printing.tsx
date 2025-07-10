@@ -1,28 +1,48 @@
 
 import React, { useState } from 'react';
-import { Printer, Filter, RefreshCw } from 'lucide-react';
+import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PrintQueue from '@/components/printing/PrintQueue';
-import PrintingStats from '@/components/printing/PrintingStats';
 import PrintingFilters from '@/components/printing/PrintingFilters';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const Printing = () => {
   const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
 
   React.useEffect(() => {
-    // Use original Shopify order data directly for more detailed information
-    const readyToPrintOrders = shopifyOrders.filter(order => 
+    let readyToPrintOrders = shopifyOrders.filter(order => 
       order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
     );
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      readyToPrintOrders = readyToPrintOrders.filter(order => {
+        // Search in order number/ID
+        if (order.order_number?.toLowerCase().includes(query)) return true;
+        if (order.id?.toString().toLowerCase().includes(query)) return true;
+        
+        // Search in customer phone
+        if (order.shipping_address?.phone?.toLowerCase().includes(query)) return true;
+        
+        // Search in product names
+        if (order.line_items?.some((item: any) => 
+          (item.title || item.name)?.toLowerCase().includes(query)
+        )) return true;
+        
+        return false;
+      });
+    }
     
     setFilteredOrders(readyToPrintOrders);
-  }, [shopifyOrders]);
+  }, [shopifyOrders, searchQuery]);
 
   const handleFilterChange = (filtered: any[]) => {
     setFilteredOrders(filtered);
@@ -69,12 +89,12 @@ const Printing = () => {
     );
   }
 
-  const todayPrinted = 0; // This would come from your printed orders tracking
-  const readyForPacking = 2; // This would come from orders in packing stage
+  const todayPrinted = 0;
+  const readyForPacking = 2;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header matching the screenshot */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -170,6 +190,21 @@ const Printing = () => {
             </Card>
           </div>
 
+          {/* Search Bar */}
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by product name, order ID, or phone number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Smart Filtering Section */}
           {showFilters && (
             <Card className="mb-6">
@@ -184,7 +219,7 @@ const Printing = () => {
               </CardHeader>
               <CardContent>
                 <PrintingFilters 
-                  orders={shopifyOrders} 
+                  orders={filteredOrders} 
                   onFilterChange={handleFilterChange}
                 />
               </CardContent>

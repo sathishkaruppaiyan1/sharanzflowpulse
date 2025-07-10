@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -32,13 +31,6 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
           if (item.variant_title) {
             variations.add(item.variant_title);
           }
-          if (item.properties && Array.isArray(item.properties)) {
-            item.properties.forEach((prop: any) => {
-              if (prop.value) {
-                variations.add(prop.value);
-              }
-            });
-          }
         });
       }
     });
@@ -52,23 +44,24 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   const applyFilters = () => {
     let filtered = [...orders];
 
-    // Apply product filter
+    // Apply product filter with "contains" logic
     if (filters.product !== 'all') {
       filtered = filtered.filter(order => {
         if (!order.line_items) return false;
+        // Check if ANY item in the order contains the selected product
         return order.line_items.some((item: any) => 
           (item.title || item.name) === filters.product
         );
       });
     }
 
-    // Apply variation filter  
+    // Apply variation filter with "contains" logic
     if (filters.variation !== 'all') {
       filtered = filtered.filter(order => {
         if (!order.line_items) return false;
+        // Check if ANY item in the order has the selected variation
         return order.line_items.some((item: any) => 
-          item.variant_title === filters.variation ||
-          (item.properties && item.properties.some((prop: any) => prop.value === filters.variation))
+          item.variant_title === filters.variation
         );
       });
     }
@@ -95,14 +88,9 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
         const orderDate = new Date(order.created_at);
         return orderDate.toDateString() === today;
       });
-    } else if (filters.filterType === 'contains' && filters.product !== 'all') {
-      // Already handled by product filter above
+    } else if (filters.filterType === 'contains') {
+      // This is handled by the product filter above
     }
-
-    // Only show unfulfilled orders (ready to print)
-    filtered = filtered.filter(order => 
-      order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
-    );
 
     onFilterChange(filtered);
   };
@@ -141,16 +129,16 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">Select Product</label>
+        <label className="text-sm font-medium text-gray-700">Contains Product</label>
         <Select
           value={filters.product}
           onValueChange={(value) => setFilters({ ...filters, product: value })}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Choose a product" />
+            <SelectValue placeholder="Any product" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Products</SelectItem>
+            <SelectItem value="all">Any Product</SelectItem>
             {uniqueProducts.map(product => (
               <SelectItem key={product} value={product}>{product}</SelectItem>
             ))}
@@ -159,16 +147,16 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">Product Variation</label>
+        <label className="text-sm font-medium text-gray-700">Only Has Variation</label>
         <Select
           value={filters.variation}
           onValueChange={(value) => setFilters({ ...filters, variation: value })}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Choose variation" />
+            <SelectValue placeholder="Any variation" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Variations</SelectItem>
+            <SelectItem value="all">Any Variation</SelectItem>
             {uniqueVariations.map(variation => (
               <SelectItem key={variation} value={variation}>{variation}</SelectItem>
             ))}
@@ -191,7 +179,7 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
             onClick={clearFilters}
             className="whitespace-nowrap"
           >
-            Clear Filters
+            Clear
           </Button>
         </div>
       </div>

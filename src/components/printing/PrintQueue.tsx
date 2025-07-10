@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { Clock, Package, ArrowRight, CheckCircle, Printer, Truck, FileText, Phone } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import ShippingLabelPreview from './ShippingLabelPreview';
 
@@ -32,149 +32,119 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
     onSelectedCountChange?.(newSelected.size);
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(orders.map(order => order.id));
-      setSelectedOrders(allIds);
-      onSelectedCountChange?.(allIds.size);
-    } else {
-      setSelectedOrders(new Set());
-      onSelectedCountChange?.(0);
-    }
-  };
-
   const handlePrintSingle = (order: any) => {
     console.log('Opening print preview for order:', order.id);
     setPreviewOrder(order);
     setShowPreview(true);
   };
 
+  const handlePrintComplete = (orderId: string) => {
+    // Move order to next stage (packing) after printing
+    toast.success('Label printed successfully! Order moved to packing stage.');
+    console.log('Moving order to packing stage:', orderId);
+  };
+
   const isPrinting = (orderId: string) => printingOrders.has(orderId);
 
   return (
     <>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {orders.map((order) => (
-          <div key={order.id} className="border border-gray-200 rounded-lg bg-white">
-            <div className="p-3">
-              <div className="flex items-start justify-between">
-                {/* Left section with checkbox and order info */}
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    checked={selectedOrders.has(order.id)}
-                    onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
-                    className="mt-1"
-                  />
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-1">
-                      <h3 className="font-semibold text-base">#{order.order_number}</h3>
-                      {isPrinting(order.id) && (
-                        <Badge className="bg-blue-100 text-blue-700">
-                          <Printer className="h-3 w-3 mr-1 animate-pulse" />
-                          Printing...
-                        </Badge>
-                      )}
+          <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="grid grid-cols-12 gap-4 items-start">
+              {/* Checkbox and Order Info */}
+              <div className="col-span-2 flex items-start space-x-3">
+                <Checkbox
+                  checked={selectedOrders.has(order.id)}
+                  onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                  className="mt-1"
+                />
+                <div>
+                  <h3 className="font-semibold text-base">#{order.order_number}</h3>
+                  <p className="text-gray-600 text-sm">
+                    {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Products */}
+              <div className="col-span-3">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Products:</h4>
+                <div className="space-y-1">
+                  {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
+                    <div key={index} className="text-sm text-gray-900">
+                      {item.title || item.name}
                     </div>
-                    <p className="text-gray-600 font-medium text-sm">
-                      {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
-                    </p>
+                  )) : (
+                    <div className="text-sm text-gray-900">Order Items</div>
+                  )}
+                  {order.line_items && order.line_items.length > 2 && (
+                    <div className="text-xs text-gray-500">+{order.line_items.length - 2} more</div>
+                  )}
+                </div>
+                {order.line_items && order.line_items.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">Variations:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {order.line_items.slice(0, 3).map((item: any, index: number) => (
+                        item.variant_title && (
+                          <Badge key={index} variant="outline" className="text-xs px-2 py-0 h-5">
+                            {item.variant_title}
+                          </Badge>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Details */}
+              <div className="col-span-2">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Details:</h4>
+                <div className="space-y-1 text-sm">
+                  <div className="text-gray-900">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                  <div className="font-medium text-gray-900">₹{order.total_amount || order.current_total_price}</div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(order.created_at).toLocaleDateString('en-IN')}
                   </div>
                 </div>
+              </div>
 
-                {/* Right section with print button */}
+              {/* Address */}
+              <div className="col-span-4">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Address:</h4>
+                <div className="text-sm text-gray-900">
+                  {order.shipping_address ? (
+                    <>
+                      <div>{order.shipping_address.address1}</div>
+                      {order.shipping_address.address2 && <div>{order.shipping_address.address2}</div>}
+                      <div>{order.shipping_address.city}, {order.shipping_address.province}</div>
+                      <div>{order.shipping_address.zip} {order.shipping_address.country}</div>
+                      {order.shipping_address.phone && (
+                        <div className="flex items-center mt-1 text-red-600">
+                          <Phone className="h-3 w-3 mr-1" />
+                          <span>{order.shipping_address.phone}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-gray-500">Address not available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Print Button */}
+              <div className="col-span-1 flex justify-end">
                 <Button 
                   onClick={() => handlePrintSingle(order)}
                   disabled={isPrinting(order.id)}
                   size="sm"
-                  className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  variant="outline"
+                  className="flex items-center space-x-1"
                 >
-                  {isPrinting(order.id) ? (
-                    <>
-                      <Printer className="h-4 w-4 mr-2 animate-pulse" />
-                      Printing...
-                    </>
-                  ) : (
-                    <>
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print
-                    </>
-                  )}
+                  <Printer className="h-4 w-4" />
+                  <span>Print</span>
                 </Button>
-              </div>
-
-              {/* Order details grid - compact version */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3 ml-6">
-                {/* Products */}
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Products:</h4>
-                  <div className="space-y-0.5">
-                    {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
-                      <p key={index} className="text-xs text-gray-700">{item.title || item.name}</p>
-                    )) : (
-                      <>
-                        <p className="text-xs text-gray-700">Order Items</p>
-                      </>
-                    )}
-                    {order.line_items && order.line_items.length > 2 && (
-                      <p className="text-xs text-gray-500">+{order.line_items.length - 2} more items</p>
-                    )}
-                  </div>
-                  {order.line_items && order.line_items.length > 0 && (
-                    <div className="mt-1">
-                      <p className="text-xs font-medium text-gray-700">Variations:</p>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {order.line_items.slice(0, 2).map((item: any, index: number) => (
-                          item.variant_title && (
-                            <Badge key={index} variant="outline" className="text-xs py-0 px-1 h-5">
-                              {item.variant_title}
-                            </Badge>
-                          )
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Details */}
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Details:</h4>
-                  <div className="space-y-0.5 text-xs text-gray-700">
-                    <p>{order.total_weight ? `${order.total_weight}g` : '750g'}</p>
-                    <p className="font-medium">₹{order.total_amount || order.current_total_price}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString('en-IN')}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Address:</h4>
-                  <div className="text-xs text-gray-700">
-                    {order.shipping_address ? (
-                      <>
-                        <p>{order.shipping_address.address1}</p>
-                        {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
-                        <p>{order.shipping_address.city}, {order.shipping_address.province}</p>
-                        <p>{order.shipping_address.zip} {order.shipping_address.country}</p>
-                        {order.shipping_address.phone && (
-                          <div className="flex items-center mt-0.5">
-                            <Phone className="h-3 w-3 mr-1 text-red-500" />
-                            <span className="text-red-600">{order.shipping_address.phone}</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p>Address not available</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Empty column for spacing */}
-                <div></div>
               </div>
             </div>
           </div>
@@ -183,14 +153,7 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
         {orders.length === 0 && (
           <Card className="text-center py-8">
             <CardContent>
-              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <CardTitle className="text-gray-600 mb-2">No Orders Ready to Print</CardTitle>
-              <CardDescription>
-                {isShopifyOrders 
-                  ? "No new orders from Shopify are available for printing" 
-                  : "No orders found matching your current filters"
-                }
-              </CardDescription>
+              <div className="text-gray-500">No orders found matching your criteria</div>
             </CardContent>
           </Card>
         )}
@@ -200,6 +163,7 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
         open={showPreview}
         onClose={() => setShowPreview(false)}
         order={previewOrder}
+        onPrintComplete={handlePrintComplete}
       />
     </>
   );

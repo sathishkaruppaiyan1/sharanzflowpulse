@@ -8,22 +8,41 @@ interface ShippingLabelPreviewProps {
   open: boolean;
   onClose: () => void;
   order: any;
+  onPrintComplete?: (orderId: string) => void;
 }
 
-const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProps) => {
+const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: ShippingLabelPreviewProps) => {
   if (!order) return null;
 
   const trackingNumber = `BD${Math.random().toString().slice(2, 11)}IN`;
   
-  // Generate Code 128 barcode pattern (simplified representation)
-  const generateCode128Pattern = (text: string) => {
-    // This is a simplified representation of Code 128 barcode
-    // In a real implementation, you'd use a proper barcode library
-    const patterns = [];
+  // Proper Code 128 barcode representation
+  const generateCode128Barcode = (text: string) => {
+    // Code 128 uses bars and spaces with specific widths (1-4 units)
+    // This is a simplified visual representation
+    const barPattern = [];
     for (let i = 0; i < text.length; i++) {
-      patterns.push('|||', '||', '|', '|||', '||');
+      const char = text.charCodeAt(i);
+      // Generate alternating thick and thin bars based on character code
+      if (char % 2 === 0) {
+        barPattern.push('████', '█', '███', '██');
+      } else {
+        barPattern.push('██', '████', '█', '███');
+      }
     }
-    return patterns.join(' ');
+    return barPattern.join(' ');
+  };
+
+  const handlePrint = () => {
+    // Trigger browser print dialog
+    window.print();
+    
+    // Call the completion handler to move order to next stage
+    if (onPrintComplete) {
+      onPrintComplete(order.id);
+    }
+    
+    onClose();
   };
 
   const customerName = order.customer_name || 
@@ -39,11 +58,9 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
     phone: 'N/A'
   };
 
-  // Calculate total items
   const totalItems = order.line_items ? 
     order.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
 
-  // Calculate total weight
   const totalWeight = order.total_weight ? `${order.total_weight}g` : '750g';
   
   return (
@@ -52,7 +69,7 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Print Preview - 1 Labels</DialogTitle>
           <div className="flex items-center space-x-2">
-            <Button className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white">
               <Printer className="h-4 w-4 mr-2" />
               Print Labels
             </Button>
@@ -62,8 +79,8 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
           </div>
         </DialogHeader>
         
-        <div className="mt-4">
-          <div className="border-2 border-black bg-white p-6 font-mono text-sm">
+        <div className="mt-4 print:mt-0">
+          <div className="border-2 border-black bg-white p-6 font-mono text-sm print:border-0">
             {/* Tracking Number */}
             <div className="text-center border-b-2 border-black pb-2 mb-4">
               <div className="font-bold text-lg">TRACKING #</div>
@@ -142,8 +159,8 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
             {/* Code 128 Barcode */}
             <div className="text-center border border-black p-4 bg-gray-50">
               <div className="font-bold mb-2">CODE 128</div>
-              <div className="font-mono text-xs mb-2 tracking-wider">
-                {generateCode128Pattern(order.order_number || order.name || 'ORDER')}
+              <div className="font-mono text-xs mb-2 overflow-hidden" style={{ letterSpacing: '0.5px', lineHeight: '20px' }}>
+                {generateCode128Barcode(order.order_number || order.name || 'ORDER')}
               </div>
               <div className="font-bold">#{order.order_number || order.name}</div>
             </div>
