@@ -68,6 +68,13 @@ const Packing = () => {
     }
   };
 
+  const resetScanner = () => {
+    setCurrentOrder(null);
+    setOrderLoadedMessage('');
+    setOrderScanInput('');
+    setSkuScanInput('');
+  };
+
   const getPriorityBadge = (order: Order) => {
     const createdDate = new Date(order.created_at);
     const hoursSinceCreated = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60);
@@ -124,7 +131,19 @@ const Packing = () => {
                 
                 {/* Order Scanner */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">Order Scanner</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">Order Scanner</label>
+                    {currentOrder && (
+                      <Button 
+                        onClick={resetScanner}
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                      >
+                        Reset Scanner
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex space-x-2">
                     <Input
                       placeholder="Scan or enter Order ID/Number"
@@ -132,16 +151,23 @@ const Packing = () => {
                       onChange={(e) => setOrderScanInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleOrderScan()}
                       className="flex-1"
+                      disabled={!!currentOrder}
                     />
                     <Button 
                       onClick={handleOrderScan}
                       size="sm"
                       variant="outline"
                       className="px-3"
+                      disabled={!!currentOrder}
                     >
                       <Scan className="h-4 w-4" />
                     </Button>
                   </div>
+                  {currentOrder && (
+                    <p className="text-xs text-gray-500">
+                      Order scanner is locked. Complete SKU scanning or reset to scan another order.
+                    </p>
+                  )}
                 </div>
 
                 {/* Order Loaded Message */}
