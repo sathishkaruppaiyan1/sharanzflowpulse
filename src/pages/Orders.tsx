@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -23,12 +23,32 @@ import { useToast } from '@/hooks/use-toast';
 
 const ORDERS_PER_PAGE = 25;
 
+// Custom hook for debounced value
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
+  
+  // Debounce search term to avoid filtering on every keystroke
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
   // Use Shopify orders instead of mock orders
   const { 
@@ -38,67 +58,93 @@ const Orders = () => {
     refetch 
   } = useShopifyOrders();
 
-  // Filter orders based on search term, status, and date
-  const filteredOrders = shopifyOrders.filter(order => {
-    // Status filter - fix the logic
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'new' && order.fulfillment_status !== 'unfulfilled') {
-        return false;
+  // Memoized filter function for better performance
+  const filteredOrders = useMemo(() => {
+    return shopifyOrders.filter(order => {
+      // Status filter - improved logic with null safety
+      if (statusFilter !== 'all') {
+        const fulfillmentStatus = order.fulfillment_status || '';
+        const financialStatus = order.financial_status || '';
+        
+        if (statusFilter === 'new' && fulfillmentStatus !== 'unfulfilled') {
+          return false;
+        }
+        if (statusFilter === 'processing' && !(fulfillmentStatus === 'partial' || (fulfillmentStatus === 'unfulfilled' && financialStatus === 'paid'))) {
+          return false;
+        }
+        if (statusFilter === 'shipped' && fulfillmentStatus !== 'fulfilled') {
+          return false;
+        }
       }
-      if (statusFilter === 'processing' && !(order.fulfillment_status === 'partial' || (order.fulfillment_status === 'unfulfilled' && order.financial_status === 'paid'))) {
-        return false;
-      }
-      if (statusFilter === 'shipped' && order.fulfillment_status !== 'fulfilled') {
-        return false;
-      }
-    }
 
-    // Date filter
-    if (dateFilter) {
-      const orderDate = new Date(order.created_at).toDateString();
-      const filterDate = new Date(dateFilter).toDateString();
-      if (orderDate !== filterDate) {
-        return false;
+      // Date filter - improved date comparison
+      if (dateFilter) {
+        try {
+          const orderDate = new Date(order.created_at);
+          const filterDate = new Date(dateFilter);
+          
+          // Compare dates by setting time to midnight
+          orderDate.setHours(0, 0, 0, 0);
+          filterDate.setHours(0, 0, 0, 0);
+          
+          if (orderDate.getTime() !== filterDate.getTime()) {
+            return false;
+          }
+        } catch (e) {
+          // If date parsing fails, exclude the order
+          return false;
+        }
       }
-    }
 
-    // Search filter
-    if (!searchTerm) return true;
-    const lowercaseSearch = searchTerm.toLowerCase();
-    return (
-      order.order_number.toLowerCase().includes(lowercaseSearch) ||
-      order.customer_name.toLowerCase().includes(lowercaseSearch) ||
-      order.id.toLowerCase().includes(lowercaseSearch)
-    );
-  });
+      // Search filter - improved with null safety
+      if (!debouncedSearchTerm) return true;
+      const lowercaseSearch = debouncedSearchTerm.toLowerCase();
+      
+      return (
+        (order.order_number || '').toLowerCase().includes(lowercaseSearch) ||
+        (order.customer_name || '').toLowerCase().includes(lowercaseSearch) ||
+        (order.id || '').toString().toLowerCase().includes(lowercaseSearch)
+      );
+    });
+  }, [shopifyOrders, debouncedSearchTerm, statusFilter, dateFilter]);
 
-  // Calculate pagination values
-  const totalOrders = filteredOrders.length;
-  const totalPages = Math.ceil(totalOrders / ORDERS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ORDERS_PER_PAGE;
-  const endIndex = startIndex + ORDERS_PER_PAGE;
-  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+  // Calculate pagination values - memoized
+  const paginationData = useMemo(() => {
+    const totalOrders = filteredOrders.length;
+    const totalPages = Math.ceil(totalOrders / ORDERS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ORDERS_PER_PAGE;
+    const endIndex = startIndex + ORDERS_PER_PAGE;
+    const currentOrders = filteredOrders.slice(startIndex, endIndex);
+    
+    return {
+      totalOrders,
+      totalPages,
+      startIndex,
+      endIndex,
+      currentOrders
+    };
+  }, [filteredOrders, currentPage]);
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilter]);
+  }, [debouncedSearchTerm, statusFilter, dateFilter]);
 
-  const getStatusBadge = (fulfillmentStatus: string, financialStatus: string) => {
-    let status = 'new';
+  // Memoized status badge function
+  const getStatusBadge = useCallback((fulfillmentStatus: string, financialStatus: string) => {
     let color = 'bg-blue-100 text-blue-800';
     let label = 'New';
 
-    if (fulfillmentStatus === 'fulfilled') {
-      status = 'shipped';
+    const fulfillment = fulfillmentStatus || '';
+    const financial = financialStatus || '';
+
+    if (fulfillment === 'fulfilled') {
       color = 'bg-green-100 text-green-800';
       label = 'Shipped';
-    } else if (fulfillmentStatus === 'partial') {
-      status = 'processing';
+    } else if (fulfillment === 'partial') {
       color = 'bg-yellow-100 text-yellow-800';
       label = 'Processing';
-    } else if (financialStatus === 'paid') {
-      status = 'processing';
+    } else if (financial === 'paid') {
       color = 'bg-yellow-100 text-yellow-800';
       label = 'Processing';
     }
@@ -108,7 +154,7 @@ const Orders = () => {
         {label}
       </span>
     );
-  };
+  }, []);
 
   const handleSyncFromShopify = async () => {
     try {
@@ -126,9 +172,11 @@ const Orders = () => {
     }
   };
 
-  const generatePaginationItems = () => {
+  // Memoized pagination function
+  const generatePaginationItems = useCallback(() => {
     const items = [];
     const maxVisiblePages = 5;
+    const { totalPages } = paginationData;
     
     if (totalPages <= maxVisiblePages) {
       // Show all pages if total pages is small
@@ -212,7 +260,7 @@ const Orders = () => {
     }
     
     return items;
-  };
+  }, [currentPage, paginationData.totalPages]);
 
   if (error) {
     return (
@@ -233,11 +281,21 @@ const Orders = () => {
     );
   }
 
-  // Calculate stats from Shopify orders
-  const totalOrdersCount = shopifyOrders.length;
-  const newOrders = shopifyOrders.filter(o => o.fulfillment_status === 'unfulfilled').length;
-  const processingOrders = shopifyOrders.filter(o => o.fulfillment_status === 'partial' || (o.fulfillment_status === 'unfulfilled' && o.financial_status === 'paid')).length;
-  const shippedOrders = shopifyOrders.filter(o => o.fulfillment_status === 'fulfilled').length;
+  // Calculate stats from Shopify orders - memoized
+  const orderStats = useMemo(() => {
+    const totalOrdersCount = shopifyOrders.length;
+    const newOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'unfulfilled').length;
+    const processingOrders = shopifyOrders.filter(o => {
+      const fulfillment = o.fulfillment_status || '';
+      const financial = o.financial_status || '';
+      return fulfillment === 'partial' || (fulfillment === 'unfulfilled' && financial === 'paid');
+    }).length;
+    const shippedOrders = shopifyOrders.filter(o => (o.fulfillment_status || '') === 'fulfilled').length;
+    
+    return { totalOrdersCount, newOrders, processingOrders, shippedOrders };
+  }, [shopifyOrders]);
+
+  const { totalOrders, totalPages, startIndex, endIndex, currentOrders } = paginationData;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -252,7 +310,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Orders</p>
-                    <p className="text-2xl font-bold">{totalOrdersCount}</p>
+                    <p className="text-2xl font-bold">{orderStats.totalOrdersCount}</p>
                   </div>
                   <Package className="h-8 w-8 text-blue-500" />
                 </div>
@@ -263,7 +321,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">New Orders</p>
-                    <p className="text-2xl font-bold text-blue-600">{newOrders}</p>
+                    <p className="text-2xl font-bold text-blue-600">{orderStats.newOrders}</p>
                   </div>
                   <Clock className="h-8 w-8 text-blue-500" />
                 </div>
@@ -274,7 +332,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Processing</p>
-                    <p className="text-2xl font-bold text-yellow-600">{processingOrders}</p>
+                    <p className="text-2xl font-bold text-yellow-600">{orderStats.processingOrders}</p>
                   </div>
                   <RefreshCw className="h-8 w-8 text-yellow-500" />
                 </div>
@@ -285,7 +343,7 @@ const Orders = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Shipped</p>
-                    <p className="text-2xl font-bold text-green-600">{shippedOrders}</p>
+                    <p className="text-2xl font-bold text-green-600">{orderStats.shippedOrders}</p>
                   </div>
                   <Package className="h-8 w-8 text-green-500" />
                 </div>
@@ -383,27 +441,29 @@ const Orders = () => {
                       <tbody>
                         {currentOrders.map((order) => (
                           <tr key={order.id} className="border-b hover:bg-gray-50 transition-colors">
-                            <td className="py-3 px-4 font-mono text-sm font-medium">{order.order_number}</td>
+                            <td className="py-3 px-4 font-mono text-sm font-medium">{order.order_number || 'N/A'}</td>
                             <td className="py-3 px-4">
-                              <div className="font-medium">{order.customer_name}</div>
+                              <div className="font-medium">{order.customer_name || 'N/A'}</div>
                             </td>
-                            <td className="py-3 px-4 font-medium">{order.currency} {order.total_amount}</td>
+                            <td className="py-3 px-4 font-medium">
+                              {order.currency || ''} {order.total_amount || '0'}
+                            </td>
                             <td className="py-3 px-4">
                               {getStatusBadge(order.fulfillment_status, order.financial_status)}
                             </td>
                             <td className="py-3 px-4">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                order.financial_status === 'paid' 
+                                (order.financial_status || '') === 'paid' 
                                   ? 'bg-green-100 text-green-800' 
-                                  : order.financial_status === 'pending'
+                                  : (order.financial_status || '') === 'pending'
                                   ? 'bg-yellow-100 text-yellow-800'
                                   : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {order.financial_status}
+                                {order.financial_status || 'unknown'}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-500">
-                              {new Date(order.created_at).toLocaleDateString()}
+                              {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                             </td>
                             <td className="py-3 px-4">
                               <Button variant="outline" size="sm">
