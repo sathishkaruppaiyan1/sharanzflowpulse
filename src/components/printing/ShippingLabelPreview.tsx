@@ -19,34 +19,55 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
   // Use the order number directly as tracking number
   const trackingNumber = orderNumber.toString().replace('#', '');
   
-  // Generate Code 128 style barcode pattern
+  // Generate Code 128 style barcode with actual bars
   const generateBarcode = (text: string) => {
-    // Code 128 patterns using thin/thick bars (simplified representation)
-    const patterns = [
-      '||  ||  ',  // 0
-      '|| ||   ',  // 1
-      '||   || ',  // 2
-      '|||| |  ',  // 3
-      '|  |||| ',  // 4
-      '|||  || ',  // 5
-      '|  ||| |',  // 6
-      '|| |||  ',  // 7
-      '||||| | ',  // 8
-      '| ||||| ',  // 9
-    ];
+    // Create an array of bar widths (1 = thin, 2 = thick)
+    const barPattern = [];
     
-    let barcode = '|||  |  '; // Start code B pattern
+    // Start pattern
+    barPattern.push(2, 1, 1, 1, 2, 1);
     
-    // Generate pattern based on text characters
+    // Generate bars based on text
     for (let i = 0; i < text.length; i++) {
-      const charCode = text.charCodeAt(i);
-      const patternIndex = charCode % patterns.length;
-      barcode += patterns[patternIndex];
+      const char = text.charCodeAt(i) % 10;
+      // Different patterns for each digit
+      switch (char) {
+        case 0: barPattern.push(2, 1, 1, 2, 1, 1); break;
+        case 1: barPattern.push(1, 2, 1, 2, 1, 1); break;
+        case 2: barPattern.push(1, 1, 2, 2, 1, 1); break;
+        case 3: barPattern.push(2, 2, 1, 1, 1, 1); break;
+        case 4: barPattern.push(1, 1, 1, 2, 2, 1); break;
+        case 5: barPattern.push(2, 1, 1, 1, 1, 2); break;
+        case 6: barPattern.push(1, 2, 1, 1, 1, 2); break;
+        case 7: barPattern.push(1, 1, 2, 1, 1, 2); break;
+        case 8: barPattern.push(1, 1, 1, 1, 2, 2); break;
+        case 9: barPattern.push(2, 1, 1, 2, 1, 1); break;
+      }
     }
     
-    barcode += '|  |||  '; // Stop pattern
+    // End pattern
+    barPattern.push(2, 1, 1, 1, 2, 1, 1);
     
-    return barcode;
+    return barPattern;
+  };
+
+  const renderBarcode = (text: string) => {
+    const bars = generateBarcode(text);
+    return (
+      <div className="flex items-end justify-center space-x-0" style={{ height: '50px' }}>
+        {bars.map((width, index) => (
+          <div
+            key={index}
+            className={index % 2 === 0 ? "bg-black" : "bg-white"}
+            style={{
+              width: `${width === 1 ? 2 : 4}px`,
+              height: '50px',
+              minWidth: `${width === 1 ? 2 : 4}px`
+            }}
+          />
+        ))}
+      </div>
+    );
   };
 
   const handlePrint = () => {
@@ -209,11 +230,9 @@ const ShippingLabelPreview = ({ open, onClose, order, onPrintComplete }: Shippin
 
             {/* Code 128 Barcode */}
             <div className="text-center border border-black p-4 bg-gray-50">
-              <div className="font-bold mb-2">CODE 128 BARCODE</div>
+              <div className="font-bold mb-2">CODE 128</div>
               <div className="bg-white p-3 border border-gray-300 mb-2">
-                <div className="font-mono text-sm leading-3 tracking-wide overflow-hidden">
-                  {generateBarcode(trackingNumber)}
-                </div>
+                {renderBarcode(trackingNumber)}
               </div>
               <div className="font-bold text-sm">{trackingNumber}</div>
             </div>
