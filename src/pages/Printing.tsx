@@ -77,15 +77,19 @@ const Printing = () => {
     setShowBulkPreview(true);
   };
 
-  const handleBulkPrintComplete = () => {
+  const handleBulkPrintComplete = (orderIds: string | string[]) => {
+    const count = Array.isArray(orderIds) ? orderIds.length : 1;
     toast({
       title: "Success",
-      description: `${selectedCount} labels printed successfully!`
+      description: `${count} labels printed successfully! Orders moved to packing stage.`
     });
     setShowBulkPreview(false);
     setBulkOrders([]);
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
+    
+    // Refresh the orders to show updated stages
+    refetch();
   };
 
   if (isLoading) {
@@ -303,7 +307,7 @@ const Printing = () => {
         <ShippingLabelPreview
           open={showBulkPreview}
           onClose={() => setShowBulkPreview(false)}
-          order={bulkOrders[0]} // Show first order as preview
+          orders={bulkOrders} // Pass all orders for bulk printing
           onPrintComplete={handleBulkPrintComplete}
         />
       )}
