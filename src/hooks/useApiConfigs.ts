@@ -17,6 +17,11 @@ export interface ApiConfigs {
     verify_token: string;
     app_secret: string;
   };
+  wati: {
+    enabled: boolean;
+    api_key: string;
+    base_url: string;
+  };
   delivery: {
     frenchexpress: {
       enabled: boolean;
@@ -44,6 +49,11 @@ const defaultConfigs: ApiConfigs = {
     access_token: '',
     verify_token: '',
     app_secret: ''
+  },
+  wati: {
+    enabled: false,
+    api_key: '',
+    base_url: 'https://live-server-6371.wati.io'
   },
   delivery: {
     frenchexpress: {
