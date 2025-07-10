@@ -48,25 +48,71 @@ serve(async (req) => {
       .replace(/^https?:\/\//, '')
       .replace('.myshopify.com', '')
 
-    // Fetch orders from Shopify with more detailed information
-    const shopifyResponse = await fetch(
-      `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=50&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': shopifyConfig.access_token,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    // Function to fetch orders with pagination
+    const fetchAllOrders = async () => {
+      let allOrders: any[] = []
+      let pageInfo = null
+      let hasNextPage = true
 
-    if (!shopifyResponse.ok) {
-      throw new Error(`Shopify API error: ${shopifyResponse.status}`)
+      while (hasNextPage) {
+        // Build URL with pagination
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=250&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        
+        if (pageInfo) {
+          url += `&page_info=${pageInfo}`
+        }
+
+        console.log('Fetching orders from:', url)
+
+        const shopifyResponse = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': shopifyConfig.access_token,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!shopifyResponse.ok) {
+          throw new Error(`Shopify API error: ${shopifyResponse.status}`)
+        }
+
+        const shopifyData = await shopifyResponse.json()
+        const orders = shopifyData.orders || []
+        
+        console.log(`Fetched ${orders.length} orders in this batch`)
+        allOrders = allOrders.concat(orders)
+
+        // Check for pagination info in Link header
+        const linkHeader = shopifyResponse.headers.get('Link')
+        if (linkHeader && linkHeader.includes('rel="next"')) {
+          // Extract page_info from Link header
+          const nextLinkMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/)
+          if (nextLinkMatch) {
+            pageInfo = nextLinkMatch[1]
+            console.log('Found next page info:', pageInfo)
+          } else {
+            hasNextPage = false
+          }
+        } else {
+          hasNextPage = false
+          console.log('No more pages to fetch')
+        }
+
+        // Safety check to prevent infinite loops
+        if (allOrders.length > 10000) {
+          console.log('Reached safety limit of 10,000 orders')
+          break
+        }
+      }
+
+      return allOrders
     }
 
-    const shopifyData = await shopifyResponse.json()
+    // Fetch all orders with pagination
+    const allOrders = await fetchAllOrders()
+    console.log(`Total orders fetched: ${allOrders.length}`)
     
     // Transform Shopify orders to include detailed information
-    const transformedOrders = shopifyData.orders.map((order: any) => ({
+    const transformedOrders = allOrders.map((order: any) => ({
       id: order.id.toString(),
       order_number: order.name,
       customer_name: order.customer 
