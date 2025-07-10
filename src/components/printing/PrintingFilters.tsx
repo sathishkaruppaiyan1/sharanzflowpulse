@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,20 +18,29 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     orderDate: ''
   });
 
-  // Extract unique products and variations from real orders
+  // Extract unique products and variations from real Shopify orders
   const { uniqueProducts, uniqueVariations } = useMemo(() => {
     const products = new Set<string>();
     const variations = new Set<string>();
 
     orders.forEach(order => {
-      // Add sample products for now since we don't have detailed product data
-      // In a real implementation, you'd extract this from order.order_items
-      products.add('Wireless Bluetooth Headphones');
-      products.add('Phone Case');
-      variations.add('Black');
-      variations.add('iPhone 14 Pro');
-      variations.add('White');
-      variations.add('Samsung Galaxy');
+      if (order.line_items && Array.isArray(order.line_items)) {
+        order.line_items.forEach((item: any) => {
+          if (item.title || item.name) {
+            products.add(item.title || item.name);
+          }
+          if (item.variant_title) {
+            variations.add(item.variant_title);
+          }
+          if (item.properties && Array.isArray(item.properties)) {
+            item.properties.forEach((prop: any) => {
+              if (prop.value) {
+                variations.add(prop.value);
+              }
+            });
+          }
+        });
+      }
     });
 
     return {
@@ -44,15 +54,23 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
 
     // Apply product filter
     if (filters.product !== 'all') {
-      // In a real implementation, you'd filter based on actual product data
-      // For now, we'll keep all orders since we don't have detailed product info
-      filtered = filtered;
+      filtered = filtered.filter(order => {
+        if (!order.line_items) return false;
+        return order.line_items.some((item: any) => 
+          (item.title || item.name) === filters.product
+        );
+      });
     }
 
     // Apply variation filter  
     if (filters.variation !== 'all') {
-      // In a real implementation, you'd filter based on actual variation data
-      filtered = filtered;
+      filtered = filtered.filter(order => {
+        if (!order.line_items) return false;
+        return order.line_items.some((item: any) => 
+          item.variant_title === filters.variation ||
+          (item.properties && item.properties.some((prop: any) => prop.value === filters.variation))
+        );
+      });
     }
 
     // Apply date filter
@@ -77,7 +95,14 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
         const orderDate = new Date(order.created_at);
         return orderDate.toDateString() === today;
       });
+    } else if (filters.filterType === 'contains' && filters.product !== 'all') {
+      // Already handled by product filter above
     }
+
+    // Only show unfulfilled orders (ready to print)
+    filtered = filtered.filter(order => 
+      order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
+    );
 
     onFilterChange(filtered);
   };

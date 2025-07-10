@@ -48,9 +48,9 @@ serve(async (req) => {
       .replace(/^https?:\/\//, '')
       .replace('.myshopify.com', '')
 
-    // Fetch orders from Shopify
+    // Fetch orders from Shopify with more detailed information
     const shopifyResponse = await fetch(
-      `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=50`,
+      `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=50&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`,
       {
         headers: {
           'X-Shopify-Access-Token': shopifyConfig.access_token,
@@ -65,18 +65,23 @@ serve(async (req) => {
 
     const shopifyData = await shopifyResponse.json()
     
-    // Transform Shopify orders to our format
+    // Transform Shopify orders to include detailed information
     const transformedOrders = shopifyData.orders.map((order: any) => ({
       id: order.id.toString(),
       order_number: order.name,
       customer_name: order.customer 
         ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
         : 'Guest',
+      customer: order.customer,
       total_amount: order.current_total_price,
       currency: order.currency,
       created_at: order.created_at,
       financial_status: order.financial_status || 'pending',
-      fulfillment_status: order.fulfillment_status || 'unfulfilled'
+      fulfillment_status: order.fulfillment_status || 'unfulfilled',
+      line_items: order.line_items || [],
+      shipping_address: order.shipping_address,
+      total_weight: order.total_weight,
+      current_total_price: order.current_total_price
     }))
 
     return new Response(

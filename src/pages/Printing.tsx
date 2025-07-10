@@ -16,31 +16,9 @@ const Printing = () => {
   const [selectedCount, setSelectedCount] = useState(0);
 
   React.useEffect(() => {
-    // Transform Shopify orders to match our printing queue format
-    const transformedOrders = shopifyOrders.map(order => ({
-      id: order.id,
-      order_number: order.order_number,
-      customer: {
-        first_name: order.customer_name.split(' ')[0] || '',
-        last_name: order.customer_name.split(' ').slice(1).join(' ') || ''
-      },
-      total_amount: parseFloat(order.total_amount),
-      currency: order.currency,
-      created_at: order.created_at,
-      stage: order.fulfillment_status === 'unfulfilled' ? 'pending' : 'processing',
-      order_items: [
-        {
-          id: `${order.id}-item-1`,
-          title: `Order ${order.order_number} Items`,
-          quantity: 1,
-          price: parseFloat(order.total_amount)
-        }
-      ]
-    }));
-    
-    // Filter to show only orders that are ready to print (unfulfilled orders)
-    const readyToPrintOrders = transformedOrders.filter(order => 
-      order.stage === 'pending' || order.stage === 'processing'
+    // Use original Shopify order data directly for more detailed information
+    const readyToPrintOrders = shopifyOrders.filter(order => 
+      order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null
     );
     
     setFilteredOrders(readyToPrintOrders);
@@ -206,18 +184,7 @@ const Printing = () => {
               </CardHeader>
               <CardContent>
                 <PrintingFilters 
-                  orders={shopifyOrders.map(order => ({
-                    id: order.id,
-                    order_number: order.order_number,
-                    customer: {
-                      first_name: order.customer_name.split(' ')[0] || '',
-                      last_name: order.customer_name.split(' ').slice(1).join(' ') || ''
-                    },
-                    total_amount: parseFloat(order.total_amount),
-                    created_at: order.created_at,
-                    stage: order.fulfillment_status === 'unfulfilled' ? 'pending' : 'processing',
-                    order_items: []
-                  }))} 
+                  orders={shopifyOrders} 
                   onFilterChange={handleFilterChange}
                 />
               </CardContent>
@@ -238,6 +205,10 @@ const Printing = () => {
                   variant="ghost"
                   size="sm"
                   className="text-gray-600 hover:text-gray-900"
+                  onClick={() => {
+                    const allIds = new Set(filteredOrders.map(order => order.id));
+                    setSelectedCount(allIds.size);
+                  }}
                 >
                   Select All
                 </Button>

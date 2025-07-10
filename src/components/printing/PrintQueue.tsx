@@ -53,13 +53,13 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-2">
         {orders.map((order) => (
           <div key={order.id} className="border border-gray-200 rounded-lg bg-white">
-            <div className="p-4">
+            <div className="p-3">
               <div className="flex items-start justify-between">
                 {/* Left section with checkbox and order info */}
-                <div className="flex items-start space-x-4">
+                <div className="flex items-start space-x-3">
                   <Checkbox
                     checked={selectedOrders.has(order.id)}
                     onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
@@ -67,8 +67,8 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
                   />
                   
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="font-semibold text-lg">#{order.order_number}</h3>
+                    <div className="flex items-center space-x-3 mb-1">
+                      <h3 className="font-semibold text-base">#{order.order_number}</h3>
                       {isPrinting(order.id) && (
                         <Badge className="bg-blue-100 text-blue-700">
                           <Printer className="h-3 w-3 mr-1 animate-pulse" />
@@ -76,8 +76,8 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
                         </Badge>
                       )}
                     </div>
-                    <p className="text-gray-600 font-medium">
-                      {order.customer?.first_name} {order.customer?.last_name}
+                    <p className="text-gray-600 font-medium text-sm">
+                      {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
                     </p>
                   </div>
                 </div>
@@ -103,46 +103,73 @@ const PrintQueue = ({ orders, isShopifyOrders = false, onSelectedCountChange }: 
                 </Button>
               </div>
 
-              {/* Order details grid - exactly like the screenshot */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4 ml-6">
+              {/* Order details grid - compact version */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3 ml-6">
                 {/* Products */}
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Products:</h4>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-700">Wireless Bluetooth Headphones</p>
-                    <p className="text-sm text-gray-700">Phone Case</p>
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Products:</h4>
+                  <div className="space-y-0.5">
+                    {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
+                      <p key={index} className="text-xs text-gray-700">{item.title || item.name}</p>
+                    )) : (
+                      <>
+                        <p className="text-xs text-gray-700">Order Items</p>
+                      </>
+                    )}
+                    {order.line_items && order.line_items.length > 2 && (
+                      <p className="text-xs text-gray-500">+{order.line_items.length - 2} more items</p>
+                    )}
                   </div>
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-gray-700">Variations:</p>
-                    <div className="flex space-x-2 mt-1">
-                      <Badge variant="outline" className="text-xs">Black</Badge>
-                      <Badge variant="outline" className="text-xs">iPhone 14 Pro</Badge>
+                  {order.line_items && order.line_items.length > 0 && (
+                    <div className="mt-1">
+                      <p className="text-xs font-medium text-gray-700">Variations:</p>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {order.line_items.slice(0, 2).map((item: any, index: number) => (
+                          item.variant_title && (
+                            <Badge key={index} variant="outline" className="text-xs py-0 px-1 h-5">
+                              {item.variant_title}
+                            </Badge>
+                          )
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Details */}
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Details:</h4>
-                  <div className="space-y-1 text-sm text-gray-700">
-                    <p>750g</p>
-                    <p className="font-medium">₹{order.total_amount}</p>
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Details:</h4>
+                  <div className="space-y-0.5 text-xs text-gray-700">
+                    <p>{order.total_weight ? `${order.total_weight}g` : '750g'}</p>
+                    <p className="font-medium">₹{order.total_amount || order.current_total_price}</p>
                     <p className="text-xs text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString()}
+                      {new Date(order.created_at).toLocaleDateString('en-IN')}
                     </p>
                   </div>
                 </div>
 
                 {/* Address */}
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Address:</h4>
-                  <div className="text-sm text-gray-700">
-                    <p>123 MG Road, Bangalore, Karnataka</p>
-                    <p>560001 India</p>
-                    <div className="flex items-center mt-1">
-                      <Phone className="h-3 w-3 mr-1 text-red-500" />
-                      <span className="text-red-600">+91 98765 43210</span>
-                    </div>
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Address:</h4>
+                  <div className="text-xs text-gray-700">
+                    {order.shipping_address ? (
+                      <>
+                        <p>{order.shipping_address.address1}</p>
+                        {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
+                        <p>{order.shipping_address.city}, {order.shipping_address.province}</p>
+                        <p>{order.shipping_address.zip} {order.shipping_address.country}</p>
+                        {order.shipping_address.phone && (
+                          <div className="flex items-center mt-0.5">
+                            <Phone className="h-3 w-3 mr-1 text-red-500" />
+                            <span className="text-red-600">{order.shipping_address.phone}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p>Address not available</p>
+                      </>
+                    )}
                   </div>
                 </div>
 

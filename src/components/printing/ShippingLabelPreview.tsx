@@ -15,6 +15,37 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
 
   const trackingNumber = `BD${Math.random().toString().slice(2, 11)}IN`;
   
+  // Generate Code 128 barcode pattern (simplified representation)
+  const generateCode128Pattern = (text: string) => {
+    // This is a simplified representation of Code 128 barcode
+    // In a real implementation, you'd use a proper barcode library
+    const patterns = [];
+    for (let i = 0; i < text.length; i++) {
+      patterns.push('|||', '||', '|', '|||', '||');
+    }
+    return patterns.join(' ');
+  };
+
+  const customerName = order.customer_name || 
+    `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 
+    'Guest Customer';
+
+  const shippingAddress = order.shipping_address || {
+    address1: 'Address not available',
+    city: 'City',
+    province: 'State',
+    zip: '000000',
+    country: 'India',
+    phone: 'N/A'
+  };
+
+  // Calculate total items
+  const totalItems = order.line_items ? 
+    order.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
+
+  // Calculate total weight
+  const totalWeight = order.total_weight ? `${order.total_weight}g` : '750g';
+  
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -49,10 +80,13 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
               </div>
               <div className="border border-black p-3 bg-yellow-50">
                 <div className="font-bold text-lg">
-                  {order.customer?.first_name?.toUpperCase()} {order.customer?.last_name?.toUpperCase()}
+                  {customerName.toUpperCase()}
                 </div>
-                <div>123 MG Road, Bangalore, Karnataka 560001 India</div>
-                <div>Ph: +91 98765 43210</div>
+                <div>{shippingAddress.address1}</div>
+                {shippingAddress.address2 && <div>{shippingAddress.address2}</div>}
+                <div>{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
+                <div>{shippingAddress.country}</div>
+                <div>Ph: {shippingAddress.phone || 'N/A'}</div>
               </div>
             </div>
 
@@ -76,19 +110,19 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
               <div className="border border-black p-3">
                 <div className="flex justify-between">
                   <span>Order:</span>
-                  <span>#{order.order_number}</span>
+                  <span>#{order.order_number || order.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Weight:</span>
-                  <span>750g</span>
+                  <span>{totalWeight}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Items:</span>
-                  <span>2</span>
+                  <span>{totalItems}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total:</span>
-                  <span>₹{order.total_amount}</span>
+                  <span>₹{order.total_amount || order.current_total_price}</span>
                 </div>
               </div>
             </div>
@@ -97,16 +131,21 @@ const ShippingLabelPreview = ({ open, onClose, order }: ShippingLabelPreviewProp
             <div className="mb-4">
               <div className="font-bold mb-2">PRODUCTS:</div>
               <div className="border border-black p-3">
-                <div>• Wireless Bluetooth Headphones</div>
-                <div>• Phone Case</div>
+                {order.line_items ? order.line_items.map((item: any, index: number) => (
+                  <div key={index}>• {item.title || item.name} (Qty: {item.quantity || 1})</div>
+                )) : (
+                  <div>• Order Items</div>
+                )}
               </div>
             </div>
 
-            {/* Barcode */}
+            {/* Code 128 Barcode */}
             <div className="text-center border border-black p-4 bg-gray-50">
               <div className="font-bold mb-2">CODE 128</div>
-              <div className="font-mono text-2xl mb-2">||||| ||||| |||||</div>
-              <div className="font-bold">#{order.order_number}</div>
+              <div className="font-mono text-xs mb-2 tracking-wider">
+                {generateCode128Pattern(order.order_number || order.name || 'ORDER')}
+              </div>
+              <div className="font-bold">#{order.order_number || order.name}</div>
             </div>
           </div>
         </div>
