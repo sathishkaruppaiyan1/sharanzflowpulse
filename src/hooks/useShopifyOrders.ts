@@ -15,6 +15,7 @@ export interface ShopifyOrder {
   customer?: {
     first_name?: string;
     last_name?: string;
+    phone?: string;
   };
   line_items?: Array<{
     title?: string;
