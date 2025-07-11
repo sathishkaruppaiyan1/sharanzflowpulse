@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Package, Phone, Truck, Hash, Calendar } from 'lucide-react';
+import { Package, Phone, Truck, Hash, Calendar, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Order } from '@/types/database';
 
@@ -37,6 +38,61 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
     }
   };
 
+  const exportToCSV = () => {
+    if (completedOrders.length === 0) {
+      alert('No completed orders to export');
+      return;
+    }
+
+    const headers = ['Order Number', 'Customer Phone', 'Courier Name', 'Tracking ID'];
+    const csvContent = [
+      headers.join(','),
+      ...completedOrders.map(order => [
+        order.order_number,
+        order.customer?.phone || 'N/A',
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
+                        order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
+        order.tracking_number || 'N/A'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `completed_orders_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportToExcel = () => {
+    if (completedOrders.length === 0) {
+      alert('No completed orders to export');
+      return;
+    }
+
+    // Create a simple tab-separated format that Excel can open
+    const headers = ['Order Number', 'Customer Phone', 'Courier Name', 'Tracking ID'];
+    const tsvContent = [
+      headers.join('\t'),
+      ...completedOrders.map(order => [
+        order.order_number,
+        order.customer?.phone || 'N/A',
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
+                        order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
+        order.tracking_number || 'N/A'
+      ].join('\t'))
+    ].join('\n');
+
+    const blob = new Blob([tsvContent], { type: 'application/vnd.ms-excel' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `completed_orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (completedOrders.length === 0) {
     return (
       <Card>
@@ -54,10 +110,32 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Package className="h-5 w-5" />
-          <span>Completed Orders ({completedOrders.length})</span>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center space-x-2">
+            <Package className="h-5 w-5" />
+            <span>Completed Orders ({completedOrders.length})</span>
+          </CardTitle>
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={exportToExcel}
+              variant="outline"
+              size="sm"
+              disabled={completedOrders.length === 0}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
+            </Button>
+            <Button
+              onClick={exportToCSV}
+              variant="outline"
+              size="sm"
+              disabled={completedOrders.length === 0}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

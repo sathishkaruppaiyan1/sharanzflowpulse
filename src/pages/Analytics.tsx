@@ -1,15 +1,60 @@
 
-import React from 'react';
-import { BarChart3 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { BarChart3, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PerformanceMetrics from '@/components/analytics/PerformanceMetrics';
-import ExportReports from '@/components/analytics/ExportReports';
 import CompletedOrdersList from '@/components/analytics/CompletedOrdersList';
+import DateRangePicker from '@/components/analytics/DateRangePicker';
 import { useOrders } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Order } from '@/types/database';
 
 const Analytics = () => {
   const { data: orders = [], isLoading, error } = useOrders();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateRange, setDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: undefined,
+    to: undefined,
+  });
+
+  const filteredOrders = useMemo(() => {
+    let filtered = orders;
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(order => 
+        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer?.phone?.includes(searchQuery) ||
+        order.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply date range filter
+    if (dateRange.from || dateRange.to) {
+      filtered = filtered.filter(order => {
+        const orderDate = new Date(order.created_at);
+        const from = dateRange.from;
+        const to = dateRange.to;
+        
+        if (from && to) {
+          return orderDate >= from && orderDate <= to;
+        } else if (from) {
+          return orderDate >= from;
+        } else if (to) {
+          return orderDate <= to;
+        }
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [orders, searchQuery, dateRange]);
 
   if (isLoading) {
     return (
@@ -64,10 +109,26 @@ const Analytics = () => {
             </p>
           </div>
 
+          {/* Filters Section */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search orders, customers, tracking..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
+          </div>
+
           <div className="space-y-6">
-            <ExportReports orders={orders} />
-            <PerformanceMetrics orders={orders} />
-            <CompletedOrdersList orders={orders} />
+            <PerformanceMetrics orders={filteredOrders} />
+            <CompletedOrdersList orders={filteredOrders} />
           </div>
         </div>
       </div>
