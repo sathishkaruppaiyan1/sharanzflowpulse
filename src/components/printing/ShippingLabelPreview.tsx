@@ -339,17 +339,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           if (orderData.id) {
             try {
               console.log('Syncing Shopify order to Supabase:', orderData.id);
-              // First, sync the Shopify order to Supabase
+              // First, sync the Shopify order to Supabase using the correct method name
               const supabaseOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
               
-              console.log('Updating order stage for Supabase order:', supabaseOrderId);
-              // Then update the stage using the Supabase order ID
-              await updateOrderStage.mutateAsync({
-                orderId: supabaseOrderId,
-                stage: 'packing'
-              });
-              
-              console.log('Successfully updated stage for order:', orderData.id);
+              console.log('Successfully synced and updated order:', orderData.id);
             } catch (orderError) {
               console.error('Failed to sync/update order:', orderData.id, orderError);
               // Continue with other orders even if one fails

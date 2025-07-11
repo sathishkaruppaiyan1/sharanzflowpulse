@@ -1,7 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { ShopifyOrder } from '@/hooks/useShopifyOrders';
-import { sendWhatsAppMessage } from '@/services/watiService';
+import { watiService } from '@/services/watiService';
 
 export const supabaseOrderService = {
   fetchOrders: async (): Promise<Order[]> => {
@@ -114,7 +115,7 @@ export const supabaseOrderService = {
     // Send WhatsApp notification
     if (data && data.customer?.phone) {
       try {
-        await sendWhatsAppMessage(data.customer.phone, trackingNumber, carrier);
+        await watiService.sendOrderShippedNotification(data as Order, trackingNumber, carrier);
         console.log(`WhatsApp notification sent to ${data.customer.phone}`);
       } catch (error) {
         console.error('Error sending WhatsApp message:', error);
@@ -167,7 +168,7 @@ export const supabaseOrderService = {
         shipping_address_id: 'a7a94e96-a923-4499-a944-598c4499e989',
         total_amount: 1299,
         currency: 'INR',
-        stage: 'pending',
+        stage: 'pending' as OrderStage,
       },
       {
         order_number: '23070002',
@@ -175,7 +176,7 @@ export const supabaseOrderService = {
         shipping_address_id: 'a7a94e96-a923-4499-a944-598c4499e989',
         total_amount: 2199,
         currency: 'INR',
-        stage: 'pending',
+        stage: 'pending' as OrderStage,
       },
     ];
 
@@ -185,6 +186,131 @@ export const supabaseOrderService = {
 
     if (error) {
       console.error('Error creating sample orders:', error);
+      throw error;
+    }
+  },
+
+  // Add the missing syncShopifyOrderToSupabase method
+  syncShopifyOrderToSupabase: async (shopifyOrder: ShopifyOrder): Promise<string> => {
+    console.log(`Syncing single Shopify order to Supabase:`, shopifyOrder.id);
+    
+    try {
+      // Check if order already exists
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('shopify_order_id', parseInt(shopifyOrder.id))
+        .single();
+
+      if (existingOrder) {
+        console.log(`Order ${shopifyOrder.order_number} already exists, returning existing ID`);
+        return existingOrder.id;
+      }
+
+      // Prioritize phone number: shipping_address.phone first, then customer.phone
+      const phoneNumber = shopifyOrder.shipping_address?.phone || shopifyOrder.customer?.phone || null;
+      console.log(`Order ${shopifyOrder.order_number}: using phone = ${phoneNumber} (shipping: ${shopifyOrder.shipping_address?.phone}, customer: ${shopifyOrder.customer?.phone})`);
+
+      // Create or get customer
+      let customerId = null;
+      if (shopifyOrder.customer) {
+        const customerData = {
+          first_name: shopifyOrder.customer.first_name || null,
+          last_name: shopifyOrder.customer.last_name || null,
+          phone: phoneNumber, // Use the prioritized phone number
+          email: shopifyOrder.customer.email || null,
+          shopify_customer_id: shopifyOrder.customer.id ? parseInt(shopifyOrder.customer.id.toString()) : null,
+        };
+
+        const { data: customer, error: customerError } = await supabase
+          .from('customers')
+          .upsert(customerData, { 
+            onConflict: 'shopify_customer_id',
+            ignoreDuplicates: false 
+          })
+          .select()
+          .single();
+
+        if (customerError) {
+          console.error('Error creating/updating customer:', customerError);
+          throw customerError;
+        }
+        customerId = customer.id;
+      }
+
+      // Create shipping address
+      let shippingAddressId = null;
+      if (shopifyOrder.shipping_address) {
+        const { data: address, error: addressError } = await supabase
+          .from('addresses')
+          .insert({
+            customer_id: customerId,
+            address_line_1: shopifyOrder.shipping_address.address1 || '',
+            address_line_2: shopifyOrder.shipping_address.address2 || null,
+            city: shopifyOrder.shipping_address.city || '',
+            state: shopifyOrder.shipping_address.province || null,
+            postal_code: shopifyOrder.shipping_address.zip || null,
+            country: shopifyOrder.shipping_address.country || 'India',
+          })
+          .select()
+          .single();
+
+        if (addressError) {
+          console.error('Error creating address:', addressError);
+          throw addressError;
+        }
+        shippingAddressId = address.id;
+      }
+
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: shopifyOrder.order_number,
+          customer_id: customerId,
+          shipping_address_id: shippingAddressId,
+          total_amount: parseFloat(shopifyOrder.total_amount || '0'),
+          currency: shopifyOrder.currency || 'INR',
+          shopify_order_id: parseInt(shopifyOrder.id),
+          stage: 'packing' as OrderStage,
+          printed_at: new Date().toISOString(),
+          created_at: shopifyOrder.created_at,
+        })
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('Error creating order:', orderError);
+        throw orderError;
+      }
+
+      // Create order items
+      if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
+        const orderItems = shopifyOrder.line_items.map(item => ({
+          order_id: order.id,
+          title: item.title || item.name || 'Unknown Item',
+          quantity: item.quantity || 1,
+          price: parseFloat(item.price?.toString() || '0'),
+          total: parseFloat(item.price?.toString() || '0') * (item.quantity || 1),
+          sku: item.sku || null,
+          shopify_variant_id: item.variant_id ? parseInt(item.variant_id.toString()) : null,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('Error creating order items:', itemsError);
+          throw itemsError;
+        }
+      }
+
+      console.log(`Successfully synced single order ${shopifyOrder.order_number} with phone: ${phoneNumber}`);
+      return order.id;
+
+    } catch (error) {
+      console.error(`Error syncing single order ${shopifyOrder.order_number}:`, error);
       throw error;
     }
   },
