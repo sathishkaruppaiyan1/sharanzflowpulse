@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, EyeOff, Package, Truck, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,7 +18,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -31,7 +29,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     setTimeout(() => {
       if (isSignUp) {
         // Sign up validation
-        if (!email || !password || !confirmPassword || !name || !role) {
+        if (!email || !password || !confirmPassword || !name) {
           toast({
             title: "Sign Up Failed",
             description: "Please fill in all fields",
@@ -51,24 +49,24 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           return;
         }
 
-        // Simulate successful signup
-        onLogin({ email, role, name });
+        // Simulate successful signup with default admin role
+        onLogin({ email, role: 'admin', name });
         toast({
           title: "Account Created Successfully",
-          description: `Welcome to F3-Engine, ${name}!`,
+          description: `Welcome to Flow Pulse, ${name}!`,
         });
       } else {
         // Sign in validation
-        if (email && password && role) {
+        if (email && password) {
           const userName = name || email.split('@')[0];
           onLogin({ 
             email, 
-            role, 
+            role: 'admin', // Default role for demo
             name: userName.charAt(0).toUpperCase() + userName.slice(1) 
           });
           toast({
             title: "Login Successful",
-            description: `Welcome back to F3-Engine!`,
+            description: `Welcome back to Flow Pulse!`,
           });
         } else {
           toast({
@@ -88,7 +86,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     setPassword('');
     setConfirmPassword('');
     setName('');
-    setRole('');
   };
 
   return (
@@ -102,9 +99,9 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             </div>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            F3-Engine
+            Flow Pulse
           </h1>
-          <p className="text-gray-600 mt-2">Order Fulfillment Management System</p>
+          <p className="text-gray-600 mt-2">Order Fulfillment System</p>
         </div>
 
         <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
@@ -190,21 +187,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
                   </div>
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={setRole} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="packing_staff">Packing Staff</SelectItem>
-                    <SelectItem value="print_operator">Print Operator</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </CardContent>
             
             <CardFooter className="flex flex-col space-y-4">

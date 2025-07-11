@@ -8,7 +8,6 @@ import {
   PackageCheck, 
   Truck, 
   BarChart3,
-  Users,
   Settings,
   Home,
   LogOut
@@ -34,7 +33,6 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
   ];
 
   const adminItems = [
-    { name: 'Users', href: '/users', icon: Users },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
