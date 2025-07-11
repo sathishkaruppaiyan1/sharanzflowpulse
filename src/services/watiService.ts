@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
 
@@ -113,28 +112,25 @@ export const watiService = {
       const trackingLink = generateTrackingLink(trackingNumber, carrier);
       const courierName = getCourierDisplayName(carrier);
 
-      // Create the message text matching your template
-      const messageText = `Your order 📦 has been shipped with ${courierName} Courier.
-
-Your order ID : ${order.order_number}
-Tracking Number: ${trackingNumber}
-Courier name : ${courierName}
-
-Tracking link: ${trackingLink}
-
-Please track your order status regularly using this link ☝
-
-Delivery in 5-7 working days
-
-If you don't receive your parcel within 7 working days, kindly inform us immediately.`;
-
-      // Prepare message template for shipped notification
+      // Prepare message template for shipped notification with individual parameters
       const template: WatiMessageTemplate = {
-        templateName: 'order_shipped_template', // You need to create this template in WATI
+        templateName: 'order_shipped_template',
         parameters: [
           {
-            name: 'message_text',
-            value: messageText
+            name: 'courier_name',
+            value: courierName
+          },
+          {
+            name: 'order_id',
+            value: order.order_number
+          },
+          {
+            name: 'tracking_number',
+            value: trackingNumber
+          },
+          {
+            name: 'tracking_link',
+            value: trackingLink
           }
         ]
       };
@@ -148,7 +144,7 @@ If you don't receive your parcel within 7 working days, kindly inform us immedia
 
       if (success) {
         console.log(`Shipped notification sent successfully for order ${order.order_number} via ${courierName}`);
-        console.log(`Message: ${messageText}`);
+        console.log(`Tracking link: ${trackingLink}`);
       }
 
       return success;
