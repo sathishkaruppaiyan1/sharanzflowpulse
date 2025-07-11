@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
+import PackingStats from '@/components/packing/PackingStats';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -113,6 +114,9 @@ const Packing = () => {
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
           
+          {/* Packing Analytics */}
+          <PackingStats orders={packingOrders} />
+
           {/* Main Packing Interface */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
