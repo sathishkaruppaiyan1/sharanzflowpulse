@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Order } from '@/types/database';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { useUpdateItemPacked } from '@/hooks/useOrderItems';
+import { toast } from 'sonner';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -24,9 +25,16 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
     updateItemPacked.mutate({ itemId, packed });
   };
 
-  const handleMoveToTracking = (orderId: string) => {
+  const handleMoveToTracking = (orderId: string, orderNumber: string) => {
     console.log('Moving order to tracking:', orderId);
-    updateOrderStage.mutate({ orderId, stage: 'tracking' });
+    updateOrderStage.mutate(
+      { orderId, stage: 'tracking' },
+      {
+        onSuccess: () => {
+          toast.success(`Order ${orderNumber} has been dispatched! WhatsApp notification sent to customer.`);
+        }
+      }
+    );
   };
 
   const isOrderReadyForShipping = (order: Order) => {
@@ -67,7 +75,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                     className={`${isReady ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}
                   >
                     <Package className="h-3 w-3 mr-1" />
-                    {isReady ? 'Ready' : `${packedItems}/${totalItems} Packed`}
+                    {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
                   </Badge>
                 </div>
               </div>
@@ -139,13 +147,13 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                 </div>
                 
                 <Button 
-                  onClick={() => handleMoveToTracking(order.id)}
+                  onClick={() => handleMoveToTracking(order.id, order.order_number)}
                   disabled={!isReady || updateOrderStage.isPending}
                   size="sm"
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Truck className="h-4 w-4 mr-2" />
-                  Ready to Ship
+                  Dispatch Order
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>

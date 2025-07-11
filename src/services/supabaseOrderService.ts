@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 
@@ -213,11 +214,11 @@ export const supabaseOrderService = {
       throw error;
     }
 
-    // Send WhatsApp notification when order is moved to tracking (packed)
+    // Send WhatsApp notification when order is moved to tracking (ready for dispatch)
     if (stage === 'tracking') {
       try {
         const { watiService } = await import('./watiService');
-        await watiService.sendOrderPackedNotification(data);
+        await watiService.sendOrderDispatchedNotification(data);
       } catch (error) {
         console.error('Error sending WhatsApp notification:', error);
         // Don't throw error as order update was successful

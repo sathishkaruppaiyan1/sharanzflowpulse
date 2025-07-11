@@ -48,6 +48,11 @@ export const watiService = {
 
   // Send order packed notification
   sendOrderPackedNotification: async (order: Order): Promise<boolean> => {
+    return watiService.sendOrderDispatchedNotification(order);
+  },
+
+  // Send order dispatched notification
+  sendOrderDispatchedNotification: async (order: Order): Promise<boolean> => {
     try {
       // Get WATI configuration
       const { data: configData } = await supabase
@@ -75,9 +80,9 @@ export const watiService = {
         return false;
       }
 
-      // Prepare message template
+      // Prepare message template for dispatch notification
       const template: WatiMessageTemplate = {
-        templateName: 'order_packed', // You need to create this template in WATI
+        templateName: 'order_dispatched', // You need to create this template in WATI
         parameters: [
           {
             name: 'customer_name',
@@ -90,18 +95,28 @@ export const watiService = {
           {
             name: 'total_amount',
             value: `₹${order.total_amount}`
+          },
+          {
+            name: 'tracking_number',
+            value: order.tracking_number || 'Will be updated soon'
           }
         ]
       };
 
-      return await watiService.sendWhatsAppMessage(
+      const success = await watiService.sendWhatsAppMessage(
         order.customer.phone,
         template,
         watiConfig.api_key,
         watiConfig.base_url
       );
+
+      if (success) {
+        console.log(`Dispatch notification sent successfully for order ${order.order_number}`);
+      }
+
+      return success;
     } catch (error) {
-      console.error('Error in sendOrderPackedNotification:', error);
+      console.error('Error in sendOrderDispatchedNotification:', error);
       return false;
     }
   }
