@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Truck, Scan, Package, MapPin } from 'lucide-react';
+import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
@@ -8,6 +7,7 @@ import { useOrdersByStage, useUpdateTracking } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/watiService';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ const Tracking = () => {
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [detectedCarrier, setDetectedCarrier] = useState<string>('');
   const [isOrderLocked, setIsOrderLocked] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
@@ -36,6 +37,7 @@ const Tracking = () => {
     if (order) {
       setCurrentOrder(order);
       setIsOrderLocked(true);
+      setWhatsappStatus(null);
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
     } else {
@@ -65,6 +67,7 @@ const Tracking = () => {
     }
     
     setDetectedCarrier(carrierDisplayName);
+    setWhatsappStatus('pending');
     
     try {
       await updateTrackingMutation.mutateAsync({
@@ -73,6 +76,15 @@ const Tracking = () => {
         carrier: carrier
       });
       
+      // Check if customer has phone number to determine WhatsApp status
+      if (currentOrder.customer?.phone) {
+        setWhatsappStatus('success');
+        toast.success(`Tracking added successfully for order ${currentOrder.order_number}. WhatsApp notification sent!`);
+      } else {
+        setWhatsappStatus('failed');
+        toast.warning(`Tracking added but WhatsApp notification failed - no phone number available`);
+      }
+      
       // Reset form after successful update
       setOrderIdInput('');
       setTrackingNumberInput('');
@@ -80,9 +92,12 @@ const Tracking = () => {
       setDetectedCarrier('');
       setIsOrderLocked(false);
       
-      toast.success(`Tracking added successfully for order ${currentOrder.order_number}`);
+      // Reset WhatsApp status after a delay
+      setTimeout(() => setWhatsappStatus(null), 5000);
+      
     } catch (error) {
       console.error('Error updating tracking:', error);
+      setWhatsappStatus('failed');
       toast.error('Failed to update tracking information');
     }
   };
@@ -93,6 +108,7 @@ const Tracking = () => {
     setCurrentOrder(null);
     setDetectedCarrier('');
     setIsOrderLocked(false);
+    setWhatsappStatus(null);
   };
 
   if (isLoading) {
@@ -138,6 +154,53 @@ const Tracking = () => {
           
           {/* Tracking Stats */}
           <TrackingStats orders={trackingOrders} />
+
+          {/* WhatsApp Status Indicator */}
+          {whatsappStatus && (
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <MessageCircle className="h-5 w-5 text-blue-600" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">WhatsApp Notification</span>
+                      {whatsappStatus === 'pending' && (
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          Sending...
+                        </Badge>
+                      )}
+                      {whatsappStatus === 'success' && (
+                        <div className="flex items-center space-x-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            Sent Successfully
+                          </Badge>
+                        </div>
+                      )}
+                      {whatsappStatus === 'failed' && (
+                        <div className="flex items-center space-x-1">
+                          <XCircle className="h-4 w-4 text-red-600" />
+                          <Badge variant="secondary" className="bg-red-100 text-red-800">
+                            Failed to Send
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    {whatsappStatus === 'success' && (
+                      <p className="text-sm text-green-600 mt-1">
+                        Customer has been notified about the shipment via WhatsApp
+                      </p>
+                    )}
+                    {whatsappStatus === 'failed' && (
+                      <p className="text-sm text-red-600 mt-1">
+                        Could not send WhatsApp notification - check customer phone number
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Main Tracking Interface */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -273,6 +336,18 @@ const Tracking = () => {
                         </p>
                         {currentOrder.customer.email && (
                           <p className="text-sm text-gray-600">{currentOrder.customer.email}</p>
+                        )}
+                        {currentOrder.customer.phone && (
+                          <div className="flex items-center space-x-2 mt-1">
+                            <MessageCircle className="h-4 w-4 text-green-600" />
+                            <p className="text-sm text-green-600">WhatsApp: {currentOrder.customer.phone}</p>
+                          </div>
+                        )}
+                        {!currentOrder.customer.phone && (
+                          <div className="flex items-center space-x-2 mt-1">
+                            <XCircle className="h-4 w-4 text-red-600" />
+                            <p className="text-sm text-red-600">No phone number - WhatsApp unavailable</p>
+                          </div>
                         )}
                       </div>
                     )}

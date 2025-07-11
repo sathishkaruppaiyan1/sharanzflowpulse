@@ -4,6 +4,7 @@ import { BarChart3 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PerformanceMetrics from '@/components/analytics/PerformanceMetrics';
 import ExportReports from '@/components/analytics/ExportReports';
+import CompletedOrdersList from '@/components/analytics/CompletedOrdersList';
 import { useOrders } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -66,6 +67,7 @@ const Analytics = () => {
           <div className="space-y-6">
             <ExportReports orders={orders} />
             <PerformanceMetrics orders={orders} />
+            <CompletedOrdersList orders={orders} />
           </div>
         </div>
       </div>
