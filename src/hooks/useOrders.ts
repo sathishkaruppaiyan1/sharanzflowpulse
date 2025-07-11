@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
@@ -7,7 +6,15 @@ import { toast } from 'sonner';
 export const useOrders = () => {
   return useQuery({
     queryKey: ['orders'],
-    queryFn: supabaseOrderService.fetchOrders,
+    queryFn: async () => {
+      console.log('Fetching orders from Supabase...');
+      const orders = await supabaseOrderService.fetchOrders();
+      console.log('Fetched orders:', orders.length);
+      orders.forEach(order => {
+        console.log(`Order ${order.order_number}: customer phone = ${order.customer?.phone}, customer data:`, order.customer);
+      });
+      return orders;
+    },
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 };
@@ -15,7 +22,15 @@ export const useOrders = () => {
 export const useOrdersByStage = (stage: OrderStage) => {
   return useQuery({
     queryKey: ['orders', 'stage', stage],
-    queryFn: () => supabaseOrderService.fetchOrdersByStage(stage),
+    queryFn: async () => {
+      console.log(`Fetching orders for stage: ${stage}`);
+      const orders = await supabaseOrderService.fetchOrdersByStage(stage);
+      console.log(`Orders in ${stage} stage:`, orders.length);
+      orders.forEach(order => {
+        console.log(`Order ${order.order_number} in ${stage}: customer phone = ${order.customer?.phone}`);
+      });
+      return orders;
+    },
     refetchInterval: 30000,
   });
 };

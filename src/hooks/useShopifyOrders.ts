@@ -40,6 +40,7 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
     throw new Error('Shopify API not configured');
   }
 
+  console.log('Fetching Shopify orders...');
   const { data, error: functionError } = await supabase.functions.invoke('fetch-shopify-orders');
 
   if (functionError) {
@@ -50,7 +51,17 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
     throw new Error(data.error);
   }
 
-  return data.orders || [];
+  const orders = data.orders || [];
+  console.log(`Fetched ${orders.length} Shopify orders`);
+  
+  // Log phone number data for debugging
+  orders.forEach((order: ShopifyOrder) => {
+    const shippingPhone = order.shipping_address?.phone;
+    const customerPhone = order.customer?.phone;
+    console.log(`Shopify Order ${order.order_number}: shipping_address.phone = ${shippingPhone}, customer.phone = ${customerPhone}`);
+  });
+
+  return orders;
 };
 
 export const useShopifyOrders = () => {
