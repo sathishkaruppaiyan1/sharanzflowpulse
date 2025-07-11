@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare } from 'lucide-react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,9 +57,20 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-lg">{order.order_number}</CardTitle>
-                  <CardDescription>
-                    {order.customer?.first_name} {order.customer?.last_name}
-                  </CardDescription>
+                  <div className="text-sm text-gray-600">
+                    <p>{order.customer?.first_name} {order.customer?.last_name}</p>
+                    {order.customer?.phone ? (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Phone className="h-3 w-3 text-green-600" />
+                        <span className="text-green-600">{order.customer.phone}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 text-red-500" />
+                        <span className="text-red-500">No phone number</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge 
