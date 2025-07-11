@@ -1,18 +1,66 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StageCard from '@/components/dashboard/StageCard';
 import ShopifyOrdersCard from '@/components/dashboard/ShopifyOrdersCard';
 import Header from '@/components/layout/Header';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrders } from '@/hooks/useOrders';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { data: orders = [] } = useOrders();
+  const [realtimeData, setRealtimeData] = useState({
+    newOrders: 0,
+    readyToPrint: 0,
+    readyToPack: 0,
+    readyToShip: 0,
+    inTransit: 0
+  });
+
+  useEffect(() => {
+    // Calculate real-time statistics from orders
+    const calculateStats = () => {
+      const stats = {
+        newOrders: orders.filter(order => order.stage === 'pending').length,
+        readyToPrint: orders.filter(order => order.stage === 'printing').length,
+        readyToPack: orders.filter(order => order.stage === 'packing').length,
+        readyToShip: orders.filter(order => order.stage === 'tracking').length,
+        inTransit: orders.filter(order => order.stage === 'shipped').length
+      };
+      setRealtimeData(stats);
+    };
+
+    calculateStats();
+
+    // Set up real-time subscription for orders
+    const channel = supabase
+      .channel('orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        () => {
+          // Refetch data when orders change
+          calculateStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orders]);
 
   const stageData = [
     {
       title: 'New Orders',
-      count: 127,
+      count: realtimeData.newOrders,
       icon: Package,
       color: 'blue',
       description: 'Awaiting processing',
@@ -20,7 +68,7 @@ const Dashboard = () => {
     },
     {
       title: 'Ready to Print',
-      count: 85,
+      count: realtimeData.readyToPrint,
       icon: Printer,
       color: 'orange',
       description: 'Labels pending',
@@ -28,7 +76,7 @@ const Dashboard = () => {
     },
     {
       title: 'Ready to Pack',
-      count: 64,
+      count: realtimeData.readyToPack,
       icon: PackageCheck,
       color: 'green',
       description: 'Items to pack',
@@ -36,7 +84,7 @@ const Dashboard = () => {
     },
     {
       title: 'Ready to Ship',
-      count: 42,
+      count: realtimeData.readyToShip,
       icon: Truck,
       color: 'purple',
       description: 'Awaiting pickup',
@@ -44,7 +92,7 @@ const Dashboard = () => {
     },
     {
       title: 'In Transit',
-      count: 156,
+      count: realtimeData.inTransit,
       icon: BarChart3,
       color: 'red',
       description: 'Being delivered',
@@ -61,10 +109,10 @@ const Dashboard = () => {
           {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome to F3-Engine
+              Welcome to Flow Pulse OFS
             </h2>
             <p className="text-gray-600">
-              Manage your order fulfillment process efficiently across all stages
+              Real-time order fulfillment system - Manage your operations efficiently
             </p>
           </div>
 
@@ -92,29 +140,21 @@ const Dashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>System Status</CardTitle>
-                <CardDescription>Current system health and integrations</CardDescription>
+                <CardDescription>Current system health</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Shopify API</span>
-                    <span className="text-sm font-medium text-green-600">Connected</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">FrenchExpress</span>
+                    <span className="text-sm text-gray-600">Database</span>
                     <span className="text-sm font-medium text-green-600">Online</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Delhivery</span>
-                    <span className="text-sm font-medium text-green-600">Online</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">17Track API</span>
+                    <span className="text-sm text-gray-600">Real-time Updates</span>
                     <span className="text-sm font-medium text-green-600">Active</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">WhatsApp</span>
-                    <span className="text-sm font-medium text-yellow-600">Pending</span>
+                    <span className="text-sm text-gray-600">Order Processing</span>
+                    <span className="text-sm font-medium text-green-600">Running</span>
                   </div>
                 </div>
               </CardContent>
@@ -125,25 +165,31 @@ const Dashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>Today's Performance</CardTitle>
-              <CardDescription>Order processing metrics for today</CardDescription>
+              <CardDescription>Real-time order processing metrics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Orders Processed</span>
-                  <span className="text-xl font-bold text-green-600">247</span>
+                  <span className="text-sm text-gray-600">Total Orders</span>
+                  <span className="text-xl font-bold text-blue-600">{orders.length}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Labels Printed</span>
-                  <span className="text-xl font-bold text-blue-600">198</span>
+                  <span className="text-sm text-gray-600">Completed Orders</span>
+                  <span className="text-xl font-bold text-green-600">
+                    {orders.filter(order => order.stage === 'delivered').length}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Packages Shipped</span>
-                  <span className="text-xl font-bold text-purple-600">164</span>
+                  <span className="text-sm text-gray-600">In Progress</span>
+                  <span className="text-xl font-bold text-orange-600">
+                    {orders.filter(order => !['delivered', 'pending'].includes(order.stage || '')).length}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Processing Rate</span>
-                  <span className="text-xl font-bold text-orange-600">89%</span>
+                  <span className="text-xl font-bold text-purple-600">
+                    {orders.length > 0 ? Math.round((orders.filter(order => order.stage !== 'pending').length / orders.length) * 100) : 0}%
+                  </span>
                 </div>
               </div>
             </CardContent>

@@ -3,6 +3,7 @@ import React from 'react';
 import { BarChart3 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PerformanceMetrics from '@/components/analytics/PerformanceMetrics';
+import ExportReports from '@/components/analytics/ExportReports';
 import { useOrders } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -58,11 +59,14 @@ const Analytics = () => {
               <h2 className="text-xl font-semibold text-gray-900">Business Analytics</h2>
             </div>
             <p className="text-gray-600">
-              Track performance metrics, fulfillment efficiency, and order trends.
+              Track performance metrics, fulfillment efficiency, and export reports.
             </p>
           </div>
 
-          <PerformanceMetrics orders={orders} />
+          <div className="space-y-6">
+            <ExportReports orders={orders} />
+            <PerformanceMetrics orders={orders} />
+          </div>
         </div>
       </div>
     </div>
