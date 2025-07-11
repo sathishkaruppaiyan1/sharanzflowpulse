@@ -102,8 +102,19 @@ export const supabaseOrderService = {
       .select(`
         *,
         customer:customer_id (
+          first_name,
+          last_name,
           phone
-        )
+        ),
+        shipping_address:shipping_address_id (
+          address_line_1,
+          address_line_2,
+          city,
+          state,
+          postal_code,
+          country
+        ),
+        order_items (*)
       `)
       .single();
 
