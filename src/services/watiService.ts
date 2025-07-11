@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import type { Order } from '@/types/database';
+import type { Order, CarrierType } from '@/types/database';
 
 export interface WatiMessageTemplate {
   templateName: string;
@@ -9,6 +9,28 @@ export interface WatiMessageTemplate {
     value: string;
   }>;
 }
+
+// Function to detect courier partner based on tracking number
+export const detectCourierPartner = (trackingNumber: string): CarrierType => {
+  if (trackingNumber.startsWith('4804')) {
+    return 'frenchexpress';
+  } else if (trackingNumber.startsWith('2158')) {
+    return 'delhivery';
+  }
+  return 'other';
+};
+
+// Function to generate tracking link based on courier partner
+export const generateTrackingLink = (trackingNumber: string, carrier: CarrierType): string => {
+  switch (carrier) {
+    case 'frenchexpress':
+      return `https://frenchexpress.in/track/${trackingNumber}`;
+    case 'delhivery':
+      return `https://www.delhivery.com/track/package/${trackingNumber}`;
+    default:
+      return '';
+  }
+};
 
 export const watiService = {
   // Send WhatsApp message via WATI API
@@ -46,8 +68,8 @@ export const watiService = {
     }
   },
 
-  // Send order shipped notification with tracking ID
-  sendOrderShippedNotification: async (order: Order): Promise<boolean> => {
+  // Send order shipped notification with tracking ID and link
+  sendOrderShippedNotification: async (order: Order, trackingNumber: string, carrier: CarrierType): Promise<boolean> => {
     try {
       // Get WATI configuration
       const { data: configData } = await supabase
@@ -75,11 +97,13 @@ export const watiService = {
         return false;
       }
 
-      // Check if tracking number exists
-      if (!order.tracking_number) {
-        console.error('Tracking number not available');
-        return false;
-      }
+      // Generate tracking link
+      const trackingLink = generateTrackingLink(trackingNumber, carrier);
+
+      // Get courier partner display name
+      const courierName = carrier === 'frenchexpress' ? 'French Express' : 
+                         carrier === 'delhivery' ? 'Delhivery' : 
+                         'Other';
 
       // Prepare message template for shipped notification
       const template: WatiMessageTemplate = {
@@ -95,7 +119,15 @@ export const watiService = {
           },
           {
             name: 'tracking_number',
-            value: order.tracking_number
+            value: trackingNumber
+          },
+          {
+            name: 'courier_name',
+            value: courierName
+          },
+          {
+            name: 'tracking_link',
+            value: trackingLink
           },
           {
             name: 'total_amount',
@@ -112,7 +144,8 @@ export const watiService = {
       );
 
       if (success) {
-        console.log(`Shipped notification sent successfully for order ${order.order_number}`);
+        console.log(`Shipped notification sent successfully for order ${order.order_number} via ${courierName}`);
+        console.log(`Tracking link: ${trackingLink}`);
       }
 
       return success;

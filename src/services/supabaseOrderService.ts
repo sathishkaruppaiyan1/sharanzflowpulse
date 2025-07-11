@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
+import { detectCourierPartner } from './watiService';
 
 export const supabaseOrderService = {
   // Fetch all orders with related data
@@ -216,13 +218,16 @@ export const supabaseOrderService = {
     return data;
   },
 
-  // Update tracking information
-  updateTracking: async (orderId: string, trackingNumber: string, carrier: CarrierType): Promise<Order> => {
+  // Update tracking information with auto-detection of courier partner
+  updateTracking: async (orderId: string, trackingNumber: string, carrier?: CarrierType): Promise<Order> => {
+    // Auto-detect courier partner if not provided
+    const detectedCarrier = carrier || detectCourierPartner(trackingNumber);
+    
     const { data, error } = await supabase
       .from('orders')
       .update({ 
         tracking_number: trackingNumber, 
-        carrier,
+        carrier: detectedCarrier,
         stage: 'tracking'
       })
       .eq('id', orderId)
@@ -245,7 +250,7 @@ export const supabaseOrderService = {
     // Send WhatsApp notification when tracking is added
     try {
       const { watiService } = await import('./watiService');
-      await watiService.sendOrderShippedNotification(data);
+      await watiService.sendOrderShippedNotification(data, trackingNumber, detectedCarrier);
     } catch (error) {
       console.error('Error sending WhatsApp notification:', error);
       // Don't throw error as tracking update was successful

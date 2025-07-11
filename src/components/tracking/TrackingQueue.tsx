@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Package, Truck, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUpdateTracking, useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, CarrierType } from '@/types/database';
+import { detectCourierPartner, generateTrackingLink } from '@/services/watiService';
 import { useState } from 'react';
 
 interface TrackingQueueProps {
@@ -22,27 +22,40 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
 
   const handleTrackingSubmit = (orderId: string) => {
     const data = trackingData[orderId];
-    if (data?.trackingNumber && data?.carrier) {
+    if (data?.trackingNumber) {
+      // Auto-detect courier partner
+      const detectedCarrier = detectCourierPartner(data.trackingNumber);
+      
       updateTrackingMutation.mutate({
         orderId,
         trackingNumber: data.trackingNumber,
-        carrier: data.carrier,
+        carrier: detectedCarrier,
       });
     }
+  };
+
+  const handleTrackingNumberChange = (orderId: string, trackingNumber: string) => {
+    // Auto-detect carrier when tracking number changes
+    const detectedCarrier = detectCourierPartner(trackingNumber);
+    
+    setTrackingData(prev => ({
+      ...prev,
+      [orderId]: { trackingNumber, carrier: detectedCarrier }
+    }));
   };
 
   const handleMarkShipped = (orderId: string) => {
     updateOrderStageMutation.mutate({ orderId, stage: 'shipped' });
   };
 
-  const getCarrierUrl = (carrier: CarrierType, trackingNumber: string) => {
+  const getCourierDisplayName = (carrier: CarrierType) => {
     switch (carrier) {
       case 'frenchexpress':
-        return `https://frenchexpress.in/track/${trackingNumber}`;
+        return 'French Express';
       case 'delhivery':
-        return `https://www.delhivery.com/track/package/${trackingNumber}`;
+        return 'Delhivery';
       default:
-        return null;
+        return 'Other';
     }
   };
 
@@ -124,17 +137,26 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <MapPin className="h-4 w-4 text-green-600" />
-                    <span className="font-medium text-green-900">Tracking: {order.tracking_number}</span>
-                    <Badge variant="outline" className="text-green-700 border-green-300">
-                      {order.carrier}
-                    </Badge>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-green-900">Tracking: {order.tracking_number}</span>
+                        <Badge variant="outline" className="text-green-700 border-green-300">
+                          {getCourierDisplayName(order.carrier!)}
+                        </Badge>
+                      </div>
+                      {order.carrier && (
+                        <p className="text-sm text-green-700 mt-1">
+                          Tracking Link: {generateTrackingLink(order.tracking_number, order.carrier)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex space-x-2">
-                    {order.carrier && getCarrierUrl(order.carrier, order.tracking_number) && (
+                    {order.carrier && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => window.open(getCarrierUrl(order.carrier!, order.tracking_number!), '_blank')}
+                        onClick={() => window.open(generateTrackingLink(order.tracking_number!, order.carrier!), '_blank')}
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
                         Track
@@ -155,41 +177,19 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                 <h5 className="font-medium mb-3">Add Tracking Information</h5>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <Label htmlFor={`carrier-${order.id}`}>Carrier</Label>
-                    <Select
-                      value={trackingData[order.id]?.carrier || ''}
-                      onValueChange={(value: CarrierType) =>
-                        setTrackingData(prev => ({
-                          ...prev,
-                          [order.id]: { ...prev[order.id], carrier: value }
-                        }))
-                      }
-                    >
-                      <SelectTrigger id={`carrier-${order.id}`}>
-                        <SelectValue placeholder="Select carrier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="frenchexpress">French Express</SelectItem>
-                        <SelectItem value="delhivery">Delhivery</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
+                  <div className="md:col-span-2">
                     <Label htmlFor={`tracking-${order.id}`}>Tracking Number</Label>
                     <Input
                       id={`tracking-${order.id}`}
-                      placeholder="Enter tracking number"
+                      placeholder="Enter tracking number (4804... or 2158...)"
                       value={trackingData[order.id]?.trackingNumber || ''}
-                      onChange={(e) =>
-                        setTrackingData(prev => ({
-                          ...prev,
-                          [order.id]: { ...prev[order.id], trackingNumber: e.target.value }
-                        }))
-                      }
+                      onChange={(e) => handleTrackingNumberChange(order.id, e.target.value)}
                     />
+                    {trackingData[order.id]?.trackingNumber && (
+                      <p className="text-sm text-green-600 mt-1">
+                        Auto-detected: {getCourierDisplayName(trackingData[order.id].carrier)}
+                      </p>
+                    )}
                   </div>
                   
                   <div className="flex items-end">
@@ -197,7 +197,6 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                       onClick={() => handleTrackingSubmit(order.id)}
                       disabled={
                         !trackingData[order.id]?.trackingNumber ||
-                        !trackingData[order.id]?.carrier ||
                         updateTrackingMutation.isPending
                       }
                       className="w-full"
