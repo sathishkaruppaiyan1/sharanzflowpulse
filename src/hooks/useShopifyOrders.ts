@@ -16,12 +16,17 @@ export interface ShopifyOrder {
     first_name?: string;
     last_name?: string;
     phone?: string;
+    email?: string;
+    id?: string;
   };
   line_items?: Array<{
     title?: string;
     name?: string;
     quantity?: number;
     variant_title?: string;
+    price?: number;
+    sku?: string;
+    variant_id?: number;
   }>;
   shipping_address?: {
     address1?: string;
@@ -30,7 +35,7 @@ export interface ShopifyOrder {
     province?: string;
     zip?: string;
     country?: string;
-    phone?: string;
+    phone?: string; // Added this field
   };
   total_weight?: number;
   current_total_price?: string;
