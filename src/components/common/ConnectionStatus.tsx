@@ -20,27 +20,14 @@ const ConnectionStatus = () => {
     {
       name: 'Shopify',
       enabled: apiConfigs.shopify?.enabled && apiConfigs.shopify?.shop_url && apiConfigs.shopify?.access_token,
-      color: 'shopify'
-    },
-    {
-      name: 'WhatsApp',
-      enabled: apiConfigs.whatsapp?.enabled && apiConfigs.whatsapp?.phone_number_id && apiConfigs.whatsapp?.access_token,
-      color: 'whatsapp'
     },
     {
       name: 'WATI',
       enabled: apiConfigs.wati?.enabled && apiConfigs.wati?.api_key,
-      color: 'wati'
     },
     {
-      name: 'French Express',
-      enabled: apiConfigs.delivery?.frenchexpress?.enabled && apiConfigs.delivery?.frenchexpress?.api_key,
-      color: 'delivery'
-    },
-    {
-      name: 'Delhivery',
-      enabled: apiConfigs.delivery?.delhivery?.enabled && apiConfigs.delivery?.delhivery?.api_key,
-      color: 'delivery'
+      name: '17Track',
+      enabled: apiConfigs.track17?.enabled && apiConfigs.track17?.api_key,
     }
   ];
 

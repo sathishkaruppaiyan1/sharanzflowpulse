@@ -10,29 +10,14 @@ export interface ApiConfigs {
     access_token: string;
     webhook_secret: string;
   };
-  whatsapp: {
-    enabled: boolean;
-    phone_number_id: string;
-    access_token: string;
-    verify_token: string;
-    app_secret: string;
-  };
   wati: {
     enabled: boolean;
     api_key: string;
     base_url: string;
   };
-  delivery: {
-    frenchexpress: {
-      enabled: boolean;
-      api_key: string;
-      secret_key: string;
-    };
-    delhivery: {
-      enabled: boolean;
-      api_key: string;
-      staging_mode: boolean;
-    };
+  track17: {
+    enabled: boolean;
+    api_key: string;
   };
 }
 
@@ -43,29 +28,14 @@ const defaultConfigs: ApiConfigs = {
     access_token: '',
     webhook_secret: ''
   },
-  whatsapp: {
-    enabled: false,
-    phone_number_id: '',
-    access_token: '',
-    verify_token: '',
-    app_secret: ''
-  },
   wati: {
     enabled: false,
     api_key: '',
     base_url: 'https://live-server-6371.wati.io'
   },
-  delivery: {
-    frenchexpress: {
-      enabled: false,
-      api_key: '',
-      secret_key: ''
-    },
-    delhivery: {
-      enabled: false,
-      api_key: '',
-      staging_mode: true
-    }
+  track17: {
+    enabled: false,
+    api_key: ''
   }
 };
 
@@ -95,12 +65,8 @@ export const useApiConfigs = () => {
         const configData = data.value as unknown as Partial<ApiConfigs>;
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
-          whatsapp: { ...defaultConfigs.whatsapp, ...configData.whatsapp },
           wati: { ...defaultConfigs.wati, ...configData.wati },
-          delivery: {
-            frenchexpress: { ...defaultConfigs.delivery.frenchexpress, ...configData.delivery?.frenchexpress },
-            delhivery: { ...defaultConfigs.delivery.delhivery, ...configData.delivery?.delhivery }
-          }
+          track17: { ...defaultConfigs.track17, ...configData.track17 }
         };
         setApiConfigs(mergedConfigs);
       } else {
