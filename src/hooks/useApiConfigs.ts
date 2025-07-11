@@ -118,16 +118,36 @@ export const useApiConfigs = () => {
   const saveConfigs = async (configs: ApiConfigs) => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // First check if record exists
+      const { data: existingData } = await supabase
         .from('system_settings')
-        .upsert({
-          key: 'api_configs',
-          value: configs as any,
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('key', 'api_configs')
+        .single();
 
-      if (error) {
-        throw error;
+      let result;
+      if (existingData) {
+        // Update existing record
+        result = await supabase
+          .from('system_settings')
+          .update({
+            value: configs as any,
+            updated_at: new Date().toISOString()
+          })
+          .eq('key', 'api_configs');
+      } else {
+        // Insert new record
+        result = await supabase
+          .from('system_settings')
+          .insert({
+            key: 'api_configs',
+            value: configs as any,
+            updated_at: new Date().toISOString()
+          });
+      }
+
+      if (result.error) {
+        throw result.error;
       }
 
       setApiConfigs(configs);
