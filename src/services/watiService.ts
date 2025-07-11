@@ -32,6 +32,18 @@ export const generateTrackingLink = (trackingNumber: string, carrier: CarrierTyp
   }
 };
 
+// Function to get courier display name
+export const getCourierDisplayName = (carrier: CarrierType): string => {
+  switch (carrier) {
+    case 'frenchexpress':
+      return 'FRENCH EXPRESS';
+    case 'delhivery':
+      return 'DELHIVERY';
+    default:
+      return 'OTHER';
+  }
+};
+
 export const watiService = {
   // Send WhatsApp message via WATI API
   sendWhatsAppMessage: async (
@@ -99,39 +111,30 @@ export const watiService = {
 
       // Generate tracking link
       const trackingLink = generateTrackingLink(trackingNumber, carrier);
+      const courierName = getCourierDisplayName(carrier);
 
-      // Get courier partner display name
-      const courierName = carrier === 'frenchexpress' ? 'French Express' : 
-                         carrier === 'delhivery' ? 'Delhivery' : 
-                         'Other';
+      // Create the message text matching your template
+      const messageText = `Your order 📦 has been shipped with ${courierName} Courier.
+
+Your order ID : ${order.order_number}
+Tracking Number: ${trackingNumber}
+Courier name : ${courierName}
+
+Tracking link: ${trackingLink}
+
+Please track your order status regularly using this link ☝
+
+Delivery in 5-7 working days
+
+If you don't receive your parcel within 7 working days, kindly inform us immediately.`;
 
       // Prepare message template for shipped notification
       const template: WatiMessageTemplate = {
-        templateName: 'order_shipped', // You need to create this template in WATI
+        templateName: 'order_shipped_template', // You need to create this template in WATI
         parameters: [
           {
-            name: 'customer_name',
-            value: `${order.customer.first_name} ${order.customer.last_name}`.trim()
-          },
-          {
-            name: 'order_number',
-            value: order.order_number
-          },
-          {
-            name: 'tracking_number',
-            value: trackingNumber
-          },
-          {
-            name: 'courier_name',
-            value: courierName
-          },
-          {
-            name: 'tracking_link',
-            value: trackingLink
-          },
-          {
-            name: 'total_amount',
-            value: `₹${order.total_amount}`
+            name: 'message_text',
+            value: messageText
           }
         ]
       };
@@ -145,7 +148,7 @@ export const watiService = {
 
       if (success) {
         console.log(`Shipped notification sent successfully for order ${order.order_number} via ${courierName}`);
-        console.log(`Tracking link: ${trackingLink}`);
+        console.log(`Message: ${messageText}`);
       }
 
       return success;
