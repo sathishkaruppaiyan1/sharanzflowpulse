@@ -4,18 +4,23 @@ import { Truck, Scan, Package, MapPin } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
-import { useOrdersByStage } from '@/hooks/useOrders';
+import { useOrdersByStage, useUpdateTracking } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/database';
+import { detectCourierPartner } from '@/services/watiService';
+import { toast } from 'sonner';
 
 const Tracking = () => {
   const { data: trackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
+  const updateTrackingMutation = useUpdateTracking();
+  
   const [orderIdInput, setOrderIdInput] = useState('');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [detectedCarrier, setDetectedCarrier] = useState<string>('');
+  const [isOrderLocked, setIsOrderLocked] = useState(false);
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
@@ -30,28 +35,64 @@ const Tracking = () => {
     
     if (order) {
       setCurrentOrder(order);
-      setOrderIdInput('');
+      setIsOrderLocked(true);
+      toast.success(`Order ${order.order_number} loaded`);
+      console.log('Order found:', order.order_number);
     } else {
-      alert('Order not found in tracking queue');
+      toast.error('Order not found in tracking queue');
+      setCurrentOrder(null);
+      setIsOrderLocked(false);
     }
   };
 
-  const handleTrackingNumberScan = () => {
-    if (!trackingNumberInput.trim()) return;
+  const handleTrackingNumberScan = async () => {
+    if (!trackingNumberInput.trim() || !currentOrder) return;
     
     // Auto-detect carrier based on tracking number pattern
     const trackingNumber = trackingNumberInput.trim();
-    let carrier = '';
+    const carrier = detectCourierPartner(trackingNumber);
     
-    if (trackingNumber.length === 10 && trackingNumber.match(/^[0-9]+$/)) {
-      carrier = 'French Express';
-    } else if (trackingNumber.length === 13 && trackingNumber.match(/^[A-Z0-9]+$/)) {
-      carrier = 'Delhivery';
-    } else {
-      carrier = 'Other';
+    let carrierDisplayName = '';
+    switch (carrier) {
+      case 'frenchexpress':
+        carrierDisplayName = 'French Express';
+        break;
+      case 'delhivery':
+        carrierDisplayName = 'Delhivery';
+        break;
+      default:
+        carrierDisplayName = 'Other';
     }
     
-    setDetectedCarrier(carrier);
+    setDetectedCarrier(carrierDisplayName);
+    
+    try {
+      await updateTrackingMutation.mutateAsync({
+        orderId: currentOrder.id,
+        trackingNumber: trackingNumber,
+        carrier: carrier
+      });
+      
+      // Reset form after successful update
+      setOrderIdInput('');
+      setTrackingNumberInput('');
+      setCurrentOrder(null);
+      setDetectedCarrier('');
+      setIsOrderLocked(false);
+      
+      toast.success(`Tracking added successfully for order ${currentOrder.order_number}`);
+    } catch (error) {
+      console.error('Error updating tracking:', error);
+      toast.error('Failed to update tracking information');
+    }
+  };
+
+  const handleResetOrder = () => {
+    setOrderIdInput('');
+    setTrackingNumberInput('');
+    setCurrentOrder(null);
+    setDetectedCarrier('');
+    setIsOrderLocked(false);
   };
 
   if (isLoading) {
@@ -104,9 +145,21 @@ const Tracking = () => {
             {/* Left Column - Tracking Assignment Scanner */}
             <Card>
               <CardHeader>
-                <div className="flex items-center space-x-2">
-                  <Scan className="h-5 w-5 text-gray-600" />
-                  <CardTitle className="text-lg">Tracking Assignment Scanner</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Scan className="h-5 w-5 text-gray-600" />
+                    <CardTitle className="text-lg">Tracking Assignment Scanner</CardTitle>
+                  </div>
+                  {isOrderLocked && (
+                    <Button
+                      onClick={handleResetOrder}
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      Reset
+                    </Button>
+                  )}
                 </div>
                 <p className="text-sm text-gray-600">
                   Scan order ID first, then scan tracking number barcode
@@ -122,22 +175,29 @@ const Tracking = () => {
                       placeholder="Scan or enter Order ID"
                       value={orderIdInput}
                       onChange={(e) => setOrderIdInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleOrderScan()}
+                      onKeyPress={(e) => e.key === 'Enter' && !isOrderLocked && handleOrderScan()}
                       className="flex-1"
+                      disabled={isOrderLocked}
                     />
                     <Button 
                       onClick={handleOrderScan}
                       size="sm"
                       variant="outline"
                       className="px-3"
+                      disabled={isOrderLocked || !orderIdInput.trim()}
                     >
                       <Scan className="h-4 w-4" />
                     </Button>
                   </div>
+                  {isOrderLocked && currentOrder && (
+                    <p className="text-sm text-green-600 font-medium">
+                      ✓ Order {currentOrder.order_number} locked and ready
+                    </p>
+                  )}
                 </div>
 
                 {/* Tracking Number Scanner - Only show when order is selected */}
-                {currentOrder && (
+                {isOrderLocked && currentOrder && (
                   <div className="space-y-3">
                     <label className="text-sm font-medium text-gray-700">Tracking Number Scanner</label>
                     <div className="flex space-x-2">
@@ -147,7 +207,19 @@ const Tracking = () => {
                         onChange={(e) => {
                           setTrackingNumberInput(e.target.value);
                           if (e.target.value.length > 8) {
-                            handleTrackingNumberScan();
+                            const carrier = detectCourierPartner(e.target.value);
+                            let carrierDisplayName = '';
+                            switch (carrier) {
+                              case 'frenchexpress':
+                                carrierDisplayName = 'French Express';
+                                break;
+                              case 'delhivery':
+                                carrierDisplayName = 'Delhivery';
+                                break;
+                              default:
+                                carrierDisplayName = 'Other';
+                            }
+                            setDetectedCarrier(carrierDisplayName);
                           }
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleTrackingNumberScan()}
@@ -156,8 +228,9 @@ const Tracking = () => {
                       <Button 
                         onClick={handleTrackingNumberScan}
                         size="sm"
-                        variant="outline"
+                        variant="default"
                         className="px-3"
+                        disabled={!trackingNumberInput.trim() || updateTrackingMutation.isPending}
                       >
                         <Package className="h-4 w-4" />
                       </Button>
@@ -165,6 +238,11 @@ const Tracking = () => {
                     {detectedCarrier && (
                       <p className="text-sm text-green-600">
                         Detected carrier: {detectedCarrier}
+                      </p>
+                    )}
+                    {updateTrackingMutation.isPending && (
+                      <p className="text-sm text-blue-600">
+                        Adding tracking information...
                       </p>
                     )}
                   </div>
@@ -183,6 +261,9 @@ const Tracking = () => {
                     <div className="flex items-center space-x-2">
                       <Package className="h-4 w-4 text-gray-500" />
                       <span className="font-medium">{currentOrder.order_number}</span>
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        Locked
+                      </span>
                     </div>
                     
                     {currentOrder.customer && (
@@ -222,6 +303,16 @@ const Tracking = () => {
                         <p className="font-semibold">₹{currentOrder.total_amount}</p>
                       </div>
                     </div>
+
+                    {detectedCarrier && trackingNumberInput && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <h4 className="text-sm font-medium text-blue-900 mb-2">Ready to Add</h4>
+                        <div className="text-sm text-blue-800">
+                          <p><strong>Tracking Number:</strong> {trackingNumberInput}</p>
+                          <p><strong>Courier:</strong> {detectedCarrier}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">
