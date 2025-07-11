@@ -40,6 +40,7 @@ const Tracking = () => {
       setWhatsappStatus(null);
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
+      console.log('Customer phone:', order.customer?.phone);
     } else {
       toast.error('Order not found in tracking queue');
       setCurrentOrder(null);
@@ -337,16 +338,15 @@ const Tracking = () => {
                         {currentOrder.customer.email && (
                           <p className="text-sm text-gray-600">{currentOrder.customer.email}</p>
                         )}
-                        {currentOrder.customer.phone && (
+                        {currentOrder.customer.phone ? (
                           <div className="flex items-center space-x-2 mt-1">
                             <MessageCircle className="h-4 w-4 text-green-600" />
-                            <p className="text-sm text-green-600">WhatsApp: {currentOrder.customer.phone}</p>
+                            <p className="text-sm text-green-600 font-medium">WhatsApp: {currentOrder.customer.phone}</p>
                           </div>
-                        )}
-                        {!currentOrder.customer.phone && (
+                        ) : (
                           <div className="flex items-center space-x-2 mt-1">
                             <XCircle className="h-4 w-4 text-red-600" />
-                            <p className="text-sm text-red-600">No phone number - WhatsApp unavailable</p>
+                            <p className="text-sm text-red-600 font-medium">No phone number - WhatsApp unavailable</p>
                           </div>
                         )}
                       </div>

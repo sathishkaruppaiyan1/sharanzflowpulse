@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Package, Truck, MapPin, Calendar, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,9 +86,15 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                 </div>
                 <div>
                   <CardTitle className="text-lg">{order.order_number}</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {order.customer?.first_name} {order.customer?.last_name}
-                  </p>
+                  <div className="text-sm text-gray-600">
+                    <p>{order.customer?.first_name} {order.customer?.last_name}</p>
+                    {order.customer?.phone && (
+                      <p className="text-green-600">📱 {order.customer.phone}</p>
+                    )}
+                    {!order.customer?.phone && (
+                      <p className="text-red-500">📱 No phone number</p>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
