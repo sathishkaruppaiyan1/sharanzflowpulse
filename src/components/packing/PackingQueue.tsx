@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Order } from '@/types/database';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { useUpdateItemPacked } from '@/hooks/useOrderItems';
-import { toast } from 'sonner';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -27,14 +25,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
 
   const handleMoveToTracking = (orderId: string, orderNumber: string) => {
     console.log('Moving order to tracking:', orderId);
-    updateOrderStage.mutate(
-      { orderId, stage: 'tracking' },
-      {
-        onSuccess: () => {
-          toast.success(`Order ${orderNumber} has been dispatched! WhatsApp notification sent to customer.`);
-        }
-      }
-    );
+    updateOrderStage.mutate({ orderId, stage: 'tracking' });
   };
 
   const isOrderReadyForShipping = (order: Order) => {

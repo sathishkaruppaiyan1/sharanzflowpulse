@@ -46,13 +46,8 @@ export const watiService = {
     }
   },
 
-  // Send order packed notification
-  sendOrderPackedNotification: async (order: Order): Promise<boolean> => {
-    return watiService.sendOrderDispatchedNotification(order);
-  },
-
-  // Send order dispatched notification
-  sendOrderDispatchedNotification: async (order: Order): Promise<boolean> => {
+  // Send order shipped notification with tracking ID
+  sendOrderShippedNotification: async (order: Order): Promise<boolean> => {
     try {
       // Get WATI configuration
       const { data: configData } = await supabase
@@ -80,9 +75,15 @@ export const watiService = {
         return false;
       }
 
-      // Prepare message template for dispatch notification
+      // Check if tracking number exists
+      if (!order.tracking_number) {
+        console.error('Tracking number not available');
+        return false;
+      }
+
+      // Prepare message template for shipped notification
       const template: WatiMessageTemplate = {
-        templateName: 'order_dispatched', // You need to create this template in WATI
+        templateName: 'order_shipped', // You need to create this template in WATI
         parameters: [
           {
             name: 'customer_name',
@@ -93,12 +94,12 @@ export const watiService = {
             value: order.order_number
           },
           {
-            name: 'total_amount',
-            value: `₹${order.total_amount}`
+            name: 'tracking_number',
+            value: order.tracking_number
           },
           {
-            name: 'tracking_number',
-            value: order.tracking_number || 'Will be updated soon'
+            name: 'total_amount',
+            value: `₹${order.total_amount}`
           }
         ]
       };
@@ -111,12 +112,12 @@ export const watiService = {
       );
 
       if (success) {
-        console.log(`Dispatch notification sent successfully for order ${order.order_number}`);
+        console.log(`Shipped notification sent successfully for order ${order.order_number}`);
       }
 
       return success;
     } catch (error) {
-      console.error('Error in sendOrderDispatchedNotification:', error);
+      console.error('Error in sendOrderShippedNotification:', error);
       return false;
     }
   }
