@@ -15,9 +15,10 @@ export interface ApiConfigs {
     api_key: string;
     base_url: string;
   };
-  track17: {
+  trackingmore: {
     enabled: boolean;
     api_key: string;
+    base_url: string;
   };
 }
 
@@ -33,9 +34,10 @@ const defaultConfigs: ApiConfigs = {
     api_key: '',
     base_url: 'https://live-server-6371.wati.io'
   },
-  track17: {
+  trackingmore: {
     enabled: false,
-    api_key: ''
+    api_key: '',
+    base_url: 'https://api.trackingmore.com'
   }
 };
 
@@ -66,7 +68,7 @@ export const useApiConfigs = () => {
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
           wati: { ...defaultConfigs.wati, ...configData.wati },
-          track17: { ...defaultConfigs.track17, ...configData.track17 }
+          trackingmore: { ...defaultConfigs.trackingmore, ...configData.trackingmore }
         };
         setApiConfigs(mergedConfigs);
       } else {
