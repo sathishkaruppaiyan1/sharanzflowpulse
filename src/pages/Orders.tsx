@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -51,13 +50,22 @@ const Orders = () => {
   // Debounce search term to avoid filtering on every keystroke
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  // Use Shopify orders instead of mock orders
+  // Use Shopify orders instead of mock orders - sort by newest first
   const { 
-    orders: shopifyOrders = [], 
+    orders: rawShopifyOrders = [], 
     loading: isLoading, 
     error, 
     refetch 
   } = useShopifyOrders();
+
+  // Sort orders by newest first (created_at descending)
+  const shopifyOrders = useMemo(() => {
+    return [...rawShopifyOrders].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA; // Newest first
+    });
+  }, [rawShopifyOrders]);
 
   // Memoized filter function for better performance
   const filteredOrders = useMemo(() => {

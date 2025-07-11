@@ -14,7 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
-  const { orders: shopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
+  const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   const { data: packingOrders = [] } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
@@ -24,6 +24,15 @@ const Printing = () => {
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
   const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
+
+  // Sort Shopify orders by newest first (created_at descending)
+  const shopifyOrders = React.useMemo(() => {
+    return [...rawShopifyOrders].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA; // Newest first
+    });
+  }, [rawShopifyOrders]);
 
   // Fetch synced Shopify order IDs to exclude from printing stage
   useEffect(() => {
