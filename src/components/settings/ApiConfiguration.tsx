@@ -36,7 +36,7 @@ const ApiConfiguration = () => {
 
   const isShopifyConnected = apiConfigs.shopify?.enabled && apiConfigs.shopify?.shop_url && apiConfigs.shopify?.access_token;
   const isWatiConnected = apiConfigs.wati?.enabled && apiConfigs.wati?.api_key;
-  const is17TrackConnected = apiConfigs.track17?.enabled && apiConfigs.track17?.api_key;
+  const isTrackingMoreConnected = apiConfigs.trackingmore?.enabled && apiConfigs.trackingmore?.api_key;
 
   return (
     <div className="space-y-6">
@@ -214,50 +214,68 @@ const ApiConfiguration = () => {
         </CardContent>
       </Card>
 
-      {/* 17Track Integration */}
+      {/* TrackingMore Integration */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Truck className="h-6 w-6" />
               <div>
-                <CardTitle className="text-xl">17Track Integration</CardTitle>
+                <CardTitle className="text-xl">TrackingMore Integration</CardTitle>
                 <CardDescription>
-                  Configure 17Track API for delivery monitoring
+                  Configure TrackingMore API for shipment tracking and delivery monitoring
                 </CardDescription>
               </div>
             </div>
             <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-              is17TrackConnected 
+              isTrackingMoreConnected 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {is17TrackConnected ? '✓ Connected' : '✗ Not Connected'}
+              {isTrackingMoreConnected ? '✓ Connected' : '✗ Not Connected'}
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="track17-api-key">API Key</Label>
+            <Label htmlFor="trackingmore-api-key">API Key</Label>
             <Input
-              id="track17-api-key"
+              id="trackingmore-api-key"
               type="password"
-              placeholder="Enter your 17Track API key"
-              value={apiConfigs.track17?.api_key || ''}
+              placeholder="Enter your TrackingMore API key"
+              value={apiConfigs.trackingmore?.api_key || ''}
               onChange={(e) =>
                 setApiConfigs(prev => ({
                   ...prev,
-                  track17: { ...prev.track17, api_key: e.target.value, enabled: true }
+                  trackingmore: { ...prev.trackingmore, api_key: e.target.value, enabled: true }
                 }))
               }
             />
           </div>
 
+          <div>
+            <Label htmlFor="trackingmore-base-url">Base URL</Label>
+            <Input
+              id="trackingmore-base-url"
+              placeholder="https://api.trackingmore.com"
+              value={apiConfigs.trackingmore?.base_url || 'https://api.trackingmore.com'}
+              onChange={(e) =>
+                setApiConfigs(prev => ({
+                  ...prev,
+                  trackingmore: { ...prev.trackingmore, base_url: e.target.value }
+                }))
+              }
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Default TrackingMore API endpoint
+            </p>
+          </div>
+
           <div className="flex space-x-3 pt-4">
             <Button
               variant="outline"
-              onClick={() => handleTestConnection('17Track')}
-              disabled={!is17TrackConnected}
+              onClick={() => handleTestConnection('TrackingMore')}
+              disabled={!isTrackingMoreConnected}
             >
               Test Connection
             </Button>
@@ -266,7 +284,7 @@ const ApiConfiguration = () => {
               disabled={saving}
               className="min-w-[160px]"
             >
-              {saving ? 'Saving...' : 'Save 17Track Configuration'}
+              {saving ? 'Saving...' : 'Save TrackingMore Configuration'}
             </Button>
           </div>
         </CardContent>

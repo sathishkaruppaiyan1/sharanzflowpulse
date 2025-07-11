@@ -26,8 +26,8 @@ const ConnectionStatus = () => {
       enabled: apiConfigs.wati?.enabled && apiConfigs.wati?.api_key,
     },
     {
-      name: '17Track',
-      enabled: apiConfigs.track17?.enabled && apiConfigs.track17?.api_key,
+      name: 'TrackingMore',
+      enabled: apiConfigs.trackingmore?.enabled && apiConfigs.trackingmore?.api_key,
     }
   ];
 
