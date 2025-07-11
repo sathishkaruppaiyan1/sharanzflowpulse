@@ -31,7 +31,7 @@ const Sidebar = () => {
   return (
     <div className="w-64 bg-white shadow-lg h-full flex flex-col">
       <div className="p-6 border-b">
-        <h1 className="text-xl font-bold text-gray-800">Flow Pulse OFS</h1>
+        <h1 className="text-xl font-bold text-gray-800">Order Management</h1>
       </div>
       
       <nav className="flex-1 p-4">
