@@ -17,7 +17,18 @@ const TrackingStats = ({ orders }: TrackingStatsProps) => {
     order.tracking_number && order.stage === 'tracking'
   );
   
-  const shipped = orders.filter(order => order.stage === 'shipped');
+  // Only show orders shipped today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const shippedToday = orders.filter(order => {
+    if (order.stage !== 'shipped' || !order.shipped_at) return false;
+    
+    const shippedDate = new Date(order.shipped_at);
+    return shippedDate >= today && shippedDate < tomorrow;
+  });
   
   const urgentOrders = orders.filter(order => {
     const createdDate = new Date(order.created_at);
@@ -59,9 +70,9 @@ const TrackingStats = ({ orders }: TrackingStatsProps) => {
           <Truck className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">{shipped.length}</div>
+          <div className="text-2xl font-bold text-green-600">{shippedToday.length}</div>
           <CardDescription className="text-xs text-muted-foreground">
-            in transit
+            shipped today
           </CardDescription>
         </CardContent>
       </Card>
