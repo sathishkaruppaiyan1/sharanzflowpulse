@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
 
@@ -44,6 +43,30 @@ export const getCourierDisplayName = (carrier: CarrierType): string => {
   }
 };
 
+// Function to format phone number for WATI
+const formatPhoneForWati = (phoneNumber: string): string => {
+  // Remove all non-digits
+  const digits = phoneNumber.replace(/[^\d]/g, '');
+  
+  // If it's an Indian number without country code, add +91
+  if (digits.length === 10 && digits.match(/^[6-9]/)) {
+    return `91${digits}`;
+  }
+  
+  // If it already has 91 prefix, use as is
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits;
+  }
+  
+  // If it has 13 digits and starts with 91, remove the leading digit
+  if (digits.length === 13 && digits.startsWith('91')) {
+    return digits.substring(1);
+  }
+  
+  // Otherwise return as is
+  return digits;
+};
+
 export const watiService = {
   // Send WhatsApp message via WATI API
   sendWhatsAppMessage: async (
@@ -56,14 +79,26 @@ export const watiService = {
       // Clean the API key - remove 'Bearer ' prefix if it exists
       const cleanApiKey = apiKey.replace(/^Bearer\s+/i, '');
       
+      // Format phone number for WATI
+      const formattedPhone = formatPhoneForWati(phoneNumber);
+      
       console.log('WATI API Request:', {
         url: `${baseUrl}/api/v1/sendTemplateMessage`,
-        phoneNumber: phoneNumber.replace(/[^\d]/g, ''),
+        originalPhone: phoneNumber,
+        formattedPhone: formattedPhone,
         templateName: template.templateName,
         parameters: template.parameters,
         hasApiKey: !!cleanApiKey,
         apiKeyPrefix: cleanApiKey.substring(0, 10) + '...'
       });
+
+      const requestBody = {
+        whatsappNumber: formattedPhone,
+        templateName: template.templateName,
+        parameters: template.parameters
+      };
+
+      console.log('WATI Request Body:', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch(`${baseUrl}/api/v1/sendTemplateMessage`, {
         method: 'POST',
@@ -71,11 +106,7 @@ export const watiService = {
           'Authorization': `Bearer ${cleanApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          whatsappNumber: phoneNumber.replace(/[^\d]/g, ''), // Remove non-digits
-          templateName: template.templateName,
-          parameters: template.parameters
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const responseText = await response.text();
@@ -97,6 +128,14 @@ export const watiService = {
       } catch (parseError) {
         console.error('Failed to parse WATI response as JSON:', parseError);
         console.log('Raw response:', responseText);
+        return false;
+      }
+
+      console.log('WATI API Response Parsed:', result);
+
+      // Check if the message was actually sent successfully
+      if (result.result === false) {
+        console.error('WATI API returned failure:', result.info || 'Unknown error');
         return false;
       }
 
