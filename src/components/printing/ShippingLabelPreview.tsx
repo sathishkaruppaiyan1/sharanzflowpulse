@@ -24,7 +24,6 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   if (!order && !orders?.length) return null;
 
-  // Generate Code 128 style barcode with actual bars
   const generateBarcode = (text: string) => {
     const barPattern = [];
     
@@ -127,7 +126,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Barcode (moved to top) -->
+          <!-- Barcode (moved to top below TO address) -->
           <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
             <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
               <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
@@ -182,7 +181,6 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     }
   };
 
-  // Fallback print method using current window
   const printWithCurrentWindow = (labelsHTML: string) => {
     try {
       console.log('Using fallback print method with current window');
@@ -471,7 +469,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Barcode (moved to top, no CODE 128 label) */}
+            {/* Barcode (moved directly below TO address) */}
             <div className="text-center border border-black p-4 bg-gray-50 mb-4">
               <div className="bg-white p-3 border border-gray-300 mb-2">
                 {renderBarcode(trackingNumber)}
