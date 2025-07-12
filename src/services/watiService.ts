@@ -48,28 +48,43 @@ const formatPhoneForWati = (phoneNumber: string): string => {
   // Remove all non-digits
   const digits = phoneNumber.replace(/[^\d]/g, '');
   
-  // If it's an Indian number without country code, add +91
+  console.log('Phone formatting debug:', {
+    original: phoneNumber,
+    digitsOnly: digits,
+    length: digits.length
+  });
+  
+  // For WATI API, we need the format: 919994901826 (without + sign)
+  // If it's an Indian number without country code, add 91
   if (digits.length === 10 && digits.match(/^[6-9]/)) {
-    return `+91${digits}`;
+    const formatted = `91${digits}`;
+    console.log('Formatted 10-digit Indian number:', formatted);
+    return formatted;
   }
   
-  // If it already has 91 prefix, add + sign
+  // If it already has 91 prefix and is 12 digits, use as is
   if (digits.length === 12 && digits.startsWith('91')) {
-    return `+${digits}`;
+    console.log('Already has 91 prefix:', digits);
+    return digits;
   }
   
-  // If it has 13 digits and starts with 91, remove the leading digit and add +
+  // If it has 13 digits and starts with 91, remove the leading digit
   if (digits.length === 13 && digits.startsWith('91')) {
-    return `+${digits.substring(1)}`;
+    const formatted = digits.substring(1);
+    console.log('Removed leading digit from 13-digit number:', formatted);
+    return formatted;
   }
   
-  // If it starts with + already, use as is
+  // If original has + sign, remove it
   if (phoneNumber.startsWith('+')) {
-    return phoneNumber;
+    const cleanNumber = phoneNumber.substring(1);
+    console.log('Removed + sign:', cleanNumber);
+    return cleanNumber;
   }
   
-  // Otherwise add + prefix
-  return `+${digits}`;
+  // Otherwise return digits only
+  console.log('Returning digits as is:', digits);
+  return digits;
 };
 
 export const watiService = {
