@@ -78,6 +78,13 @@ export const useItemScanning = (currentOrder: Order | null) => {
           toast.success(`📦 ${item.title} - ${newScannedCount}/${item.quantity} scanned`);
         }
       }
+
+      // Check if order is complete and show notification, but don't auto-move
+      if (currentOrder && isOrderComplete()) {
+        toast.success(`🎉 Order ${currentOrder.order_number} scanning completed! Use manual controls to move to next stage.`, {
+          duration: 5000
+        });
+      }
     },
     onError: (error) => {
       console.error('Error updating scan count:', error);
