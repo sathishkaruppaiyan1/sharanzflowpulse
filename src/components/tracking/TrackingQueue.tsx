@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Package, Truck, MapPin, Calendar, ExternalLink, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUpdateTracking, useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, CarrierType } from '@/types/database';
 import { detectCourierPartner, generateTrackingLink } from '@/services/watiService';
@@ -21,7 +22,7 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
   const updateTrackingMutation = useUpdateTracking();
   const updateOrderStageMutation = useUpdateOrderStage();
   const [trackingData, setTrackingData] = useState<Record<string, { trackingNumber: string; carrier: CarrierType }>>({});
-  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+  const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
 
   const handleTrackingSubmit = (orderId: string) => {
     const data = trackingData[orderId];
@@ -51,10 +52,10 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
     updateOrderStageMutation.mutate({ orderId, stage: 'shipped' });
   };
 
-  const toggleOrderExpansion = (orderId: string) => {
-    setExpandedOrders(prev => ({
+  const handleDialogChange = (orderId: string, open: boolean) => {
+    setOpenDialogs(prev => ({
       ...prev,
-      [orderId]: !prev[orderId]
+      [orderId]: open
     }));
   };
 
@@ -113,29 +114,28 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                     {new Date(order.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleOrderExpansion(order.id)}
-                    >
+                <Dialog 
+                  open={openDialogs[order.id] || false} 
+                  onOpenChange={(open) => handleDialogChange(order.id, open)}
+                >
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm">
                       <Settings className="h-4 w-4" />
                     </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="absolute right-0 z-10 mt-2 w-80 bg-white border rounded-lg shadow-lg p-4">
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Change Order Stage</DialogTitle>
+                    </DialogHeader>
                     <StageChangeControls 
                       order={order} 
                       currentStage="tracking"
                       onStageChange={() => {
-                        setExpandedOrders(prev => ({
-                          ...prev,
-                          [order.id]: false
-                        }));
+                        handleDialogChange(order.id, false);
                       }}
                     />
-                  </CollapsibleContent>
-                </Collapsible>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardHeader>

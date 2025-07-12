@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
+import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
@@ -8,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/watiService';
 import { toast } from 'sonner';
+import StageChangeControls from '@/components/common/StageChangeControls';
 
 const Tracking = () => {
   const { data: trackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
@@ -22,6 +25,7 @@ const Tracking = () => {
   const [detectedCarrier, setDetectedCarrier] = useState<string>('');
   const [isOrderLocked, setIsOrderLocked] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
+  const [stageDialogOpen, setStageDialogOpen] = useState(false);
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
@@ -317,7 +321,30 @@ const Tracking = () => {
             {/* Right Column - Order Information */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Order Information</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Order Information</CardTitle>
+                  {currentOrder && (
+                    <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Change Order Stage</DialogTitle>
+                        </DialogHeader>
+                        <StageChangeControls 
+                          order={currentOrder} 
+                          currentStage="tracking"
+                          onStageChange={() => {
+                            setStageDialogOpen(false);
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {currentOrder ? (
