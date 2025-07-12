@@ -127,9 +127,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Code 128 Barcode -->
+          <!-- Barcode (moved to top) -->
           <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
-            <div style="font-weight: bold; margin-bottom: 8px;">CODE 128</div>
             <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
               <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
                 ${barcodeHTML}
@@ -446,10 +445,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           
           <div className="bg-green-50 p-3 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
-              <strong>Updated Template:</strong> New layout with barcode after TO address and split FROM/courier details
+              <strong>Updated Template:</strong> Barcode moved to top below TO address, no CODE 128 label
             </p>
             <p className="text-xs text-green-700 mt-1">
-              Footer includes parcel opening video requirement for complaints.
+              Split FROM/courier details layout with footer requirements included.
             </p>
           </div>
           
@@ -472,9 +471,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Code 128 Barcode */}
+            {/* Barcode (moved to top, no CODE 128 label) */}
             <div className="text-center border border-black p-4 bg-gray-50 mb-4">
-              <div className="font-bold mb-2">CODE 128</div>
               <div className="bg-white p-3 border border-gray-300 mb-2">
                 {renderBarcode(trackingNumber)}
               </div>
