@@ -1,13 +1,14 @@
-
-import React from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { useUpdateItemPacked } from '@/hooks/useOrderItems';
+import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -16,6 +17,7 @@ interface PackingQueueProps {
 const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
   const updateItemPacked = useUpdateItemPacked();
+  const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
 
   console.log('PackingQueue received orders:', orders.length, orders);
 
@@ -27,6 +29,13 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   const handleMoveToTracking = (orderId: string, orderNumber: string) => {
     console.log('Moving order to tracking:', orderId);
     updateOrderStage.mutate({ orderId, stage: 'tracking' });
+  };
+
+  const handleDialogChange = (orderId: string, open: boolean) => {
+    setOpenDialogs(prev => ({
+      ...prev,
+      [orderId]: open
+    }));
   };
 
   const isOrderReadyForShipping = (order: Order) => {
@@ -80,6 +89,28 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                     <Package className="h-3 w-3 mr-1" />
                     {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
                   </Badge>
+                  <Dialog 
+                    open={openDialogs[order.id] || false} 
+                    onOpenChange={(open) => handleDialogChange(order.id, open)}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Change Order Stage</DialogTitle>
+                      </DialogHeader>
+                      <StageChangeControls 
+                        order={order} 
+                        currentStage="packing"
+                        onStageChange={() => {
+                          handleDialogChange(order.id, false);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
             </CardHeader>

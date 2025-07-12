@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 
 const Packing = () => {
@@ -24,7 +24,7 @@ const Packing = () => {
   const [skuScanInput, setSkuScanInput] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderLoadedMessage, setOrderLoadedMessage] = useState('');
-  const [showStageControls, setShowStageControls] = useState(false);
+  const [showStageDialog, setShowStageDialog] = useState(false);
 
   const {
     scanProgress,
@@ -107,7 +107,7 @@ const Packing = () => {
     setOrderLoadedMessage('');
     setOrderScanInput('');
     setSkuScanInput('');
-    setShowStageControls(false);
+    setShowStageDialog(false);
   };
 
   const getPriorityBadge = (order: Order) => {
@@ -273,21 +273,27 @@ const Packing = () => {
                   <div className="space-y-3 pt-4 border-t">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-gray-700">Stage Management</label>
-                      <Collapsible open={showStageControls} onOpenChange={setShowStageControls}>
-                        <CollapsibleTrigger asChild>
+                      <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
+                        <DialogTrigger asChild>
                           <Button size="sm" variant="outline">
                             <Settings className="h-4 w-4 mr-1" />
                             Change Stage
                           </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="mt-3 p-3 border rounded-lg bg-gray-50">
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Change Order Stage</DialogTitle>
+                          </DialogHeader>
                           <StageChangeControls 
                             order={currentOrder} 
                             currentStage="packing"
-                            onStageChange={resetScanner}
+                            onStageChange={() => {
+                              setShowStageDialog(false);
+                              resetScanner();
+                            }}
                           />
-                        </CollapsibleContent>
-                      </Collapsible>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     
                     <div className="flex space-x-2">
@@ -321,7 +327,31 @@ const Packing = () => {
             {/* Right Column - Current Order Details */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Current Order Details</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Current Order Details</CardTitle>
+                  {currentOrder && (
+                    <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Change Order Stage</DialogTitle>
+                        </DialogHeader>
+                        <StageChangeControls 
+                          order={currentOrder} 
+                          currentStage="packing"
+                          onStageChange={() => {
+                            setShowStageDialog(false);
+                            resetScanner();
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {currentOrder ? (
