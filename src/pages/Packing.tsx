@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
