@@ -91,6 +91,8 @@ export const useItemScanning = (currentOrder: Order | null) => {
       return false;
     }
 
+    console.log('Scanning SKU:', sku, 'in order:', currentOrder.order_number);
+
     // Find matching item by SKU
     const matchingItem = currentOrder.order_items.find(item => 
       item.sku === sku || 
@@ -98,7 +100,7 @@ export const useItemScanning = (currentOrder: Order | null) => {
     );
 
     if (!matchingItem) {
-      toast.error('❌ Wrong product scanned!');
+      toast.error(`❌ SKU "${sku}" not found in this order!`);
       return false;
     }
 
@@ -109,10 +111,12 @@ export const useItemScanning = (currentOrder: Order | null) => {
     }
 
     if (progress.completed) {
-      toast.warning(`✅ ${matchingItem.title} already completed`);
+      toast.warning(`✅ ${matchingItem.title} already completed (${progress.scannedCount}/${progress.requiredCount})`);
       return true;
     }
 
+    console.log('Item found, updating scan count:', matchingItem.title, 'Current count:', progress.scannedCount);
+    
     // Increment scan count
     updateItemScanCount.mutate({ itemId: matchingItem.id, increment: true });
     return true;
@@ -120,7 +124,9 @@ export const useItemScanning = (currentOrder: Order | null) => {
 
   const isOrderComplete = () => {
     if (!currentOrder) return false;
-    return Object.values(scanProgress).every(progress => progress.completed);
+    const allCompleted = Object.values(scanProgress).every(progress => progress.completed);
+    console.log('Checking if order complete:', allCompleted, 'Progress:', scanProgress);
+    return allCompleted;
   };
 
   const getOrderProgress = () => {

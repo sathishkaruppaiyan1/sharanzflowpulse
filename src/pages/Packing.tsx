@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3 } from 'lucide-react';
+import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -41,30 +41,15 @@ const Packing = () => {
   // Initialize scan progress when order is loaded
   useEffect(() => {
     if (currentOrder) {
+      console.log('Initializing scan progress for order:', currentOrder.order_number);
       initializeScanProgress(currentOrder);
     }
   }, [currentOrder]);
 
-  // Check if order is complete and move to next stage
-  useEffect(() => {
-    if (currentOrder && isOrderComplete()) {
-      console.log('Order completed, moving to tracking stage');
-      updateOrderStage.mutate({ 
-        orderId: currentOrder.id, 
-        stage: 'tracking' 
-      }, {
-        onSuccess: () => {
-          setCurrentOrder(null);
-          setOrderLoadedMessage('');
-          setOrderScanInput('');
-          setSkuScanInput('');
-        }
-      });
-    }
-  }, [scanProgress, currentOrder, isOrderComplete, updateOrderStage]);
-
   const handleOrderScan = () => {
     if (!orderScanInput.trim()) return;
+    
+    console.log('Scanning for order:', orderScanInput);
     
     // Find order by order number or ID
     const order = packingOrders.find(o => 
@@ -75,23 +60,43 @@ const Packing = () => {
     );
     
     if (order) {
+      console.log('Order found:', order.order_number);
       setCurrentOrder(order);
-      setOrderLoadedMessage(`Order #${order.order_number.replace('#', '')} loaded`);
+      setOrderLoadedMessage(`Order #${order.order_number.replace('#', '')} loaded - Ready for SKU scanning`);
       setOrderScanInput('');
     } else {
+      console.log('Order not found:', orderScanInput);
       setOrderLoadedMessage('');
       setCurrentOrder(null);
-      alert('Order not found in packing queue');
+      toast.error(`Order "${orderScanInput}" not found in packing queue`);
     }
   };
 
   const handleSkuScan = () => {
     if (!skuScanInput.trim() || !currentOrder) return;
     
+    console.log('SKU scan attempt:', skuScanInput);
     const success = scanItem(skuScanInput);
     if (success) {
       setSkuScanInput('');
     }
+  };
+
+  const handleManualStageChange = (orderId: string, orderNumber: string, newStage: 'tracking' | 'shipped') => {
+    console.log(`Manually moving order ${orderNumber} to ${newStage} stage`);
+    updateOrderStage.mutate({ 
+      orderId, 
+      stage: newStage 
+    }, {
+      onSuccess: () => {
+        if (currentOrder && currentOrder.id === orderId) {
+          setCurrentOrder(null);
+          setOrderLoadedMessage('');
+          setOrderScanInput('');
+          setSkuScanInput('');
+        }
+      }
+    });
   };
 
   const resetScanner = () => {
@@ -134,6 +139,7 @@ const Packing = () => {
 
   const { scannedItems, totalItems } = getOrderProgress();
   const progressPercentage = totalItems > 0 ? (scannedItems / totalItems) * 100 : 0;
+  const orderComplete = isOrderComplete();
 
   return (
     <div className="flex flex-col h-full">
@@ -156,7 +162,7 @@ const Packing = () => {
                   <CardTitle className="text-lg">Barcode Scanner</CardTitle>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Scan order ID or order number to load complete order details
+                  Scan order ID to load, then scan product SKUs to pack items
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -223,6 +229,12 @@ const Packing = () => {
                     <p className="text-xs text-blue-600">
                       {progressPercentage.toFixed(0)}% completed
                     </p>
+                    {orderComplete && (
+                      <div className="flex items-center space-x-2 p-2 bg-green-100 border border-green-300 rounded">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-green-800 font-medium">All items scanned! Ready to dispatch.</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -232,7 +244,7 @@ const Packing = () => {
                     <label className="text-sm font-medium text-gray-700">Product SKU Scanner</label>
                     <div className="flex space-x-2">
                       <Input
-                        placeholder="Scan product SKU"
+                        placeholder="Scan product SKU or name"
                         value={skuScanInput}
                         onChange={(e) => setSkuScanInput(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSkuScan()}
@@ -249,6 +261,36 @@ const Packing = () => {
                         <Package className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {/* Manual Stage Controls */}
+                {currentOrder && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <label className="text-sm font-medium text-gray-700">Manual Stage Control</label>
+                    <div className="flex space-x-2">
+                      <Button 
+                        onClick={() => handleManualStageChange(currentOrder.id, currentOrder.order_number, 'tracking')}
+                        disabled={updateOrderStage.isPending}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Move to Tracking
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                      <Button 
+                        onClick={() => handleManualStageChange(currentOrder.id, currentOrder.order_number, 'shipped')}
+                        disabled={updateOrderStage.isPending}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Mark as Shipped
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Use these controls to manually move orders between stages
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -269,7 +311,7 @@ const Packing = () => {
                         <p className="text-sm text-gray-600">Packing order #{currentOrder.order_number.replace('#', '')}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                            PRINTED
+                            PACKING
                           </Badge>
                           {getPriorityBadge(currentOrder)}
                         </div>
@@ -350,12 +392,17 @@ const Packing = () => {
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <p className="text-sm font-medium">{item.title}</p>
-                                  {item.sku && (
+                                  {item.sku ? (
                                     <div className="flex items-center space-x-1 mt-1">
                                       <Hash className="h-3 w-3 text-blue-600" />
-                                      <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
+                                      <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border font-bold">
                                         {item.sku}
                                       </span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-1 mt-1">
+                                      <AlertTriangle className="h-3 w-3 text-orange-500" />
+                                      <span className="text-xs text-orange-600">No SKU - Search by name</span>
                                     </div>
                                   )}
                                 </div>
