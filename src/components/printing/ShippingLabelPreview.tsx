@@ -114,14 +114,6 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       return `
         <div style="border: 2px solid #000; padding: 16px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.3; color: #000; margin-bottom: 15px; max-width: 600px; ${pageBreak}">
-          <!-- Tracking Number -->
-          <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
-            <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">TRACKING #</div>
-            <div style="border: 1px solid #000; padding: 8px; background: #f9fafb;">
-              <div style="font-weight: bold; font-size: 16px;">${trackingNumber}</div>
-            </div>
-          </div>
-
           <!-- TO Section -->
           <div style="margin-bottom: 12px;">
             <div style="font-weight: bold; margin-bottom: 6px;">📍 TO:</div>
@@ -135,27 +127,37 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- FROM Section -->
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: bold; margin-bottom: 6px;">FROM:</div>
-            <div style="border: 1px solid #000; padding: 10px; background: #f9fafb;">
-              <div style="font-weight: bold;">F3-ENGINE WAREHOUSE</div>
-              <div>123 Fulfillment Street</div>
-              <div>Mumbai, MH 400001</div>
-              <div>Ph: +91-22-1234-5678</div>
+          <!-- Code 128 Barcode -->
+          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">CODE 128</div>
+            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
+              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
+                ${barcodeHTML}
+              </div>
             </div>
+            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
           </div>
 
-          <!-- Package Info -->
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: bold; margin-bottom: 6px;">📦 PACKAGE INFO:</div>
-            <div style="border: 1px solid #000; padding: 10px;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                <tr><td style="padding: 1px 0;">Order:</td><td style="text-align: right; font-weight: bold;">${orderNumber}</td></tr>
-                <tr><td style="padding: 1px 0;">Weight:</td><td style="text-align: right;">${totalWeight}</td></tr>
-                <tr><td style="padding: 1px 0;">Items:</td><td style="text-align: right;">${totalItems}</td></tr>
-                <tr><td style="padding: 1px 0;">Total:</td><td style="text-align: right;">₹${orderData.total_amount || orderData.current_total_price}</td></tr>
-              </table>
+          <!-- FROM Section and Courier Details - Split Layout -->
+          <div style="display: flex; margin-bottom: 12px; gap: 8px;">
+            <!-- FROM Section - Left Side -->
+            <div style="flex: 1;">
+              <div style="font-weight: bold; margin-bottom: 6px;">FROM:</div>
+              <div style="border: 1px solid #000; padding: 10px; background: #f9fafb; height: 100%;">
+                <div style="font-weight: bold;">Black Lovers</div>
+                <div>WhatsApp: 7990190234</div>
+              </div>
+            </div>
+            
+            <!-- Courier Details - Right Side -->
+            <div style="flex: 1;">
+              <div style="font-weight: bold; margin-bottom: 6px;">COURIER DETAILS:</div>
+              <div style="border: 1px solid #000; padding: 10px; background: #f0f9ff; height: 100%;">
+                <div>Order: <strong>${orderNumber}</strong></div>
+                <div>Weight: ${totalWeight}</div>
+                <div>Items: ${totalItems}</div>
+                <div>Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
+              </div>
             </div>
           </div>
 
@@ -169,15 +171,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Code 128 Barcode -->
-          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb;">
-            <div style="font-weight: bold; margin-bottom: 8px;">CODE 128</div>
-            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
-              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
-                ${barcodeHTML}
-              </div>
-            </div>
-            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
+          <!-- Footer -->
+          <div style="text-align: center; border-top: 2px solid #000; padding-top: 8px; font-weight: bold; font-size: 10px;">
+            <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
           </div>
         </div>
       `;
@@ -450,22 +446,14 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           
           <div className="bg-green-50 p-3 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
-              <strong>Single Page Layout:</strong> {isBulkPrint ? 'Each label on separate page for bulk print' : 'All content fits on one page'}
+              <strong>Updated Template:</strong> New layout with barcode after TO address and split FROM/courier details
             </p>
             <p className="text-xs text-green-700 mt-1">
-              Barcode will look exactly the same as preview when printed.
+              Footer includes parcel opening video requirement for complaints.
             </p>
           </div>
           
           <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm">
-            {/* Tracking Number */}
-            <div className="text-center border-b-2 border-black pb-2 mb-4">
-              <div className="font-bold text-lg">TRACKING #</div>
-              <div className="border border-black p-2 mt-2 bg-gray-50">
-                <div className="font-bold text-lg">{trackingNumber}</div>
-              </div>
-            </div>
-
             {/* TO Section */}
             <div className="mb-4">
               <div className="flex items-center mb-2">
@@ -484,39 +472,34 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* FROM Section */}
-            <div className="mb-4">
-              <div className="font-bold mb-2">FROM:</div>
-              <div className="border border-black p-3 bg-gray-50">
-                <div className="font-bold">F3-ENGINE WAREHOUSE</div>
-                <div>123 Fulfillment Street</div>
-                <div>Mumbai, MH 400001</div>
-                <div>Ph: +91-22-1234-5678</div>
+            {/* Code 128 Barcode */}
+            <div className="text-center border border-black p-4 bg-gray-50 mb-4">
+              <div className="font-bold mb-2">CODE 128</div>
+              <div className="bg-white p-3 border border-gray-300 mb-2">
+                {renderBarcode(trackingNumber)}
               </div>
+              <div className="font-bold text-sm">{trackingNumber}</div>
             </div>
 
-            {/* Package Info */}
-            <div className="mb-4">
-              <div className="flex items-center mb-2">
-                <span className="mr-2">📦</span>
-                <span className="font-bold">PACKAGE INFO:</span>
+            {/* FROM Section and Courier Details - Split Layout */}
+            <div className="flex mb-4 gap-2">
+              {/* FROM Section - Left Side */}
+              <div className="flex-1">
+                <div className="font-bold mb-2">FROM:</div>
+                <div className="border border-black p-3 bg-gray-50 h-full">
+                  <div className="font-bold">Black Lovers</div>
+                  <div>WhatsApp: 7990190234</div>
+                </div>
               </div>
-              <div className="border border-black p-3">
-                <div className="flex justify-between">
-                  <span>Order:</span>
-                  <span>{orderNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Weight:</span>
-                  <span>{totalWeight}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Items:</span>
-                  <span>{totalItems}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total:</span>
-                  <span>₹{displayOrder.total_amount || displayOrder.current_total_price}</span>
+              
+              {/* Courier Details - Right Side */}
+              <div className="flex-1">
+                <div className="font-bold mb-2">COURIER DETAILS:</div>
+                <div className="border border-black p-3 bg-blue-50 h-full">
+                  <div>Order: <strong>{orderNumber}</strong></div>
+                  <div>Weight: {totalWeight}</div>
+                  <div>Items: {totalItems}</div>
+                  <div>Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
                 </div>
               </div>
             </div>
@@ -533,13 +516,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Code 128 Barcode */}
-            <div className="text-center border border-black p-4 bg-gray-50">
-              <div className="font-bold mb-2">CODE 128</div>
-              <div className="bg-white p-3 border border-gray-300 mb-2">
-                {renderBarcode(trackingNumber)}
-              </div>
-              <div className="font-bold text-sm">{trackingNumber}</div>
+            {/* Footer */}
+            <div className="text-center border-t-2 border-black pt-2 font-bold text-xs">
+              <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
             </div>
           </div>
         </div>
