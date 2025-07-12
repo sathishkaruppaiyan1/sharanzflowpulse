@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight } from 'lucide-react';
+import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
+import StageChangeControls from '@/components/common/StageChangeControls';
 import { useOrdersByStage, useUpdateOrderStage } from '@/hooks/useOrders';
 import { useItemScanning } from '@/hooks/useItemScanning';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Order } from '@/types/database';
 
 const Packing = () => {
@@ -23,6 +24,7 @@ const Packing = () => {
   const [skuScanInput, setSkuScanInput] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderLoadedMessage, setOrderLoadedMessage] = useState('');
+  const [showStageControls, setShowStageControls] = useState(false);
 
   const {
     scanProgress,
@@ -105,6 +107,7 @@ const Packing = () => {
     setOrderLoadedMessage('');
     setOrderScanInput('');
     setSkuScanInput('');
+    setShowStageControls(false);
   };
 
   const getPriorityBadge = (order: Order) => {
@@ -268,7 +271,25 @@ const Packing = () => {
                 {/* Manual Stage Controls */}
                 {currentOrder && (
                   <div className="space-y-3 pt-4 border-t">
-                    <label className="text-sm font-medium text-gray-700">Manual Stage Control</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700">Stage Management</label>
+                      <Collapsible open={showStageControls} onOpenChange={setShowStageControls}>
+                        <CollapsibleTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Settings className="h-4 w-4 mr-1" />
+                            Change Stage
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-3 p-3 border rounded-lg bg-gray-50">
+                          <StageChangeControls 
+                            order={currentOrder} 
+                            currentStage="packing"
+                            onStageChange={resetScanner}
+                          />
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                    
                     <div className="flex space-x-2">
                       <Button 
                         onClick={() => handleManualStageChange(currentOrder.id, currentOrder.order_number, 'tracking')}

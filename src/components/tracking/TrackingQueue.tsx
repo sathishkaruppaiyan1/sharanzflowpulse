@@ -1,16 +1,17 @@
-
 import React from 'react';
-import { Package, Truck, MapPin, Calendar, ExternalLink } from 'lucide-react';
+import { Package, Truck, MapPin, Calendar, ExternalLink, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUpdateTracking, useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, CarrierType } from '@/types/database';
 import { detectCourierPartner, generateTrackingLink } from '@/services/watiService';
 import { useState } from 'react';
+import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface TrackingQueueProps {
   orders: Order[];
@@ -20,6 +21,7 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
   const updateTrackingMutation = useUpdateTracking();
   const updateOrderStageMutation = useUpdateOrderStage();
   const [trackingData, setTrackingData] = useState<Record<string, { trackingNumber: string; carrier: CarrierType }>>({});
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
   const handleTrackingSubmit = (orderId: string) => {
     const data = trackingData[orderId];
@@ -47,6 +49,13 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
 
   const handleMarkShipped = (orderId: string) => {
     updateOrderStageMutation.mutate({ orderId, stage: 'shipped' });
+  };
+
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
   };
 
   const getCourierDisplayName = (carrier: CarrierType) => {
@@ -97,11 +106,36 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">₹{order.total_amount}</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(order.created_at).toLocaleDateString()}
-                </p>
+              <div className="flex items-center space-x-2">
+                <div className="text-right">
+                  <p className="text-sm font-medium">₹{order.total_amount}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(order.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleOrderExpansion(order.id)}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="absolute right-0 z-10 mt-2 w-80 bg-white border rounded-lg shadow-lg p-4">
+                    <StageChangeControls 
+                      order={order} 
+                      currentStage="tracking"
+                      onStageChange={() => {
+                        setExpandedOrders(prev => ({
+                          ...prev,
+                          [order.id]: false
+                        }));
+                      }}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </div>
           </CardHeader>
