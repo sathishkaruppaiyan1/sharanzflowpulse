@@ -50,21 +50,26 @@ const formatPhoneForWati = (phoneNumber: string): string => {
   
   // If it's an Indian number without country code, add +91
   if (digits.length === 10 && digits.match(/^[6-9]/)) {
-    return `91${digits}`;
+    return `+91${digits}`;
   }
   
-  // If it already has 91 prefix, use as is
+  // If it already has 91 prefix, add + sign
   if (digits.length === 12 && digits.startsWith('91')) {
-    return digits;
+    return `+${digits}`;
   }
   
-  // If it has 13 digits and starts with 91, remove the leading digit
+  // If it has 13 digits and starts with 91, remove the leading digit and add +
   if (digits.length === 13 && digits.startsWith('91')) {
-    return digits.substring(1);
+    return `+${digits.substring(1)}`;
   }
   
-  // Otherwise return as is
-  return digits;
+  // If it starts with + already, use as is
+  if (phoneNumber.startsWith('+')) {
+    return phoneNumber;
+  }
+  
+  // Otherwise add + prefix
+  return `+${digits}`;
 };
 
 export const watiService = {
