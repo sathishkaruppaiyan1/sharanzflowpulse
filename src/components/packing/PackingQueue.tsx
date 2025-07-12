@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle } from 'lucide-react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,7 +127,14 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                         />
                         <div className="flex-1">
                           <p className="font-medium text-sm">{item.title}</p>
-                          <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
+                          {item.sku && (
+                            <div className="flex items-center space-x-1 mt-1">
+                              <Hash className="h-3 w-3 text-blue-600" />
+                              <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
+                                {item.sku}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">

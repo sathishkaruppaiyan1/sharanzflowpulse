@@ -1,30 +1,67 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
-import { useOrdersByStage } from '@/hooks/useOrders';
+import { useOrdersByStage, useUpdateOrderStage } from '@/hooks/useOrders';
+import { useItemScanning } from '@/hooks/useItemScanning';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Order } from '@/types/database';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading: packingLoading } = useOrdersByStage('packing');
   const { data: trackingOrders = [] } = useOrdersByStage('tracking');
+  const updateOrderStage = useUpdateOrderStage();
   
   const [orderScanInput, setOrderScanInput] = useState('');
   const [skuScanInput, setSkuScanInput] = useState('');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderLoadedMessage, setOrderLoadedMessage] = useState('');
 
+  const {
+    scanProgress,
+    initializeScanProgress,
+    scanItem,
+    isOrderComplete,
+    getOrderProgress,
+    isScanning
+  } = useItemScanning(currentOrder);
+
   const isLoading = packingLoading;
 
   // Calculate stats
   const readyToPack = packingOrders.length;
   const readyForTracking = trackingOrders.length;
+
+  // Initialize scan progress when order is loaded
+  useEffect(() => {
+    if (currentOrder) {
+      initializeScanProgress(currentOrder);
+    }
+  }, [currentOrder]);
+
+  // Check if order is complete and move to next stage
+  useEffect(() => {
+    if (currentOrder && isOrderComplete()) {
+      console.log('Order completed, moving to tracking stage');
+      updateOrderStage.mutate({ 
+        orderId: currentOrder.id, 
+        stage: 'tracking' 
+      }, {
+        onSuccess: () => {
+          setCurrentOrder(null);
+          setOrderLoadedMessage('');
+          setOrderScanInput('');
+          setSkuScanInput('');
+        }
+      });
+    }
+  }, [scanProgress, currentOrder, isOrderComplete, updateOrderStage]);
 
   const handleOrderScan = () => {
     if (!orderScanInput.trim()) return;
@@ -51,20 +88,8 @@ const Packing = () => {
   const handleSkuScan = () => {
     if (!skuScanInput.trim() || !currentOrder) return;
     
-    // Check if scanned SKU matches any item in current order
-    const matchingItem = currentOrder.order_items.find(item => 
-      item.sku === skuScanInput || 
-      item.title.toLowerCase().includes(skuScanInput.toLowerCase())
-    );
-    
-    if (matchingItem) {
-      // Correct SKU scanned - move to next stage or mark as packed
-      console.log('Correct SKU scanned:', skuScanInput);
-      setSkuScanInput('');
-      // Here you would typically update the item as packed
-    } else {
-      // Wrong SKU scanned
-      alert('You scanned wrong product');
+    const success = scanItem(skuScanInput);
+    if (success) {
       setSkuScanInput('');
     }
   };
@@ -106,6 +131,9 @@ const Packing = () => {
       </div>
     );
   }
+
+  const { scannedItems, totalItems } = getOrderProgress();
+  const progressPercentage = totalItems > 0 ? (scannedItems / totalItems) * 100 : 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -182,6 +210,22 @@ const Packing = () => {
                   </div>
                 )}
 
+                {/* Scanning Progress */}
+                {currentOrder && (
+                  <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-800">Scanning Progress</span>
+                      <Badge variant="outline" className="bg-white">
+                        {scannedItems}/{totalItems}
+                      </Badge>
+                    </div>
+                    <Progress value={progressPercentage} className="h-2" />
+                    <p className="text-xs text-blue-600">
+                      {progressPercentage.toFixed(0)}% completed
+                    </p>
+                  </div>
+                )}
+
                 {/* Product SKU Scanner - Only show when order is loaded */}
                 {currentOrder && (
                   <div className="space-y-3">
@@ -193,12 +237,14 @@ const Packing = () => {
                         onChange={(e) => setSkuScanInput(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSkuScan()}
                         className="flex-1"
+                        disabled={isScanning}
                       />
                       <Button 
                         onClick={handleSkuScan}
                         size="sm"
                         variant="outline"
                         className="px-3"
+                        disabled={isScanning}
                       >
                         <Package className="h-4 w-4" />
                       </Button>
@@ -293,29 +339,54 @@ const Packing = () => {
                       </div>
                     </div>
 
-                    {/* Required Items */}
+                    {/* Required Items with Scan Progress */}
                     <div className="pt-4 border-t">
                       <p className="font-medium text-sm mb-3">Required Items:</p>
-                      <div className="space-y-2">
-                        {currentOrder.order_items.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <span className="text-sm font-medium">{item.title}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {item.packed ? 'Packed' : 'Pending'}
-                            </Badge>
-                          </div>
-                        ))}
+                      <div className="space-y-3">
+                        {currentOrder.order_items.map((item) => {
+                          const itemProgress = scanProgress[item.id];
+                          return (
+                            <div key={item.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{item.title}</p>
+                                  {item.sku && (
+                                    <div className="flex items-center space-x-1 mt-1">
+                                      <Hash className="h-3 w-3 text-blue-600" />
+                                      <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
+                                        {item.sku}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <Badge 
+                                  variant={itemProgress?.completed ? "default" : "outline"}
+                                  className={itemProgress?.completed ? "bg-green-100 text-green-800" : ""}
+                                >
+                                  {itemProgress?.scannedCount || 0}/{item.quantity}
+                                </Badge>
+                              </div>
+                              {itemProgress && item.quantity > 1 && (
+                                <Progress 
+                                  value={(itemProgress.scannedCount / itemProgress.requiredCount) * 100} 
+                                  className="h-1"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    {/* Progress */}
+                    {/* Overall Progress */}
                     <div className="pt-4 border-t">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Progress:</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Overall Progress:</span>
                         <span className="text-sm font-medium">
-                          {currentOrder.order_items.filter(item => item.packed).length} / {currentOrder.order_items.length} items
+                          {scannedItems} / {totalItems} items scanned
                         </span>
                       </div>
+                      <Progress value={progressPercentage} className="h-2" />
                     </div>
                   </div>
                 ) : (
