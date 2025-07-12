@@ -53,17 +53,22 @@ export const watiService = {
     baseUrl: string
   ): Promise<boolean> => {
     try {
+      // Clean the API key - remove 'Bearer ' prefix if it exists
+      const cleanApiKey = apiKey.replace(/^Bearer\s+/i, '');
+      
       console.log('WATI API Request:', {
         url: `${baseUrl}/api/v1/sendTemplateMessage`,
         phoneNumber: phoneNumber.replace(/[^\d]/g, ''),
         templateName: template.templateName,
-        parameters: template.parameters
+        parameters: template.parameters,
+        hasApiKey: !!cleanApiKey,
+        apiKeyPrefix: cleanApiKey.substring(0, 10) + '...'
       });
 
       const response = await fetch(`${baseUrl}/api/v1/sendTemplateMessage`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${cleanApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
