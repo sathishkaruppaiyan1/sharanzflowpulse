@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,7 +66,7 @@ export const useItemScanning = (currentOrder: Order | null) => {
       if (error) throw error;
       return { data, newScannedCount, isCompleted };
     },
-    onSuccess: ({ newScannedCount, isCompleted }, { itemId }) => {
+    onSuccess: async ({ newScannedCount, isCompleted }, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       
       const item = currentOrder?.order_items.find(i => i.id === itemId);
@@ -79,11 +78,32 @@ export const useItemScanning = (currentOrder: Order | null) => {
         }
       }
 
-      // Check if order is complete and show notification, but don't auto-move
+      // Check if order is complete and automatically move to tracking stage
       if (currentOrder && isOrderComplete()) {
-        toast.success(`🎉 Order ${currentOrder.order_number} scanning completed! Use manual controls to move to next stage.`, {
-          duration: 5000
-        });
+        try {
+          console.log(`Order ${currentOrder.order_number} completed, moving to tracking stage automatically`);
+          
+          const { error } = await supabase
+            .from('orders')
+            .update({ 
+              stage: 'tracking',
+              packed_at: new Date().toISOString()
+            })
+            .eq('id', currentOrder.id);
+
+          if (error) {
+            console.error('Error moving order to tracking:', error);
+            toast.error('Failed to move order to tracking stage');
+          } else {
+            toast.success(`🎉 Order ${currentOrder.order_number} completed and moved to tracking stage!`, {
+              duration: 5000
+            });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+          }
+        } catch (error) {
+          console.error('Error in automatic stage progression:', error);
+          toast.error('Failed to automatically progress order stage');
+        }
       }
     },
     onError: (error) => {
