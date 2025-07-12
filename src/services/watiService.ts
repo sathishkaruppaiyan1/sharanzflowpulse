@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
 
@@ -52,6 +53,13 @@ export const watiService = {
     baseUrl: string
   ): Promise<boolean> => {
     try {
+      console.log('WATI API Request:', {
+        url: `${baseUrl}/api/v1/sendTemplateMessage`,
+        phoneNumber: phoneNumber.replace(/[^\d]/g, ''),
+        templateName: template.templateName,
+        parameters: template.parameters
+      });
+
       const response = await fetch(`${baseUrl}/api/v1/sendTemplateMessage`, {
         method: 'POST',
         headers: {
@@ -65,12 +73,28 @@ export const watiService = {
         }),
       });
 
+      const responseText = await response.text();
+      console.log('WATI API Response Status:', response.status);
+      console.log('WATI API Response Text:', responseText);
+
       if (!response.ok) {
-        console.error('WATI API error:', await response.text());
+        console.error('WATI API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: responseText
+        });
         return false;
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse WATI response as JSON:', parseError);
+        console.log('Raw response:', responseText);
+        return false;
+      }
+
       console.log('WATI message sent successfully:', result);
       return true;
     } catch (error) {
@@ -82,35 +106,74 @@ export const watiService = {
   // Send order shipped notification with tracking ID and link
   sendOrderShippedNotification: async (order: Order, trackingNumber: string, carrier: CarrierType): Promise<boolean> => {
     try {
+      console.log('Starting WhatsApp notification process for order:', order.order_number);
+
       // Get WATI configuration
-      const { data: configData } = await supabase
+      const { data: configData, error: configError } = await supabase
         .from('system_settings')
         .select('value')
         .eq('key', 'api_configs')
         .single();
+
+      if (configError) {
+        console.error('Error fetching API configurations:', configError);
+        return false;
+      }
 
       if (!configData?.value) {
         console.error('No API configurations found');
         return false;
       }
 
+      console.log('API configurations retrieved:', configData.value);
+
       const apiConfigs = configData.value as any;
       const watiConfig = apiConfigs.wati;
 
-      if (!watiConfig?.enabled || !watiConfig.api_key) {
-        console.error('WATI not configured or disabled');
+      if (!watiConfig) {
+        console.error('WATI configuration not found in API configs');
         return false;
       }
 
-      // Check if customer has phone number
-      if (!order.customer?.phone) {
-        console.error('Customer phone number not available');
+      if (!watiConfig.enabled) {
+        console.error('WATI is disabled in configuration');
         return false;
       }
+
+      if (!watiConfig.api_key) {
+        console.error('WATI API key not configured');
+        return false;
+      }
+
+      if (!watiConfig.base_url) {
+        console.error('WATI base URL not configured');
+        return false;
+      }
+
+      console.log('WATI configuration valid:', {
+        enabled: watiConfig.enabled,
+        hasApiKey: !!watiConfig.api_key,
+        baseUrl: watiConfig.base_url
+      });
+
+      // Check if customer has phone number
+      if (!order.customer?.phone) {
+        console.error('Customer phone number not available for order:', order.order_number);
+        return false;
+      }
+
+      console.log('Customer phone number found:', order.customer.phone);
 
       // Generate tracking link
       const trackingLink = generateTrackingLink(trackingNumber, carrier);
       const courierName = getCourierDisplayName(carrier);
+
+      console.log('Tracking details:', {
+        trackingNumber,
+        carrier,
+        courierName,
+        trackingLink
+      });
 
       // Prepare message template for shipped notification with individual parameters
       const template: WatiMessageTemplate = {
@@ -135,6 +198,8 @@ export const watiService = {
         ]
       };
 
+      console.log('Sending WhatsApp message with template:', template);
+
       const success = await watiService.sendWhatsAppMessage(
         order.customer.phone,
         template,
@@ -145,6 +210,8 @@ export const watiService = {
       if (success) {
         console.log(`Shipped notification sent successfully for order ${order.order_number} via ${courierName}`);
         console.log(`Tracking link: ${trackingLink}`);
+      } else {
+        console.error(`Failed to send shipped notification for order ${order.order_number}`);
       }
 
       return success;
