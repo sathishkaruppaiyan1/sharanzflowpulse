@@ -21,9 +21,9 @@ export const useItemScanning = (currentOrder: Order | null) => {
     order.order_items.forEach(item => {
       progress[item.id] = {
         itemId: item.id,
-        scannedCount: item.packed ? item.quantity : 0,
+        scannedCount: 0, // Always start from 0, regardless of packed status
         requiredCount: item.quantity,
-        completed: item.packed || false
+        completed: false // Always start as not completed
       };
     });
     setScanProgress(progress);
