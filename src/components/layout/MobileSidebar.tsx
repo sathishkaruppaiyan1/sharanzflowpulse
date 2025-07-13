@@ -50,6 +50,11 @@ const MobileSidebar = ({ user, onLogout, isOpen, onClose }: MobileSidebarProps) 
     onClose();
   };
 
+  // Don't render if user is not available
+  if (!user) {
+    return null;
+  }
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="left" className="w-80 p-0">
