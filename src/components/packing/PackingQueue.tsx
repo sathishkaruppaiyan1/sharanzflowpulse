@@ -116,7 +116,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
             </CardHeader>
             
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="mobile-grid lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm text-gray-700">Order Details</h4>
                   <div className="text-sm space-y-1">

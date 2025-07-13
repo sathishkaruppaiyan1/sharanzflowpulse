@@ -149,27 +149,27 @@ const Packing = () => {
     <div className="flex flex-col h-full">
       <Header title="Packing" showSearch={false} />
       
-      <div className="flex-1 p-6 bg-gray-50 overflow-auto">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex-1 p-4 sm:p-6 bg-gray-50 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
           
           {/* Packing Analytics */}
           <PackingStats orders={packingOrders} />
 
           {/* Main Packing Interface */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="mobile-grid lg:grid-cols-2 gap-4 sm:gap-6">
             
             {/* Left Column - Barcode Scanner */}
             <Card>
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <Scan className="h-5 w-5 text-gray-600" />
-                  <CardTitle className="text-lg">Barcode Scanner</CardTitle>
+                  <Scan className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+                  <CardTitle className="text-base sm:text-lg">Barcode Scanner</CardTitle>
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs sm:text-sm text-gray-600">
                   Scan order ID to load, then scan product SKUs to pack items
                 </p>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6">
                 
                 {/* Order Scanner */}
                 <div className="space-y-3">
@@ -186,7 +186,7 @@ const Packing = () => {
                       </Button>
                     )}
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                     <Input
                       placeholder="Scan or enter Order ID/Number"
                       value={orderScanInput}
@@ -199,10 +199,11 @@ const Packing = () => {
                       onClick={handleOrderScan}
                       size="sm"
                       variant="outline"
-                      className="px-3"
+                      className="mobile-button sm:px-3"
                       disabled={!!currentOrder}
                     >
-                      <Scan className="h-4 w-4" />
+                      <Scan className="h-4 w-4 sm:mr-1" />
+                      <span className="sm:hidden">Scan Order</span>
                     </Button>
                   </div>
                   {currentOrder && (
@@ -327,8 +328,8 @@ const Packing = () => {
             {/* Right Column - Current Order Details */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Current Order Details</CardTitle>
+                <div className="mobile-row">
+                  <CardTitle className="text-base sm:text-lg">Current Order Details</CardTitle>
                   {currentOrder && (
                     <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
                       <DialogTrigger asChild>
@@ -408,7 +409,7 @@ const Packing = () => {
                     </div>
 
                     {/* Order Summary */}
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="mobile-grid sm:grid-cols-2 gap-4 pt-4 border-t">
                       <div>
                         <p className="text-sm text-gray-500">Total Items</p>
                         <p className="font-semibold">{currentOrder.order_items.length}</p>

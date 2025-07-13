@@ -48,10 +48,10 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="flex h-screen bg-gray-100">
+          <div className="flex h-screen bg-gray-100 w-full overflow-hidden">
             <Sidebar user={user} onLogout={handleLogout} />
             
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/orders" element={<Orders />} />

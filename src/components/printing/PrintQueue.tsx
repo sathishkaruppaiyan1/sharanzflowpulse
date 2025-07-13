@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -75,7 +74,85 @@ const PrintQueue = ({
       <div className="space-y-2">
         {orders.map((order) => (
           <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
-            <div className="grid grid-cols-12 gap-3 items-start">
+            {/* Mobile Layout */}
+            <div className="block lg:hidden">
+              <div className="space-y-3">
+                {/* Header Row */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-2 flex-1">
+                    <Checkbox
+                      checked={selectedOrders.has(order.id)}
+                      onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
+                      <p className="text-gray-600 text-xs">
+                        {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => handlePrintSingle(order)}
+                    disabled={isPrinting(order.id)}
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                  >
+                    <Printer className="h-3 w-3 mr-1" />
+                    <span className="text-xs">Print</span>
+                  </Button>
+                </div>
+
+                {/* Order Details */}
+                <div className="space-y-2">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
+                    <div className="space-y-0.5">
+                      {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
+                        <div key={index} className="text-xs text-gray-900">
+                          {item.title || item.name}
+                        </div>
+                      )) : (
+                        <div className="text-xs text-gray-900">Order Items</div>
+                      )}
+                      {order.line_items && order.line_items.length > 2 && (
+                        <div className="text-xs text-gray-500">+{order.line_items.length - 2} more</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-xs">
+                    <div>
+                      <span className="font-medium">₹{order.total_amount || order.current_total_price}</span>
+                      <span className="text-gray-500 ml-2">{order.total_weight ? `${order.total_weight}g` : '750g'}</span>
+                    </div>
+                    <div className="text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString('en-IN')}
+                    </div>
+                  </div>
+
+                  {order.shipping_address && (
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
+                      <div className="text-xs text-gray-900">
+                        <div>{order.shipping_address.address1}</div>
+                        <div>{order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.zip}</div>
+                        {order.shipping_address.phone && (
+                          <div className="flex items-center mt-0.5 text-red-600">
+                            <Phone className="h-2.5 w-2.5 mr-1" />
+                            <span>{order.shipping_address.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Layout */}
+            <div className="hidden lg:grid lg:grid-cols-12 gap-3 items-start">
               {/* Checkbox and Order Info */}
               <div className="col-span-2 flex items-start space-x-2">
                 <Checkbox

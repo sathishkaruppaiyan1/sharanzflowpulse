@@ -2,6 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile-first responsive utilities */
+@layer components {
+  .mobile-container {
+    @apply w-full max-w-full px-4 mx-auto;
+  }
+  
+  .mobile-grid {
+    @apply grid grid-cols-1 gap-4;
+  }
+  
+  .tablet-grid {
+    @apply md:grid-cols-2 md:gap-6;
+  }
+  
+  .desktop-grid {
+    @apply lg:grid-cols-3 xl:grid-cols-4 lg:gap-6;
+  }
+  
+  .mobile-card {
+    @apply p-4 space-y-3;
+  }
+  
+  .mobile-stack {
+    @apply flex flex-col space-y-2;
+  }
+  
+  .mobile-row {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2;
+  }
+  
+  .mobile-text {
+    @apply text-sm leading-relaxed;
+  }
+  
+  .mobile-button {
+    @apply w-full sm:w-auto px-4 py-2 text-sm;
+  }
+  
+  .responsive-padding {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+  
+  .responsive-margin {
+    @apply m-4 sm:m-6 lg:m-8;
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
