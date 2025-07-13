@@ -173,8 +173,8 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
       <div className="flex flex-col h-full">
         <Header title="Packing" showSearch={false} onMenuClick={onMenuClick} />
       
-      <div className="flex-1 p-4 sm:p-6 bg-gray-50 overflow-auto">
-        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      <div className="flex-1 p-3 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
           
           {/* Packing Analytics */}
           <PackingStats orders={packingOrders} />

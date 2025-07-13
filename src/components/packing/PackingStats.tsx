@@ -34,67 +34,67 @@ const PackingStats = ({ orders }: PackingStatsProps) => {
   const completionRate = totalItems > 0 ? Math.round((packedItems / totalItems) * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-      <Card>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Packing Queue</CardTitle>
-          <Package className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium text-gray-700">Packing Queue</CardTitle>
+          <Package className="h-4 w-4 text-blue-500" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{orders.length}</div>
-          <CardDescription className="text-xs text-muted-foreground">
+        <CardContent className="pt-0">
+          <div className="text-xl sm:text-2xl font-bold text-gray-900">{orders.length}</div>
+          <CardDescription className="text-xs text-gray-500 mt-1">
             orders ready to pack
           </CardDescription>
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Today's Orders</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium text-gray-700">Today's Orders</CardTitle>
+          <Clock className="h-4 w-4 text-orange-500" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{todaysOrders.length}</div>
-          <CardDescription className="text-xs text-muted-foreground">
+        <CardContent className="pt-0">
+          <div className="text-xl sm:text-2xl font-bold text-gray-900">{todaysOrders.length}</div>
+          <CardDescription className="text-xs text-gray-500 mt-1">
             received today
           </CardDescription>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Today Packed</CardTitle>
-          <CheckCircle className="h-4 w-4 text-green-600" />
+          <CardTitle className="text-xs sm:text-sm font-medium text-gray-700">Today Packed</CardTitle>
+          <CheckCircle className="h-4 w-4 text-green-500" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">{todayPackedOrders.length}</div>
-          <CardDescription className="text-xs text-muted-foreground">
+        <CardContent className="pt-0">
+          <div className="text-xl sm:text-2xl font-bold text-green-600">{todayPackedOrders.length}</div>
+          <CardDescription className="text-xs text-gray-500 mt-1">
             completed today
           </CardDescription>
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Items Progress</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium text-gray-700">Items Progress</CardTitle>
+          <TrendingUp className="h-4 w-4 text-purple-500" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{completionRate}%</div>
-          <CardDescription className="text-xs text-muted-foreground">
+        <CardContent className="pt-0">
+          <div className="text-xl sm:text-2xl font-bold text-purple-600">{completionRate}%</div>
+          <CardDescription className="text-xs text-gray-500 mt-1">
             {packedItems}/{totalItems} items packed
           </CardDescription>
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm col-span-2 sm:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Urgent Orders</CardTitle>
-          <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium text-gray-700">Urgent Orders</CardTitle>
+          <AlertCircle className="h-4 w-4 text-red-500" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-red-600">{urgentOrders.length}</div>
-          <CardDescription className="text-xs text-muted-foreground">
+        <CardContent className="pt-0">
+          <div className="text-xl sm:text-2xl font-bold text-red-600">{urgentOrders.length}</div>
+          <CardDescription className="text-xs text-gray-500 mt-1">
             over 48h old
           </CardDescription>
         </CardContent>
