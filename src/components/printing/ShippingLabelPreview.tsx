@@ -113,7 +113,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       return `
         <div style="border: 2px solid #000; padding: 16px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.3; color: #000; margin-bottom: 15px; max-width: 600px; ${pageBreak}">
-          <!-- TO Section -->
+          <!-- 1. Barcode Section (at the top) -->
+          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
+            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
+              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
+                ${barcodeHTML}
+              </div>
+            </div>
+            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
+          </div>
+
+          <!-- 2. TO Section -->
           <div style="margin-bottom: 12px;">
             <div style="font-weight: bold; margin-bottom: 6px;">📍 TO:</div>
             <div style="border: 1px solid #000; padding: 10px; background: #fffbeb;">
@@ -126,17 +136,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Barcode (moved to top below TO address) -->
-          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
-            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
-              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
-                ${barcodeHTML}
-              </div>
-            </div>
-            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
-          </div>
-
-          <!-- FROM Section and Courier Details - Split Layout -->
+          <!-- 3. FROM Section and Courier Details - Split Layout -->
           <div style="display: flex; margin-bottom: 12px; gap: 8px;">
             <!-- FROM Section - Left Side -->
             <div style="flex: 1;">
@@ -159,7 +159,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Products -->
+          <!-- 4. Products -->
           <div style="margin-bottom: 12px;">
             <div style="font-weight: bold; margin-bottom: 6px;">PRODUCTS:</div>
             <div style="border: 1px solid #000; padding: 10px;">
@@ -169,7 +169,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Footer -->
+          <!-- 5. Footer -->
           <div style="text-align: center; border-top: 2px solid #000; padding-top: 8px; font-weight: bold; font-size: 10px;">
             <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
           </div>
@@ -443,15 +443,23 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           
           <div className="bg-green-50 p-3 rounded-lg border border-green-200">
             <p className="text-sm text-green-800">
-              <strong>Updated Template:</strong> Barcode moved to top below TO address, no CODE 128 label
+              <strong>Reordered Layout:</strong> 1. Barcode → 2. TO address → 3. FROM/Courier split → 4. Products → 5. Footer
             </p>
             <p className="text-xs text-green-700 mt-1">
-              Split FROM/courier details layout with footer requirements included.
+              Layout matches your exact requirements with proper section ordering.
             </p>
           </div>
           
           <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm">
-            {/* TO Section */}
+            {/* 1. Barcode Section (at the top) */}
+            <div className="text-center border border-black p-4 bg-gray-50 mb-4">
+              <div className="bg-white p-3 border border-gray-300 mb-2">
+                {renderBarcode(trackingNumber)}
+              </div>
+              <div className="font-bold text-sm">{trackingNumber}</div>
+            </div>
+
+            {/* 2. TO Section */}
             <div className="mb-4">
               <div className="flex items-center mb-2">
                 <span className="mr-2">📍</span>
@@ -469,15 +477,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Barcode (moved directly below TO address) */}
-            <div className="text-center border border-black p-4 bg-gray-50 mb-4">
-              <div className="bg-white p-3 border border-gray-300 mb-2">
-                {renderBarcode(trackingNumber)}
-              </div>
-              <div className="font-bold text-sm">{trackingNumber}</div>
-            </div>
-
-            {/* FROM Section and Courier Details - Split Layout */}
+            {/* 3. FROM Section and Courier Details - Split Layout */}
             <div className="flex mb-4 gap-2">
               {/* FROM Section - Left Side */}
               <div className="flex-1">
@@ -500,7 +500,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Products */}
+            {/* 4. Products */}
             <div className="mb-4">
               <div className="font-bold mb-2">PRODUCTS:</div>
               <div className="border border-black p-3">
@@ -512,7 +512,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Footer */}
+            {/* 5. Footer */}
             <div className="text-center border-t-2 border-black pt-2 font-bold text-xs">
               <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
             </div>
