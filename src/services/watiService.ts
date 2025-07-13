@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
 
@@ -115,11 +116,14 @@ export const watiService = {
         apiKeyLength: cleanApiKey.length
       });
 
-      // WATI API request body - using simple array for bodyParameters
+      // WATI API request body - try different format based on WATI docs
       const requestBody = {
         whatsappNumber: formattedPhone,
         templateName: template.templateName,
-        bodyParameters: template.parameters.map(param => param.value)
+        bodyParameters: template.parameters.map(param => ({
+          name: param.name,
+          value: param.value
+        }))
       };
 
       console.log('WATI Request Body:', JSON.stringify(requestBody, null, 2));
