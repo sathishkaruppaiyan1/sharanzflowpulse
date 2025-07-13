@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
 
@@ -113,14 +112,11 @@ export const watiService = {
         apiKeyPrefix: cleanApiKey.substring(0, 10) + '...'
       });
 
-      // Updated request body format for WATI API
+      // Correct request body format for WATI API
       const requestBody = {
         whatsappNumber: formattedPhone,
         templateName: template.templateName,
-        bodyParameters: template.parameters.map(param => ({
-          key: param.name,
-          value: param.value
-        }))
+        bodyParameters: template.parameters
       };
 
       console.log('WATI Request Body:', JSON.stringify(requestBody, null, 2));
