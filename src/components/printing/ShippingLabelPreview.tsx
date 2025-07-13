@@ -112,23 +112,23 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
       return `
-        <div style="border: 2px solid #000; padding: 16px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.3; color: #000; margin-bottom: 15px; max-width: 600px; ${pageBreak}">
+        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 12px; background: #fff; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.2; color: #000; margin-bottom: 15px; box-sizing: border-box; ${pageBreak}">
           <!-- 1. Barcode Section -->
-          <div style="text-align: center; border: 1px solid #000; padding: 12px; background: #f9fafb; margin-bottom: 12px;">
-            <div style="background: #fff; padding: 8px; border: 1px solid #d1d5db; margin-bottom: 6px;">
-              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
+          <div style="text-align: center; border: 1px solid #000; padding: 8px; background: #f9fafb; margin-bottom: 8px;">
+            <div style="background: #fff; padding: 6px; border: 1px solid #d1d5db; margin-bottom: 4px;">
+              <div style="text-align: center; height: 40px; display: flex; align-items: end; justify-content: center;">
                 ${barcodeHTML}
               </div>
             </div>
-            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
+            <div style="font-weight: bold; font-size: 11px;">${trackingNumber}</div>
           </div>
 
           <!-- 2. TO Section -->
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: bold; margin-bottom: 6px;">📍 TO:</div>
-            <div style="border: 1px solid #000; padding: 10px; background: #fffbeb;">
-              <div style="font-weight: bold; font-size: 14px;">${customerName.toUpperCase()}</div>
-              <div style="margin-top: 2px;">${shippingAddress.address1}</div>
+          <div style="margin-bottom: 8px;">
+            <div style="font-weight: bold; margin-bottom: 4px;">📍 TO:</div>
+            <div style="border: 1px solid #000; padding: 8px; background: #fffbeb;">
+              <div style="font-weight: bold; font-size: 12px;">${customerName.toUpperCase()}</div>
+              <div style="margin-top: 1px;">${shippingAddress.address1}</div>
               ${shippingAddress.address2 ? `<div>${shippingAddress.address2}</div>` : ''}
               <div>${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
               <div>${shippingAddress.country}</div>
@@ -137,11 +137,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
 
           <!-- 3. FROM Section and Courier Details - Split Layout -->
-          <div style="display: flex; margin-bottom: 12px; gap: 8px;">
+          <div style="display: flex; margin-bottom: 8px; gap: 6px;">
             <!-- FROM Section - Left Side -->
             <div style="flex: 1;">
-              <div style="font-weight: bold; margin-bottom: 6px;">FROM:</div>
-              <div style="border: 1px solid #000; padding: 10px; background: #f9fafb; height: 100%;">
+              <div style="font-weight: bold; margin-bottom: 4px;">FROM:</div>
+              <div style="border: 1px solid #000; padding: 8px; background: #f9fafb; height: 60px; box-sizing: border-box;">
                 <div style="font-weight: bold;">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
@@ -149,8 +149,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             
             <!-- Courier Details - Right Side -->
             <div style="flex: 1;">
-              <div style="font-weight: bold; margin-bottom: 6px;">COURIER DETAILS:</div>
-              <div style="border: 1px solid #000; padding: 10px; background: #f0f9ff; height: 100%;">
+              <div style="font-weight: bold; margin-bottom: 4px;">COURIER DETAILS:</div>
+              <div style="border: 1px solid #000; padding: 8px; background: #f0f9ff; height: 60px; box-sizing: border-box;">
                 <div>Order: <strong>${orderNumber}</strong></div>
                 <div>Weight: ${totalWeight}</div>
                 <div>Items: ${totalItems}</div>
@@ -160,17 +160,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
 
           <!-- 4. Products -->
-          <div style="margin-bottom: 12px;">
-            <div style="font-weight: bold; margin-bottom: 6px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 10px;">
+          <div style="margin-bottom: 8px; margin-top: 12px;">
+            <div style="font-weight: bold; margin-bottom: 4px;">PRODUCTS:</div>
+            <div style="border: 1px solid #000; padding: 8px; max-height: 80px; overflow: hidden;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => 
-                `<div style="margin-bottom: 2px;">• ${item.title || item.name} (Qty: <strong>${item.quantity || 1}</strong>)</div>`
+                `<div style="margin-bottom: 1px; font-size: 9px;">• ${item.title || item.name} (Qty: <strong>${item.quantity || 1}</strong>)</div>`
               ).join('') : '<div>• Order Items</div>'}
             </div>
           </div>
 
           <!-- 5. Footer -->
-          <div style="text-align: center; border-top: 2px solid #000; padding-top: 8px; font-weight: bold; font-size: 10px;">
+          <div style="text-align: center; border-top: 2px solid #000; padding-top: 6px; font-weight: bold; font-size: 8px; margin-top: auto;">
             <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
           </div>
         </div>
@@ -205,7 +205,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           }
           @page {
             margin: 0.3in;
-            size: A4;
+            size: 4in 6in;
           }
         }
       `;
@@ -267,7 +267,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                     font-family: 'Courier New', monospace; 
                     padding: 15px;
                     background: white;
-                    line-height: 1.3;
+                    line-height: 1.2;
                   }
                   @media print {
                     body { 
@@ -277,7 +277,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                     }
                     @page { 
                       margin: 0.3in; 
-                      size: A4; 
+                      size: 4in 6in; 
                     }
                   }
                   @media screen {
@@ -409,10 +409,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>
-            Print Preview - {isBulkPrint ? `${ordersToProcess.length} Labels` : '1 Label'}
+            Print Preview - {isBulkPrint ? `${ordersToProcess.length} Labels` : '1 Label'} (4x6 Format)
           </DialogTitle>
           <div className="flex items-center space-x-2">
             <Button 
@@ -433,7 +433,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           {isBulkPrint && (
             <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-800">
-                <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed.
+                <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed in 4x6 format.
               </p>
               <p className="text-xs text-blue-600 mt-1">
                 Preview shows the first label. All labels will use the same template.
@@ -441,70 +441,70 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           )}
           
-          <div className="print-content border-2 border-black bg-white p-6 font-mono text-sm">
+          <div className="print-content border-2 border-black bg-white font-mono text-sm" style={{ width: '4in', height: '6in', padding: '12px', boxSizing: 'border-box' }}>
             {/* 1. Barcode Section */}
-            <div className="text-center border border-black p-4 bg-gray-50 mb-4">
-              <div className="bg-white p-3 border border-gray-300 mb-2">
+            <div className="text-center border border-black p-3 bg-gray-50 mb-3">
+              <div className="bg-white p-2 border border-gray-300 mb-2">
                 {renderBarcode(trackingNumber)}
               </div>
               <div className="font-bold text-sm">{trackingNumber}</div>
             </div>
 
             {/* 2. TO Section */}
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="flex items-center mb-2">
                 <span className="mr-2">📍</span>
                 <span className="font-bold">TO:</span>
               </div>
-              <div className="border border-black p-3 bg-yellow-50">
-                <div className="font-bold text-lg">
+              <div className="border border-black p-2 bg-yellow-50">
+                <div className="font-bold text-base">
                   {customerName.toUpperCase()}
                 </div>
-                <div>{shippingAddress.address1}</div>
-                {shippingAddress.address2 && <div>{shippingAddress.address2}</div>}
-                <div>{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
-                <div>{shippingAddress.country}</div>
-                <div>Ph: {shippingAddress.phone || 'N/A'}</div>
+                <div className="text-sm">{shippingAddress.address1}</div>
+                {shippingAddress.address2 && <div className="text-sm">{shippingAddress.address2}</div>}
+                <div className="text-sm">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
+                <div className="text-sm">{shippingAddress.country}</div>
+                <div className="text-sm">Ph: {shippingAddress.phone || 'N/A'}</div>
               </div>
             </div>
 
             {/* 3. FROM Section and Courier Details - Split Layout */}
-            <div className="flex mb-4 gap-2">
+            <div className="flex mb-3 gap-2">
               {/* FROM Section - Left Side */}
               <div className="flex-1">
-                <div className="font-bold mb-2">FROM:</div>
-                <div className="border border-black p-3 bg-gray-50 h-full">
-                  <div className="font-bold">Black Lovers</div>
-                  <div>WhatsApp: 7990190234</div>
+                <div className="font-bold mb-2 text-sm">FROM:</div>
+                <div className="border border-black p-2 bg-gray-50" style={{ height: '60px' }}>
+                  <div className="font-bold text-sm">Black Lovers</div>
+                  <div className="text-xs">WhatsApp: 7990190234</div>
                 </div>
               </div>
               
               {/* Courier Details - Right Side */}
               <div className="flex-1">
-                <div className="font-bold mb-2">COURIER DETAILS:</div>
-                <div className="border border-black p-3 bg-blue-50 h-full">
-                  <div>Order: <strong>{orderNumber}</strong></div>
-                  <div>Weight: {totalWeight}</div>
-                  <div>Items: {totalItems}</div>
-                  <div>Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
+                <div className="font-bold mb-2 text-sm">COURIER DETAILS:</div>
+                <div className="border border-black p-2 bg-blue-50" style={{ height: '60px' }}>
+                  <div className="text-xs">Order: <strong>{orderNumber}</strong></div>
+                  <div className="text-xs">Weight: {totalWeight}</div>
+                  <div className="text-xs">Items: {totalItems}</div>
+                  <div className="text-xs">Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
                 </div>
               </div>
             </div>
 
             {/* 4. Products */}
-            <div className="mb-4">
-              <div className="font-bold mb-2">PRODUCTS:</div>
-              <div className="border border-black p-3">
+            <div className="mb-3" style={{ marginTop: '12px' }}>
+              <div className="font-bold mb-2 text-sm">PRODUCTS:</div>
+              <div className="border border-black p-2" style={{ maxHeight: '80px', overflow: 'hidden' }}>
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
-                  <div key={index}>• {item.title || item.name} (Qty: <strong>{item.quantity || 1}</strong>)</div>
+                  <div key={index} className="text-xs mb-1">• {item.title || item.name} (Qty: <strong>{item.quantity || 1}</strong>)</div>
                 )) : (
-                  <div>• Order Items</div>
+                  <div className="text-xs">• Order Items</div>
                 )}
               </div>
             </div>
 
             {/* 5. Footer */}
-            <div className="text-center border-t-2 border-black pt-2 font-bold text-xs">
+            <div className="text-center border-t-2 border-black pt-2 font-bold text-xs mt-auto">
               <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
             </div>
           </div>
