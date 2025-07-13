@@ -4,12 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import StageCard from '@/components/dashboard/StageCard';
 import ShopifyOrdersCard from '@/components/dashboard/ShopifyOrdersCard';
 import Header from '@/components/layout/Header';
+import MobileSidebar from '@/components/layout/MobileSidebar';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/integrations/supabase/client';
 
-const Dashboard = () => {
+interface DashboardProps {
+  onMenuClick: () => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  user: { email: string; role: string; name: string };
+  onLogout: () => void;
+}
+
+const Dashboard = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: DashboardProps) => {
   const navigate = useNavigate();
   const { data: orders = [] } = useOrders();
   const [realtimeData, setRealtimeData] = useState({
@@ -101,8 +110,15 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <Header title="Dashboard" />
+    <>
+      <MobileSidebar 
+        user={user}
+        onLogout={onLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header title="Dashboard" onMenuClick={onMenuClick} />
       
       <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
@@ -196,7 +212,8 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
-    </div>
+      </div>
+    </>
   );
 };
 

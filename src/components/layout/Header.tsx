@@ -15,16 +15,15 @@ const Header = ({ title, onMenuClick, showSearch = true }: HeaderProps) => {
     <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-          {onMenuClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onMenuClick}
-              className="lg:hidden p-1 sm:p-2"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          )}
+          {/* Mobile menu button - only visible on mobile */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onMenuClick}
+            className="lg:hidden p-2"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">{title}</h1>
         </div>
 

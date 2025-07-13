@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import MobileSidebar from '@/components/layout/MobileSidebar';
 import PrintQueue from '@/components/printing/PrintQueue';
 import PrintingFilters from '@/components/printing/PrintingFilters';
 import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
@@ -13,7 +14,15 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-const Printing = () => {
+interface PrintingProps {
+  onMenuClick: () => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  user: { email: string; role: string; name: string };
+  onLogout: () => void;
+}
+
+const Printing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: PrintingProps) => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   const { data: packingOrders = [] } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,45 +181,68 @@ const Printing = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full">
-        <Header title="Printing Stage" showSearch={false} />
-        <div className="flex-1 p-6 bg-gray-50">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Printer className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading Shopify orders...</p>
+      <>
+        <MobileSidebar 
+          user={user}
+          onLogout={onLogout}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
+        <div className="flex flex-col h-full">
+          <Header title="Printing Stage" showSearch={false} onMenuClick={onMenuClick} />
+          <div className="flex-1 p-6 bg-gray-50">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Printer className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
+                <p className="text-gray-500">Loading Shopify orders...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
-        <Header title="Printing Stage" showSearch={false} />
-        <div className="flex-1 p-6 bg-gray-50">
-          <Card className="max-w-md mx-auto mt-8">
-            <CardHeader>
-              <CardTitle className="text-red-600">Error Loading Shopify Orders</CardTitle>
-              <CardDescription>
-                Unable to load orders from Shopify. Please check your API configuration.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600">{error}</p>
-            </CardContent>
-          </Card>
+      <>
+        <MobileSidebar 
+          user={user}
+          onLogout={onLogout}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
+        <div className="flex flex-col h-full">
+          <Header title="Printing Stage" showSearch={false} onMenuClick={onMenuClick} />
+          <div className="flex-1 p-6 bg-gray-50">
+            <Card className="max-w-md mx-auto mt-8">
+              <CardHeader>
+                <CardTitle className="text-red-600">Error Loading Shopify Orders</CardTitle>
+                <CardDescription>
+                  Unable to load orders from Shopify. Please check your API configuration.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">{error}</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   const readyForPacking = packingOrders.length;
 
   return (
-    <div className="flex flex-col h-full">
+    <>
+      <MobileSidebar 
+        user={user}
+        onLogout={onLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex flex-col h-full">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -386,7 +418,8 @@ const Printing = () => {
           onPrintComplete={handleBulkPrintComplete}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

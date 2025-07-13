@@ -21,6 +21,7 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [user, setUser] = useState<{ email: string; role: string; name: string } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogin = (userData: { email: string; role: string; name: string }) => {
     setUser(userData);
@@ -28,6 +29,10 @@ const App = () => {
 
   const handleLogout = () => {
     setUser(null);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   if (!user) {
@@ -49,18 +54,21 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <div className="flex h-screen bg-gray-100 w-full overflow-hidden">
-            <Sidebar user={user} onLogout={handleLogout} />
+            {/* Desktop Sidebar - Hidden on mobile */}
+            <div className="hidden lg:block">
+              <Sidebar user={user} onLogout={handleLogout} />
+            </div>
             
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/printing" element={<Printing />} />
-                <Route path="/packing" element={<Packing />} />
-                <Route path="/tracking" element={<Tracking />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/" element={<Dashboard onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/orders" element={<Orders onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/printing" element={<Printing onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/packing" element={<Packing onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/tracking" element={<Tracking onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/analytics" element={<Analytics onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/users" element={<Users onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
+                <Route path="/settings" element={<Settings onMenuClick={toggleMobileMenu} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} user={user} onLogout={handleLogout} />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>

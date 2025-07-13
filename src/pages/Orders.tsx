@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from '@/components/layout/Header';
+import MobileSidebar from '@/components/layout/MobileSidebar';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import OrderDetails from '@/components/orders/OrderDetails';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +39,15 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-const Orders = () => {
+interface OrdersProps {
+  onMenuClick: () => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  user: { email: string; role: string; name: string };
+  onLogout: () => void;
+}
+
+const Orders = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: OrdersProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
@@ -295,26 +304,41 @@ const Orders = () => {
   // Handle error state
   if (error) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Orders Management" />
-        <main className="flex-1 flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load orders</h3>
-            <p className="text-gray-500 mb-4">There was an error fetching your Shopify orders.</p>
-            <Button onClick={handleSyncFromShopify}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
-        </main>
-      </div>
+      <>
+        <MobileSidebar 
+          user={user}
+          onLogout={onLogout}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="Orders Management" onMenuClick={onMenuClick} />
+          <main className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load orders</h3>
+              <p className="text-gray-500 mb-4">There was an error fetching your Shopify orders.</p>
+              <Button onClick={handleSyncFromShopify}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          </main>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <Header title="Orders Management" />
+    <>
+      <MobileSidebar 
+        user={user}
+        onLogout={onLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header title="Orders Management" onMenuClick={onMenuClick} />
       
       <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
@@ -532,7 +556,8 @@ const Orders = () => {
         onClose={() => setShowOrderDetails(false)}
         order={selectedOrder}
       />
-    </div>
+      </div>
+    </>
   );
 };
 

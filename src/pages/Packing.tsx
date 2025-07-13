@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
+import MobileSidebar from '@/components/layout/MobileSidebar';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
 import StageChangeControls from '@/components/common/StageChangeControls';
@@ -15,7 +16,15 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 
-const Packing = () => {
+interface PackingProps {
+  onMenuClick: () => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  user: { email: string; role: string; name: string };
+  onLogout: () => void;
+}
+
+const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: PackingProps) => {
   const { data: packingOrders = [], isLoading: packingLoading } = useOrdersByStage('packing');
   const { data: trackingOrders = [] } = useOrdersByStage('tracking');
   const updateOrderStage = useUpdateOrderStage();
@@ -127,17 +136,25 @@ const Packing = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full">
-        <Header title="Packing" showSearch={false} />
-        <div className="flex-1 p-6 bg-gray-50">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Package className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading packing data...</p>
+      <>
+        <MobileSidebar 
+          user={user}
+          onLogout={onLogout}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
+        <div className="flex flex-col h-full">
+          <Header title="Packing" showSearch={false} onMenuClick={onMenuClick} />
+          <div className="flex-1 p-6 bg-gray-50">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Package className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
+                <p className="text-gray-500">Loading packing data...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -146,8 +163,15 @@ const Packing = () => {
   const orderComplete = isOrderComplete();
 
   return (
-    <div className="flex flex-col h-full">
-      <Header title="Packing" showSearch={false} />
+    <>
+      <MobileSidebar 
+        user={user}
+        onLogout={onLogout}
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex flex-col h-full">
+        <Header title="Packing" showSearch={false} onMenuClick={onMenuClick} />
       
       <div className="flex-1 p-4 sm:p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -517,6 +541,7 @@ const Packing = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
