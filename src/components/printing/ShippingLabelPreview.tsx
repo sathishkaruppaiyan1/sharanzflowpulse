@@ -139,22 +139,22 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <!-- 3. FROM Section and Courier Details - Split Layout -->
           <div style="display: flex; margin-bottom: 8px; gap: 6px;">
             <!-- FROM Section - Left Side -->
-            <div style="flex: 1;">
+            <div style="flex: 1; min-width: fit-content;">
               <div style="font-weight: bold; margin-bottom: 4px;">FROM:</div>
-              <div style="border: 1px solid #000; padding: 8px; background: #f9fafb; height: 60px; box-sizing: border-box;">
+              <div style="border: 1px solid #000; padding: 8px; background: #f9fafb; min-height: 60px; box-sizing: border-box;">
                 <div style="font-weight: bold;">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
             </div>
             
             <!-- Courier Details - Right Side -->
-            <div style="flex: 1;">
+            <div style="flex: 1; min-width: fit-content;">
               <div style="font-weight: bold; margin-bottom: 4px;">COURIER DETAILS:</div>
-              <div style="border: 1px solid #000; padding: 8px; background: #f0f9ff; height: 60px; box-sizing: border-box;">
-                <div>Order: <strong>${orderNumber}</strong></div>
-                <div>Weight: ${totalWeight}</div>
-                <div>Items: ${totalItems}</div>
-                <div>Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
+              <div style="border: 1px solid #000; padding: 8px; background: #f0f9ff; min-height: 60px; width: 100%; box-sizing: border-box; word-wrap: break-word;">
+                <div style="white-space: nowrap; overflow: visible;">Order: <strong>${orderNumber}</strong></div>
+                <div style="white-space: nowrap; overflow: visible;">Weight: ${totalWeight}</div>
+                <div style="white-space: nowrap; overflow: visible;">Items: ${totalItems}</div>
+                <div style="white-space: nowrap; overflow: visible;">Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
               </div>
             </div>
           </div>
