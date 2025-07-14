@@ -282,7 +282,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      sync_shopify_order: {
+        Args: { shopify_order_data: Json }
+        Returns: string
+      }
     }
     Enums: {
       carrier_type: "frenchexpress" | "delhivery" | "other"
