@@ -265,19 +265,28 @@ export const supabaseOrderService = {
         console.log('Cleaned up orphaned order items');
       }
 
-      // Delete orphaned addresses (addresses without valid customer_id)
+      // Delete orphaned addresses (addresses not referenced by any order)
       const { error: cleanAddressesError } = await supabase
-        .from('addresses')
-        .delete()
-        .is('customer_id', null);
+        .rpc('delete_orphaned_addresses');
 
       if (cleanAddressesError) {
         console.error('Error cleaning up addresses:', cleanAddressesError);
+        // If the RPC doesn't exist, try direct delete of addresses with null customer_id
+        const { error: directAddressError } = await supabase
+          .from('addresses')
+          .delete()
+          .is('customer_id', null);
+
+        if (directAddressError) {
+          console.error('Error cleaning up addresses directly:', directAddressError);
+        } else {
+          console.log('Cleaned up orphaned addresses');
+        }
       } else {
         console.log('Cleaned up orphaned addresses');
       }
 
-      // Delete customers with null phone and email (likely test data)
+      // Delete customers with no orders and no contact info
       const { error: cleanCustomersError } = await supabase
         .from('customers')
         .delete()
@@ -299,7 +308,6 @@ export const supabaseOrderService = {
   },
 
   createSampleOrders: async (): Promise<void> => {
-    // Dummy data for sample orders
     const sampleOrders = [
       {
         order_number: '23070001',
@@ -329,7 +337,6 @@ export const supabaseOrderService = {
     }
   },
 
-  // Add the missing syncShopifyOrderToSupabase method
   syncShopifyOrderToSupabase: async (shopifyOrder: ShopifyOrder): Promise<string> => {
     console.log(`Syncing single Shopify order to Supabase:`, shopifyOrder.id);
     
