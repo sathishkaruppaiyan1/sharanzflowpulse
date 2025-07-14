@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, Settings, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { useOrdersByStage, useUpdateOrderStage } from '@/hooks/useOrders';
-import { useItemScanning } from '@/hooks/useItemScanning';
+import { usePackingScanner } from '@/hooks/usePackingScanner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,27 +28,18 @@ const Packing = () => {
   const [showStageDialog, setShowStageDialog] = useState(false);
 
   const {
-    scanProgress,
-    initializeScanProgress,
     scanItem,
-    isOrderComplete,
+    toggleItemPacked,
     getOrderProgress,
+    isOrderComplete,
     isScanning
-  } = useItemScanning(currentOrder);
+  } = usePackingScanner(currentOrder);
 
   const isLoading = packingLoading;
 
   // Calculate stats
   const readyToPack = packingOrders.length;
   const readyForTracking = trackingOrders.length;
-
-  // Initialize scan progress when order is loaded
-  useEffect(() => {
-    if (currentOrder) {
-      console.log('Initializing scan progress for order:', currentOrder.order_number);
-      initializeScanProgress(currentOrder);
-    }
-  }, [currentOrder]);
 
   const handleOrderScan = () => {
     if (!orderScanInput.trim()) return;
@@ -65,7 +57,7 @@ const Packing = () => {
     if (order) {
       console.log('Order found:', order.order_number);
       setCurrentOrder(order);
-      setOrderLoadedMessage(`Order #${order.order_number.replace('#', '')} loaded - Ready for SKU scanning`);
+      setOrderLoadedMessage(`Order ${order.order_number} loaded - Ready for SKU scanning`);
       setOrderScanInput('');
     } else {
       console.log('Order not found:', orderScanInput);
@@ -141,8 +133,7 @@ const Packing = () => {
     );
   }
 
-  const { scannedItems, totalItems } = getOrderProgress();
-  const progressPercentage = totalItems > 0 ? (scannedItems / totalItems) * 100 : 0;
+  const { packedItems, totalItems, percentage } = getOrderProgress();
   const orderComplete = isOrderComplete();
 
   return (
@@ -224,19 +215,19 @@ const Packing = () => {
                 {currentOrder && (
                   <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-blue-800">Scanning Progress</span>
+                      <span className="text-sm font-medium text-blue-800">Packing Progress</span>
                       <Badge variant="outline" className="bg-white">
-                        {scannedItems}/{totalItems}
+                        {packedItems}/{totalItems}
                       </Badge>
                     </div>
-                    <Progress value={progressPercentage} className="h-2" />
+                    <Progress value={percentage} className="h-2" />
                     <p className="text-xs text-blue-600">
-                      {progressPercentage.toFixed(0)}% completed
+                      {percentage}% completed
                     </p>
                     {orderComplete && (
                       <div className="flex items-center space-x-2 p-2 bg-green-100 border border-green-300 rounded">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm text-green-800 font-medium">All items scanned! Ready to dispatch.</span>
+                        <span className="text-sm text-green-800 font-medium">All items packed! Ready to dispatch.</span>
                       </div>
                     )}
                   </div>
@@ -360,7 +351,7 @@ const Packing = () => {
                     {/* Order Header */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600">Packing order #{currentOrder.order_number.replace('#', '')}</p>
+                        <p className="text-sm text-gray-600">Packing order {currentOrder.order_number}</p>
                         <div className="flex items-center space-x-2 mt-1">
                           <Badge variant="secondary" className="bg-purple-100 text-purple-800">
                             PACKING
@@ -433,47 +424,48 @@ const Packing = () => {
                       </div>
                     </div>
 
-                    {/* Required Items with Scan Progress */}
+                    {/* Required Items */}
                     <div className="pt-4 border-t">
                       <p className="font-medium text-sm mb-3">Required Items:</p>
                       <div className="space-y-3">
-                        {currentOrder.order_items.map((item) => {
-                          const itemProgress = scanProgress[item.id];
-                          return (
-                            <div key={item.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{item.title}</p>
-                                  {item.sku ? (
-                                    <div className="flex items-center space-x-1 mt-1">
-                                      <Hash className="h-3 w-3 text-blue-600" />
-                                      <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border font-bold">
-                                        {item.sku}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center space-x-1 mt-1">
-                                      <AlertTriangle className="h-3 w-3 text-orange-500" />
-                                      <span className="text-xs text-orange-600">No SKU - Search by name</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <Badge 
-                                  variant={itemProgress?.completed ? "default" : "outline"}
-                                  className={itemProgress?.completed ? "bg-green-100 text-green-800" : ""}
-                                >
-                                  {itemProgress?.scannedCount || 0}/{item.quantity}
-                                </Badge>
+                        {currentOrder.order_items.map((item) => (
+                          <div key={item.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{item.title}</p>
+                                {item.sku ? (
+                                  <div className="flex items-center space-x-1 mt-1">
+                                    <Hash className="h-3 w-3 text-blue-600" />
+                                    <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border font-bold">
+                                      {item.sku}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-1 mt-1">
+                                    <AlertTriangle className="h-3 w-3 text-orange-500" />
+                                    <span className="text-xs text-orange-600">No SKU - Search by name</span>
+                                  </div>
+                                )}
                               </div>
-                              {itemProgress && item.quantity > 1 && (
-                                <Progress 
-                                  value={(itemProgress.scannedCount / itemProgress.requiredCount) * 100} 
-                                  className="h-1"
-                                />
-                              )}
+                              <div className="flex items-center space-x-2">
+                                <Badge 
+                                  variant={item.packed ? "default" : "outline"}
+                                  className={item.packed ? "bg-green-100 text-green-800" : ""}
+                                >
+                                  {item.packed ? 'Packed' : 'Pending'}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant={item.packed ? "outline" : "default"}
+                                  onClick={() => toggleItemPacked(item.id, !item.packed)}
+                                  disabled={isScanning}
+                                >
+                                  {item.packed ? 'Unpack' : 'Pack'}
+                                </Button>
+                              </div>
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -482,10 +474,10 @@ const Packing = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-gray-600">Overall Progress:</span>
                         <span className="text-sm font-medium">
-                          {scannedItems} / {totalItems} items scanned
+                          {packedItems} / {totalItems} items packed
                         </span>
                       </div>
-                      <Progress value={progressPercentage} className="h-2" />
+                      <Progress value={percentage} className="h-2" />
                     </div>
                   </div>
                 ) : (
