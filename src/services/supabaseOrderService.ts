@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { ShopifyOrder } from '@/hooks/useShopifyOrders';
@@ -169,136 +170,8 @@ export const supabaseOrderService = {
     return data as Order[];
   },
 
-  deleteOrder: async (orderId: string): Promise<void> => {
-    console.log('Starting delete operation for order:', orderId);
-    
-    try {
-      // First, get order details before deletion for logging
-      const { data: orderData, error: fetchError } = await supabase
-        .from('orders')
-        .select('shipping_address_id, customer_id, order_number')
-        .eq('id', orderId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching order details:', fetchError);
-        throw new Error(`Failed to fetch order details: ${fetchError.message}`);
-      }
-
-      console.log('Order details before deletion:', orderData);
-
-      // Delete order items first
-      console.log('Deleting order items...');
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .delete()
-        .eq('order_id', orderId);
-
-      if (itemsError) {
-        console.error('Error deleting order items:', itemsError);
-        throw new Error(`Failed to delete order items: ${itemsError.message}`);
-      }
-      console.log('Order items deleted successfully');
-
-      // Delete the order
-      console.log('Deleting order...');
-      const { error: orderError } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', orderId);
-
-      if (orderError) {
-        console.error('Error deleting order:', orderError);
-        throw new Error(`Failed to delete order: ${orderError.message}`);
-      }
-      console.log('Order deleted successfully');
-
-      // Clean up the shipping address if it exists
-      if (orderData?.shipping_address_id) {
-        console.log('Deleting shipping address...');
-        const { error: addressError } = await supabase
-          .from('addresses')
-          .delete()
-          .eq('id', orderData.shipping_address_id);
-
-        if (addressError) {
-          console.warn('Warning: Could not delete shipping address:', addressError);
-          // Don't throw here as the main order is already deleted
-        } else {
-          console.log('Shipping address deleted successfully');
-        }
-      }
-
-      console.log(`Order ${orderData?.order_number} deleted successfully with ID: ${orderId}`);
-
-    } catch (error) {
-      console.error('Delete order error:', error);
-      throw error;
-    }
-  },
-
-  cleanupDatabase: async (): Promise<void> => {
-    console.log('Starting database cleanup...');
-    
-    try {
-      // Delete orders with null or empty order numbers
-      const { error: cleanOrdersError } = await supabase
-        .from('orders')
-        .delete()
-        .or('order_number.is.null,order_number.eq.');
-
-      if (cleanOrdersError) {
-        console.error('Error cleaning up orders:', cleanOrdersError);
-      } else {
-        console.log('Cleaned up orders with null/empty order numbers');
-      }
-
-      // Delete orphaned order items (items without valid order_id)
-      const { error: cleanItemsError } = await supabase
-        .from('order_items')
-        .delete()
-        .is('order_id', null);
-
-      if (cleanItemsError) {
-        console.error('Error cleaning up order items:', cleanItemsError);
-      } else {
-        console.log('Cleaned up orphaned order items');
-      }
-
-      // Delete orphaned addresses (addresses with null customer_id)
-      const { error: cleanAddressesError } = await supabase
-        .from('addresses')
-        .delete()
-        .is('customer_id', null);
-
-      if (cleanAddressesError) {
-        console.error('Error cleaning up orphaned addresses:', cleanAddressesError);
-      } else {
-        console.log('Cleaned up orphaned addresses');
-      }
-
-      // Delete customers with no contact info
-      const { error: cleanCustomersError } = await supabase
-        .from('customers')
-        .delete()
-        .is('phone', null)
-        .is('email', null);
-
-      if (cleanCustomersError) {
-        console.error('Error cleaning up customers:', cleanCustomersError);
-      } else {
-        console.log('Cleaned up customers with no contact info');
-      }
-
-      console.log('Database cleanup completed');
-
-    } catch (error) {
-      console.error('Database cleanup error:', error);
-      throw error;
-    }
-  },
-
   createSampleOrders: async (): Promise<void> => {
+    // Dummy data for sample orders
     const sampleOrders = [
       {
         order_number: '23070001',
@@ -328,6 +201,7 @@ export const supabaseOrderService = {
     }
   },
 
+  // Add the missing syncShopifyOrderToSupabase method
   syncShopifyOrderToSupabase: async (shopifyOrder: ShopifyOrder): Promise<string> => {
     console.log(`Syncing single Shopify order to Supabase:`, shopifyOrder.id);
     

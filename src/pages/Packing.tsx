@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
-import MobileSidebar from '@/components/layout/MobileSidebar';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
 import StageChangeControls from '@/components/common/StageChangeControls';
@@ -16,15 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 
-interface PackingProps {
-  onMenuClick: () => void;
-  isMobileMenuOpen: boolean;
-  setIsMobileMenuOpen: (open: boolean) => void;
-  user: { email: string; role: string; name: string };
-  onLogout: () => void;
-}
-
-const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: PackingProps) => {
+const Packing = () => {
   const { data: packingOrders = [], isLoading: packingLoading } = useOrdersByStage('packing');
   const { data: trackingOrders = [] } = useOrdersByStage('tracking');
   const updateOrderStage = useUpdateOrderStage();
@@ -136,25 +127,17 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
 
   if (isLoading) {
     return (
-      <>
-        <MobileSidebar 
-          user={user}
-          onLogout={onLogout}
-          isOpen={isMobileMenuOpen}
-          onClose={() => setIsMobileMenuOpen(false)}
-        />
-        <div className="flex flex-col h-full">
-          <Header title="Packing" showSearch={false} onMenuClick={onMenuClick} />
-          <div className="flex-1 p-6 bg-gray-50">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <Package className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-                <p className="text-gray-500">Loading packing data...</p>
-              </div>
+      <div className="flex flex-col h-full">
+        <Header title="Packing" showSearch={false} />
+        <div className="flex-1 p-6 bg-gray-50">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Package className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
+              <p className="text-gray-500">Loading packing data...</p>
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -163,37 +146,30 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
   const orderComplete = isOrderComplete();
 
   return (
-    <>
-      <MobileSidebar 
-        user={user}
-        onLogout={onLogout}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-      <div className="flex flex-col h-full">
-        <Header title="Packing" showSearch={false} onMenuClick={onMenuClick} />
+    <div className="flex flex-col h-full">
+      <Header title="Packing" showSearch={false} />
       
-      <div className="flex-1 p-3 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 overflow-auto">
-        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
+      <div className="flex-1 p-6 bg-gray-50 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-6">
           
           {/* Packing Analytics */}
           <PackingStats orders={packingOrders} />
 
           {/* Main Packing Interface */}
-          <div className="mobile-grid lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {/* Left Column - Barcode Scanner */}
             <Card>
               <CardHeader>
                 <div className="flex items-center space-x-2">
-                  <Scan className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                  <CardTitle className="text-base sm:text-lg">Barcode Scanner</CardTitle>
+                  <Scan className="h-5 w-5 text-gray-600" />
+                  <CardTitle className="text-lg">Barcode Scanner</CardTitle>
                 </div>
-                <p className="text-xs sm:text-sm text-gray-600">
+                <p className="text-sm text-gray-600">
                   Scan order ID to load, then scan product SKUs to pack items
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6">
+              <CardContent className="space-y-6">
                 
                 {/* Order Scanner */}
                 <div className="space-y-3">
@@ -210,7 +186,7 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
                       </Button>
                     )}
                   </div>
-                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                  <div className="flex space-x-2">
                     <Input
                       placeholder="Scan or enter Order ID/Number"
                       value={orderScanInput}
@@ -223,11 +199,10 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
                       onClick={handleOrderScan}
                       size="sm"
                       variant="outline"
-                      className="mobile-button sm:px-3"
+                      className="px-3"
                       disabled={!!currentOrder}
                     >
-                      <Scan className="h-4 w-4 sm:mr-1" />
-                      <span className="sm:hidden">Scan Order</span>
+                      <Scan className="h-4 w-4" />
                     </Button>
                   </div>
                   {currentOrder && (
@@ -352,8 +327,8 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
             {/* Right Column - Current Order Details */}
             <Card>
               <CardHeader>
-                <div className="mobile-row">
-                  <CardTitle className="text-base sm:text-lg">Current Order Details</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Current Order Details</CardTitle>
                   {currentOrder && (
                     <Dialog open={showStageDialog} onOpenChange={setShowStageDialog}>
                       <DialogTrigger asChild>
@@ -433,7 +408,7 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
                     </div>
 
                     {/* Order Summary */}
-                    <div className="mobile-grid sm:grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                       <div>
                         <p className="text-sm text-gray-500">Total Items</p>
                         <p className="font-semibold">{currentOrder.order_items.length}</p>
@@ -535,13 +510,12 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
               </p>
             </CardHeader>
             <CardContent>
-              <PackingQueue />
+              <PackingQueue orders={packingOrders} />
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-    </>
   );
 };
 

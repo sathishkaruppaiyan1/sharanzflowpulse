@@ -4,21 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import StageCard from '@/components/dashboard/StageCard';
 import ShopifyOrdersCard from '@/components/dashboard/ShopifyOrdersCard';
 import Header from '@/components/layout/Header';
-import MobileSidebar from '@/components/layout/MobileSidebar';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/integrations/supabase/client';
 
-interface DashboardProps {
-  onMenuClick: () => void;
-  isMobileMenuOpen: boolean;
-  setIsMobileMenuOpen: (open: boolean) => void;
-  user: { email: string; role: string; name: string };
-  onLogout: () => void;
-}
-
-const Dashboard = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: DashboardProps) => {
+const Dashboard = () => {
   const navigate = useNavigate();
   const { data: orders = [] } = useOrders();
   const [realtimeData, setRealtimeData] = useState({
@@ -110,30 +101,23 @@ const Dashboard = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, o
   ];
 
   return (
-    <>
-      <MobileSidebar 
-        user={user}
-        onLogout={onLogout}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Dashboard" onMenuClick={onMenuClick} />
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Header title="Dashboard" />
       
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Welcome Section */}
-          <div className="mb-6 sm:mb-8">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
               Welcome to Flow Pulse OFS
             </h2>
-            <p className="text-sm sm:text-base text-gray-600">
+            <p className="text-gray-600">
               Real-time order fulfillment system - Manage your operations efficiently
             </p>
           </div>
 
           {/* Stage Cards */}
-          <div className="mobile-grid tablet-grid lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
             {stageData.map((stage) => (
               <StageCard
                 key={stage.title}
@@ -148,18 +132,18 @@ const Dashboard = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, o
           </div>
 
           {/* Main Content Grid */}
-          <div className="mobile-grid lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Shopify Orders */}
             <ShopifyOrdersCard />
 
             {/* System Status */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base sm:text-lg">System Status</CardTitle>
-                <CardDescription className="text-sm">Current system health</CardDescription>
+                <CardTitle>System Status</CardTitle>
+                <CardDescription>Current system health</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 sm:space-y-4">
+                <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Database</span>
                     <span className="text-sm font-medium text-green-600">Online</span>
@@ -212,8 +196,7 @@ const Dashboard = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, o
           </Card>
         </div>
       </main>
-      </div>
-    </>
+    </div>
   );
 };
 

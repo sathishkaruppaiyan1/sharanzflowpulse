@@ -8,19 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/layout/Header';
-import MobileSidebar from '@/components/layout/MobileSidebar';
 import SystemConfiguration from '@/components/settings/SystemConfiguration';
 import ApiConfiguration from '@/components/settings/ApiConfiguration';
 
-interface SettingsProps {
-  onMenuClick: () => void;
-  isMobileMenuOpen: boolean;
-  setIsMobileMenuOpen: (open: boolean) => void;
-  user: { email: string; role: string; name: string };
-  onLogout: () => void;
-}
-
-const Settings = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: SettingsProps) => {
+const Settings = () => {
   const { toast } = useToast();
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -32,15 +23,8 @@ const Settings = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, on
   };
 
   return (
-    <>
-      <MobileSidebar 
-        user={user}
-        onLogout={onLogout}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-      <div className="flex flex-col h-full">
-        <Header title="Settings" showSearch={false} onMenuClick={onMenuClick} />
+    <div className="flex flex-col h-full">
+      <Header title="Settings" showSearch={false} />
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-4xl mx-auto">
@@ -218,8 +202,7 @@ const Settings = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, on
           </Tabs>
         </div>
       </div>
-      </div>
-    </>
+    </div>
   );
 };
 

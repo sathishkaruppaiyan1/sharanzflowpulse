@@ -2,7 +2,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
-import MobileSidebar from '@/components/layout/MobileSidebar';
 import PerformanceMetrics from '@/components/analytics/PerformanceMetrics';
 import CompletedOrdersList from '@/components/analytics/CompletedOrdersList';
 import DateRangePicker from '@/components/analytics/DateRangePicker';
@@ -11,15 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Order } from '@/types/database';
 
-interface AnalyticsProps {
-  onMenuClick: () => void;
-  isMobileMenuOpen: boolean;
-  setIsMobileMenuOpen: (open: boolean) => void;
-  user: { email: string; role: string; name: string };
-  onLogout: () => void;
-}
-
-const Analytics = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: AnalyticsProps) => {
+const Analytics = () => {
   const { data: orders = [], isLoading, error } = useOrders();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<{
@@ -67,67 +58,44 @@ const Analytics = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, o
 
   if (isLoading) {
     return (
-      <>
-        <MobileSidebar 
-          user={user}
-          onLogout={onLogout}
-          isOpen={isMobileMenuOpen}
-          onClose={() => setIsMobileMenuOpen(false)}
-        />
-        <div className="flex flex-col h-full">
-          <Header title="Analytics" showSearch={false} onMenuClick={onMenuClick} />
-          <div className="flex-1 p-6 bg-gray-50">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <BarChart3 className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-                <p className="text-gray-500">Loading analytics...</p>
-              </div>
+      <div className="flex flex-col h-full">
+        <Header title="Analytics" showSearch={false} />
+        <div className="flex-1 p-6 bg-gray-50">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <BarChart3 className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
+              <p className="text-gray-500">Loading analytics...</p>
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <>
-        <MobileSidebar 
-          user={user}
-          onLogout={onLogout}
-          isOpen={isMobileMenuOpen}
-          onClose={() => setIsMobileMenuOpen(false)}
-        />
-        <div className="flex flex-col h-full">
-          <Header title="Analytics" showSearch={false} onMenuClick={onMenuClick} />
-          <div className="flex-1 p-6 bg-gray-50">
-            <Card className="max-w-md mx-auto mt-8">
-              <CardHeader>
-                <CardTitle className="text-red-600">Error Loading Analytics</CardTitle>
-                <CardDescription>
-                  Unable to load analytics data. Please try again.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">{error.message}</p>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="flex flex-col h-full">
+        <Header title="Analytics" showSearch={false} />
+        <div className="flex-1 p-6 bg-gray-50">
+          <Card className="max-w-md mx-auto mt-8">
+            <CardHeader>
+              <CardTitle className="text-red-600">Error Loading Analytics</CardTitle>
+              <CardDescription>
+                Unable to load analytics data. Please try again.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600">{error.message}</p>
+            </CardContent>
+          </Card>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <MobileSidebar 
-        user={user}
-        onLogout={onLogout}
-        isOpen={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      />
-      <div className="flex flex-col h-full">
-        <Header title="Analytics" showSearch={false} onMenuClick={onMenuClick} />
+    <div className="flex flex-col h-full">
+      <Header title="Analytics" showSearch={false} />
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto">
@@ -165,8 +133,7 @@ const Analytics = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, o
           </div>
         </div>
       </div>
-      </div>
-    </>
+    </div>
   );
 };
 

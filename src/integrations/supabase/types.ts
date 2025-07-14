@@ -100,8 +100,6 @@ export type Database = {
           id: string
           order_id: string | null
           packed: boolean | null
-          packed_quantity: number | null
-          pending_quantity: number | null
           price: number | null
           product_id: string | null
           quantity: number
@@ -115,8 +113,6 @@ export type Database = {
           id?: string
           order_id?: string | null
           packed?: boolean | null
-          packed_quantity?: number | null
-          pending_quantity?: number | null
           price?: number | null
           product_id?: string | null
           quantity?: number
@@ -130,8 +126,6 @@ export type Database = {
           id?: string
           order_id?: string | null
           packed?: boolean | null
-          packed_quantity?: number | null
-          pending_quantity?: number | null
           price?: number | null
           product_id?: string | null
           quantity?: number
