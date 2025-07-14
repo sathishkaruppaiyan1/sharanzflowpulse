@@ -265,28 +265,19 @@ export const supabaseOrderService = {
         console.log('Cleaned up orphaned order items');
       }
 
-      // Delete orphaned addresses (addresses not referenced by any order)
+      // Delete orphaned addresses (addresses with null customer_id)
       const { error: cleanAddressesError } = await supabase
-        .rpc('delete_orphaned_addresses');
+        .from('addresses')
+        .delete()
+        .is('customer_id', null);
 
       if (cleanAddressesError) {
-        console.error('Error cleaning up addresses:', cleanAddressesError);
-        // If the RPC doesn't exist, try direct delete of addresses with null customer_id
-        const { error: directAddressError } = await supabase
-          .from('addresses')
-          .delete()
-          .is('customer_id', null);
-
-        if (directAddressError) {
-          console.error('Error cleaning up addresses directly:', directAddressError);
-        } else {
-          console.log('Cleaned up orphaned addresses');
-        }
+        console.error('Error cleaning up orphaned addresses:', cleanAddressesError);
       } else {
         console.log('Cleaned up orphaned addresses');
       }
 
-      // Delete customers with no orders and no contact info
+      // Delete customers with no contact info
       const { error: cleanCustomersError } = await supabase
         .from('customers')
         .delete()
