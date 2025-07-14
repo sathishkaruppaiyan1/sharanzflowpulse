@@ -70,25 +70,15 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
     }
   };
 
-  // Helper function to get phone number from multiple sources
+  // Helper function to get phone number from customer
   const getPhoneNumber = (order: Order) => {
-    // First try customer phone
-    if (order.customer?.phone) {
-      return order.customer.phone;
-    }
-    // Then try shipping address phone
-    if (order.shipping_address?.phone) {
-      return order.shipping_address.phone;
-    }
-    return null;
+    return order.customer?.phone || null;
   };
 
   // Debug function to log customer data
   const debugCustomerData = (order: Order) => {
     console.log('Tracking - Customer data for order', order.order_number, ':', order.customer);
     console.log('Tracking - Customer phone:', order.customer?.phone);
-    console.log('Tracking - Shipping address:', order.shipping_address);
-    console.log('Tracking - Shipping address phone:', order.shipping_address?.phone);
     console.log('Tracking - Final phone number:', getPhoneNumber(order));
   };
 

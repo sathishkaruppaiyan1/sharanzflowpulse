@@ -27,15 +27,9 @@ const Tracking = () => {
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
 
-  // Helper function to get phone number from multiple sources
+  // Helper function to get phone number from customer
   const getPhoneNumber = (order: Order) => {
-    if (order.customer?.phone) {
-      return order.customer.phone;
-    }
-    if (order.shipping_address?.phone) {
-      return order.shipping_address.phone;
-    }
-    return null;
+    return order.customer?.phone || null;
   };
 
   const handleOrderScan = () => {
@@ -56,7 +50,6 @@ const Tracking = () => {
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
-      console.log('Shipping phone:', order.shipping_address?.phone);
       console.log('Final phone:', getPhoneNumber(order));
     } else {
       toast.error('Order not found in tracking queue');

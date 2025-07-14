@@ -96,11 +96,6 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                         <Phone className="h-3 w-3 text-green-600" />
                         <span className="text-green-600">{order.customer.phone}</span>
                       </div>
-                    ) : order.shipping_address?.phone ? (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Phone className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">{order.shipping_address.phone}</span>
-                      </div>
                     ) : (
                       <div className="flex items-center space-x-1 mt-1">
                         <AlertTriangle className="h-3 w-3 text-red-500" />
