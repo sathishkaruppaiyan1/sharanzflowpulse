@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings } from 'lucide-react';
+import { Package, Scan, User, Mail, Phone, MapPin, Weight, Truck, CheckCircle, AlertTriangle, Hash, BarChart3, ArrowRight, Settings, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import MobileSidebar from '@/components/layout/MobileSidebar';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
+import PendingOrdersQueue from '@/components/packing/PendingOrdersQueue';
+import QuantitySelector from '@/components/packing/QuantitySelector';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { useOrdersByStage, useUpdateOrderStage } from '@/hooks/useOrders';
 import { useItemScanning } from '@/hooks/useItemScanning';
+import { useUpdatePartialQuantity } from '@/hooks/usePartialPacking';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 
@@ -34,6 +38,10 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderLoadedMessage, setOrderLoadedMessage] = useState('');
   const [showStageDialog, setShowStageDialog] = useState(false);
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  
+  const updatePartialQuantity = useUpdatePartialQuantity();
 
   const {
     scanProgress,
@@ -88,10 +96,45 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
     if (!skuScanInput.trim() || !currentOrder) return;
     
     console.log('SKU scan attempt:', skuScanInput);
-    const success = scanItem(skuScanInput);
-    if (success) {
-      setSkuScanInput('');
+    
+    // Find matching item by SKU
+    const matchingItem = currentOrder.order_items.find(item => 
+      item.sku === skuScanInput || 
+      item.title.toLowerCase().includes(skuScanInput.toLowerCase())
+    );
+
+    if (!matchingItem) {
+      toast.error(`❌ SKU "${skuScanInput}" not found in this order!`);
+      return;
     }
+
+    // If item has quantity > 1, open quantity selector
+    if (matchingItem.quantity > 1) {
+      setSelectedItem(matchingItem);
+      setShowQuantitySelector(true);
+      setSkuScanInput('');
+    } else {
+      // For single quantity items, use the original scan logic
+      const success = scanItem(skuScanInput);
+      if (success) {
+        setSkuScanInput('');
+      }
+    }
+  };
+
+  const handleQuantityConfirm = (packedQty: number, pendingQty: number) => {
+    if (!selectedItem) return;
+    
+    updatePartialQuantity.mutate({
+      itemId: selectedItem.id,
+      packedQuantity: packedQty,
+      pendingQuantity: pendingQty
+    }, {
+      onSuccess: () => {
+        toast.success(`✅ ${selectedItem.title} - ${packedQty} packed, ${pendingQty} pending`);
+        setSelectedItem(null);
+      }
+    });
   };
 
   const handleManualStageChange = (orderId: string, orderNumber: string, newStage: 'tracking' | 'shipped') => {
@@ -526,21 +569,62 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
             </Card>
           </div>
 
-          {/* Orders Ready for Packing - Full Width List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
-              <p className="text-sm text-gray-600">
-                {readyToPack} orders waiting to be packed
-              </p>
-            </CardHeader>
-            <CardContent>
-              <PackingQueue orders={packingOrders} />
-            </CardContent>
-          </Card>
+          {/* Packing and Pending Orders Tabs */}
+          <Tabs defaultValue="packing" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="packing" className="flex items-center space-x-2">
+                <Package className="h-4 w-4" />
+                <span>Active Packing ({readyToPack})</span>
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="flex items-center space-x-2">
+                <Clock className="h-4 w-4" />
+                <span>Pending Orders</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="packing" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    {readyToPack} orders waiting to be packed
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <PackingQueue orders={packingOrders} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="pending" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Pending Orders</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    Orders with partially packed quantities waiting for stock
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <PendingOrdersQueue orders={packingOrders} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
+
+    {/* Quantity Selector Dialog */}
+    {selectedItem && (
+      <QuantitySelector
+        isOpen={showQuantitySelector}
+        onClose={() => setShowQuantitySelector(false)}
+        itemTitle={selectedItem.title}
+        totalQuantity={selectedItem.quantity}
+        alreadyPacked={selectedItem.packed_quantity || 0}
+        onConfirm={handleQuantityConfirm}
+      />
+    )}
     </>
   );
 };
