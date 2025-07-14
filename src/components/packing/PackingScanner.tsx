@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,8 +23,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const [skuInput, setSkuInput] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [matchedItem, setMatchedItem] = useState<any>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -39,9 +39,24 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     if (!order.order_items) return null;
     
     return order.order_items.find((item: any) => {
-      return item.sku && item.sku.toLowerCase() === sku.toLowerCase();
+      const skuMatch = item.sku && item.sku.toLowerCase() === sku.toLowerCase();
+      const nameMatch = item.title && item.title.toLowerCase().includes(sku.toLowerCase());
+      return skuMatch || nameMatch;
     });
   }, []);
+
+  const calculateProgress = useCallback(() => {
+    if (!selectedOrder || !selectedOrder.order_items) return { scanned: 0, total: 0, percentage: 0 };
+    
+    const totalQty = selectedOrder.order_items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    const scannedQty = Object.values(scannedItems).reduce((sum: number, count: number) => sum + count, 0);
+    
+    return {
+      scanned: scannedQty,
+      total: totalQty,
+      percentage: totalQty > 0 ? Math.round((scannedQty / totalQty) * 100) : 0
+    };
+  }, [selectedOrder, scannedItems]);
 
   const handleOrderScan = async () => {
     if (!orderIdInput.trim()) return;
@@ -81,11 +96,12 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       }
 
       setSelectedOrder(order);
+      setScannedItems({});
       setStep('sku');
       
       toast({
         title: "Order Selected",
-        description: `Order ${order.order_number} locked. Now scan SKUs for this order.`,
+        description: `Order ${order.order_number} locked. Scan each item ${order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0)} times total.`,
       });
 
       // Focus on SKU input after a short delay
@@ -115,8 +131,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       
       if (!item) {
         toast({
-          title: "SKU Not Found",
-          description: `No item found with SKU: ${skuInput} in order ${selectedOrder.order_number}`,
+          title: "Item Not Found",
+          description: `No item found with SKU/Name: ${skuInput} in order ${selectedOrder.order_number}`,
           variant: "destructive"
         });
         setSkuInput('');
@@ -124,10 +140,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
-      if (item.packed) {
+      // Check current scan count for this item
+      const currentScans = scannedItems[item.id] || 0;
+      
+      if (currentScans >= item.quantity) {
         toast({
-          title: "Already Packed",
-          description: `${item.title} is already marked as packed.`,
+          title: "Item Complete",
+          description: `${item.title} has been scanned ${item.quantity} times already.`,
           variant: "default"
         });
         setSkuInput('');
@@ -135,8 +154,45 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
-      setMatchedItem(item);
-      setShowConfirmDialog(true);
+      // Increment scan count
+      const newScannedItems = {
+        ...scannedItems,
+        [item.id]: currentScans + 1
+      };
+      setScannedItems(newScannedItems);
+
+      // Check if this item is now complete
+      const isItemComplete = newScannedItems[item.id] >= item.quantity;
+      
+      toast({
+        title: "Item Scanned",
+        description: `${item.title} scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
+      });
+
+      // If item is complete, mark it as packed
+      if (isItemComplete) {
+        await supabaseOrderService.updateOrderItemPacked(item.id, true);
+        onItemPacked(selectedOrder.id, item.id);
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
+
+      setSkuInput('');
+      
+      // Check if all items are complete
+      const progress = calculateProgress();
+      const newTotal = Object.values(newScannedItems).reduce((sum: number, count: number) => sum + count, 0);
+      
+      if (newTotal >= progress.total) {
+        toast({
+          title: "Order Complete! 🎉",
+          description: `Order ${selectedOrder.order_number} fully packed and moved to tracking stage.`,
+        });
+        resetScanner();
+      } else {
+        setTimeout(() => {
+          skuInputRef.current?.focus();
+        }, 100);
+      }
 
     } catch (error) {
       console.error('Error processing SKU scan:', error);
@@ -150,61 +206,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     }
   };
 
-  const handleMarkAsPacked = async () => {
-    if (!selectedOrder || !matchedItem) return;
-
-    try {
-      await supabaseOrderService.updateOrderItemPacked(matchedItem.id, true);
-      
-      onItemPacked(selectedOrder.id, matchedItem.id);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      
-      toast({
-        title: "Item Packed",
-        description: `${matchedItem.title} marked as packed successfully!`,
-      });
-      
-      setShowConfirmDialog(false);
-      setMatchedItem(null);
-      setSkuInput('');
-
-      // Check if all items in the order are now packed
-      const updatedOrder = findOrderByNumber(selectedOrder.order_number);
-      if (updatedOrder) {
-        const unpackedItems = updatedOrder.order_items?.filter((item: any) => !item.packed && item.id !== matchedItem.id) || [];
-        
-        if (unpackedItems.length === 0) {
-          toast({
-            title: "Order Complete!",
-            description: `All items in order ${selectedOrder.order_number} are now packed. Order will move to tracking.`,
-          });
-          // Reset to start
-          resetScanner();
-        } else {
-          // Continue scanning for this order
-          setTimeout(() => {
-            skuInputRef.current?.focus();
-          }, 100);
-        }
-      }
-
-    } catch (error) {
-      console.error('Error marking item as packed:', error);
-      toast({
-        title: "Error",
-        description: "Failed to mark item as packed. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const resetScanner = () => {
     setStep('order');
     setOrderIdInput('');
     setSkuInput('');
     setSelectedOrder(null);
-    setMatchedItem(null);
-    setShowConfirmDialog(false);
+    setScannedItems({});
     
     setTimeout(() => {
       orderInputRef.current?.focus();
@@ -269,12 +277,29 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
       {/* SKU Scanner - only show if order is selected */}
       {step === 'sku' && (
-        <div className="space-y-3">
-          <h3 className="font-medium text-gray-900">Product SKU Scanner</h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h3 className="font-medium text-gray-900">Product Scanner</h3>
+            
+            {/* Progress Bar */}
+            {(() => {
+              const progress = calculateProgress();
+              return (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Progress: {progress.scanned}/{progress.total} items scanned</span>
+                    <span>{progress.percentage}%</span>
+                  </div>
+                  <Progress value={progress.percentage} className="h-2" />
+                </div>
+              );
+            })()}
+          </div>
+          
           <div className="flex space-x-2">
             <Input
               ref={skuInputRef}
-              placeholder="Scan or enter product SKU"
+              placeholder="Scan or enter product SKU or name"
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
@@ -290,56 +315,38 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               <Scan className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-      )}
 
-      {/* Confirmation Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Package className="h-5 w-5 text-green-600" />
-              <span>Confirm Item Packing</span>
-            </DialogTitle>
-          </DialogHeader>
-          
-          {matchedItem && selectedOrder && (
-            <div className="space-y-4">
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="font-medium text-green-800 mb-2">Item Found:</h3>
-                <div className="space-y-1 text-sm">
-                  <p><strong>Product:</strong> {matchedItem.title}</p>
-                  <p><strong>SKU:</strong> {matchedItem.sku || 'N/A'}</p>
-                  <p><strong>Quantity:</strong> {matchedItem.quantity}</p>
-                  <p><strong>Order:</strong> {selectedOrder.order_number}</p>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2">
-                <Button
-                  onClick={handleMarkAsPacked}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Mark as Packed
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowConfirmDialog(false);
-                    setSkuInput('');
-                    setTimeout(() => skuInputRef.current?.focus(), 100);
-                  }}
-                  className="flex items-center space-x-2"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </Button>
+          {/* Item Status Display */}
+          {selectedOrder && selectedOrder.order_items && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700">Items to Pack:</h4>
+              <div className="grid gap-2">
+                {selectedOrder.order_items.map((item: any) => {
+                  const scanned = scannedItems[item.id] || 0;
+                  const isComplete = scanned >= item.quantity;
+                  return (
+                    <div key={item.id} className={`p-2 rounded-lg border ${isComplete ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{item.title}</p>
+                          <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={isComplete ? "default" : "secondary"}>
+                            {scanned}/{item.quantity}
+                          </Badge>
+                          {isComplete && <CheckCircle className="h-4 w-4 text-green-600 inline ml-1" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
     </div>
   );
 };
