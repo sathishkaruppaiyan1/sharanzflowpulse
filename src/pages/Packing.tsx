@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -9,11 +9,15 @@ import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import StageChangeControls from '@/components/common/StageChangeControls';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [stageChangeDialogOpen, setStageChangeDialogOpen] = useState(false);
+  const [selectedOrderForStageChange, setSelectedOrderForStageChange] = useState<string | null>(null);
 
   const handleItemPacked = (orderId: string, itemId: string) => {
     console.log('Item packed:', { orderId, itemId });
@@ -69,7 +73,7 @@ const Packing = () => {
             <Card className="bg-white">
               <CardContent className="p-4">
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">Ready for Tracking</h3>
+                  <h3 className="text-sm font-medium text-gray-600">Ready for Packing</h3>
                   <div className="text-2xl font-bold text-blue-600">
                     {packingOrders.filter(order => 
                       order.order_items?.every((item: any) => item.packed)
@@ -257,13 +261,24 @@ const Packing = () => {
                       <div className="flex items-center space-x-3">
                         {isComplete ? (
                           <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Ready for Tracking
+                            Ready for Packing
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
                             In Progress
                           </Badge>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedOrderForStageChange(order.id);
+                            setStageChangeDialogOpen(true);
+                          }}
+                        >
+                          <Settings className="h-3 w-3 mr-1" />
+                          Manage
+                        </Button>
                         <Button variant="outline" size="sm">
                           Select
                         </Button>
@@ -284,6 +299,25 @@ const Packing = () => {
           </Card>
         </div>
       </div>
+      
+      <Dialog open={stageChangeDialogOpen} onOpenChange={setStageChangeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Order Stage</DialogTitle>
+          </DialogHeader>
+          {selectedOrderForStageChange && (
+            <StageChangeControls 
+              order={packingOrders.find(o => o.id === selectedOrderForStageChange)!} 
+              currentStage="packing"
+              onStageChange={() => {
+                setRefreshKey(prev => prev + 1);
+                setStageChangeDialogOpen(false);
+                setSelectedOrderForStageChange(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
