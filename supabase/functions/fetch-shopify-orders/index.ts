@@ -64,7 +64,7 @@ serve(async (req) => {
       while (hasMoreOrders && allOrders.length < 10000) {
         // Build URL with proper pagination
         // Note: Cannot use 'order' parameter with 'since_id' - Shopify API restriction
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}`
         
         // Add since_id for pagination if we have it
         if (sinceId) {
@@ -141,24 +141,35 @@ serve(async (req) => {
     const allOrders = await fetchAllOrders()
     console.log(`Final count - Total orders fetched: ${allOrders.length}`)
     
+    
     // Transform Shopify orders to include detailed information
-    const transformedOrders = allOrders.map((order: any) => ({
-      id: order.id.toString(),
-      order_number: order.name,
-      customer_name: order.customer 
-        ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
-        : 'Guest',
-      customer: order.customer,
-      total_amount: order.current_total_price,
-      currency: order.currency,
-      created_at: order.created_at,
-      financial_status: order.financial_status || 'pending',
-      fulfillment_status: order.fulfillment_status || 'unfulfilled',
-      line_items: order.line_items || [],
-      shipping_address: order.shipping_address,
-      total_weight: order.total_weight,
-      current_total_price: order.current_total_price
-    }))
+    const transformedOrders = allOrders.map((order: any) => {
+      // Log line items data for debugging
+      if (order.line_items && order.line_items.length > 0) {
+        console.log(`Order ${order.name} line items:`, JSON.stringify(order.line_items, null, 2))
+        order.line_items.forEach((item: any, index: number) => {
+          console.log(`Item ${index}: title=${item.title}, sku=${item.sku}, variant_id=${item.variant_id}`)
+        })
+      }
+      
+      return {
+        id: order.id.toString(),
+        order_number: order.name,
+        customer_name: order.customer 
+          ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
+          : 'Guest',
+        customer: order.customer,
+        total_amount: order.current_total_price,
+        currency: order.currency,
+        created_at: order.created_at,
+        financial_status: order.financial_status || 'pending',
+        fulfillment_status: order.fulfillment_status || 'unfulfilled',
+        line_items: order.line_items || [],
+        shipping_address: order.shipping_address,
+        total_weight: order.total_weight,
+        current_total_price: order.current_total_price
+      }
+    })
 
     console.log(`Returning ${transformedOrders.length} transformed orders`)
 
