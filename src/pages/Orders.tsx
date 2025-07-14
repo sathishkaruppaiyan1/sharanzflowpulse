@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Pagination, 
   PaginationContent, 
@@ -15,9 +16,11 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from '@/components/ui/pagination';
-import { Search, RefreshCw, Eye, Package, Clock } from 'lucide-react';
+import { Search, RefreshCw, Eye, Package, Clock, Settings } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useToast } from '@/hooks/use-toast';
+import StageChangeControls from '@/components/common/StageChangeControls';
+import { useOrders } from '@/hooks/useOrders';
 
 const ORDERS_PER_PAGE = 25;
 
@@ -45,18 +48,21 @@ const Orders = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [openStageDialog, setOpenStageDialog] = useState<string | number | null>(null);
   const { toast } = useToast();
   
   // Debounce search term to avoid filtering on every keystroke
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  // Use Shopify orders instead of mock orders - sort by newest first
+  // Use both Shopify orders and our internal orders
   const { 
     orders: rawShopifyOrders = [], 
     loading: isLoading, 
     error, 
     refetch 
   } = useShopifyOrders();
+  
+  const { data: internalOrders = [] } = useOrders();
 
   // Sort orders by newest first (created_at descending)
   const shopifyOrders = useMemo(() => {
@@ -184,6 +190,14 @@ const Orders = () => {
   const handleViewOrder = (order: any) => {
     setSelectedOrder(order);
     setShowOrderDetails(true);
+  };
+
+  const handleStageChange = (orderId: string | number) => {
+    setOpenStageDialog(orderId);
+  };
+
+  const getInternalOrder = (shopifyOrderId: string | number) => {
+    return internalOrders.find(order => order.shopify_order_id === Number(shopifyOrderId));
   };
 
   // Memoized pagination function
@@ -481,10 +495,39 @@ const Orders = () => {
                               {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                             </td>
                             <td className="py-3 px-4">
-                              <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)}>
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)}>
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                {(() => {
+                                  const internalOrder = getInternalOrder(order.id);
+                                  return internalOrder ? (
+                                    <Dialog 
+                                       open={openStageDialog === order.id} 
+                                       onOpenChange={(open) => setOpenStageDialog(open ? order.id : null)}
+                                    >
+                                      <DialogTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <Settings className="h-4 w-4" />
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                          <DialogTitle>Change Order Stage</DialogTitle>
+                                        </DialogHeader>
+                                        <StageChangeControls 
+                                          order={internalOrder} 
+                                          currentStage={internalOrder.stage || 'pending'}
+                                          onStageChange={() => {
+                                            setOpenStageDialog(null);
+                                          }}
+                                        />
+                                      </DialogContent>
+                                    </Dialog>
+                                  ) : null;
+                                })()}
+                              </div>
                             </td>
                           </tr>
                         ))}

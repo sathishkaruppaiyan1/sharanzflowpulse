@@ -160,6 +160,11 @@ const Packing = () => {
                         <p className="text-sm text-gray-500">
                           {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
                         </p>
+                        {selectedOrder.customer?.phone ? (
+                          <p className="text-sm text-green-600 font-medium">📱 {selectedOrder.customer.phone}</p>
+                        ) : (
+                          <p className="text-sm text-red-500">📱 No phone number</p>
+                        )}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -239,6 +244,9 @@ const Packing = () => {
                             <h3 className="font-medium text-gray-900">{order.order_number}</h3>
                             <p className="text-sm text-gray-500">
                               {order.customer?.first_name} {order.customer?.last_name}
+                              {order.customer?.phone && (
+                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
+                              )}
                               <span className="mx-2">•</span>
                               {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
                             </p>
