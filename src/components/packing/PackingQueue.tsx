@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
-import { useUpdateItemPacked } from '@/hooks/useOrderItems';
+import { useUpdateItemPacked } from '@/hooks/useUpdateItemPacked';
 import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface PackingQueueProps {

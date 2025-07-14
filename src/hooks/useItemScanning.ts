@@ -22,12 +22,13 @@ export const useItemScanning = (currentOrder: Order | null) => {
     order.order_items.forEach(item => {
       progress[item.id] = {
         itemId: item.id,
-        scannedCount: 0, // Always start from 0, regardless of packed status
+        scannedCount: item.packed ? item.quantity : 0, // Use actual packed status from database
         requiredCount: item.quantity,
-        completed: false // Always start as not completed
+        completed: item.packed || false // Use actual packed status
       };
     });
     setScanProgress(progress);
+    console.log('Initialized scan progress:', progress);
   };
 
   const updateItemScanCount = useMutation({
@@ -46,7 +47,7 @@ export const useItemScanning = (currentOrder: Order | null) => {
 
       const isCompleted = newScannedCount === currentProgress.requiredCount;
 
-      // Update local state
+      // Update local state first
       setScanProgress(prev => ({
         ...prev,
         [itemId]: {
@@ -56,15 +57,22 @@ export const useItemScanning = (currentOrder: Order | null) => {
         }
       }));
 
+      console.log('Updating database for item:', itemId, 'packed:', isCompleted);
+
       // Update database
       const { data, error } = await supabase
         .from('order_items')
         .update({ packed: isCompleted })
         .eq('id', itemId)
-        .select()
+        .select('*')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database update error:', error);
+        throw error;
+      }
+
+      console.log('Database updated successfully:', data);
       return { data, newScannedCount, isCompleted };
     },
     onSuccess: async ({ newScannedCount, isCompleted }, { itemId }) => {
@@ -151,7 +159,7 @@ export const useItemScanning = (currentOrder: Order | null) => {
   };
 
   const isOrderComplete = () => {
-    if (!currentOrder) return false;
+    if (!currentOrder || Object.keys(scanProgress).length === 0) return false;
     const allCompleted = Object.values(scanProgress).every(progress => progress.completed);
     console.log('Checking if order complete:', allCompleted, 'Progress:', scanProgress);
     return allCompleted;
