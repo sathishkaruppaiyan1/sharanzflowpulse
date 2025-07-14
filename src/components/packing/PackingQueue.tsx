@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
-import { useUpdateItemPacked } from '@/hooks/useUpdateItemPacked';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface PackingQueueProps {
@@ -16,18 +19,36 @@ interface PackingQueueProps {
 
 const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
-  const updateItemPacked = useUpdateItemPacked();
+  const queryClient = useQueryClient();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
 
-  console.log('PackingQueue received orders:', orders.length, orders);
+  const updateItemPacked = useMutation({
+    mutationFn: async ({ itemId, packed }: { itemId: string; packed: boolean }) => {
+      const { data, error } = await supabase
+        .from('order_items')
+        .update({ packed })
+        .eq('id', itemId)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
+    },
+    onError: (error) => {
+      console.error('Error updating item status:', error);
+      toast.error('Failed to update item status');
+    },
+  });
 
   const handleToggleItemPacked = (itemId: string, packed: boolean) => {
-    console.log('Toggling item packed:', itemId, packed);
     updateItemPacked.mutate({ itemId, packed });
   };
 
   const handleMoveToTracking = (orderId: string, orderNumber: string) => {
-    console.log('Moving order to tracking:', orderId);
     updateOrderStage.mutate({ orderId, stage: 'tracking' });
   };
 
@@ -39,19 +60,10 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   };
 
   const isOrderReadyForShipping = (order: Order) => {
-    const allPacked = order.order_items.every(item => item.packed);
-    console.log(`Order ${order.order_number} ready for shipping:`, allPacked);
-    return allPacked;
+    return order.order_items.every(item => item.packed);
   };
 
-  // Filter orders to only show those in 'packing' stage
-  const packingStageOrders = orders.filter(order => {
-    const isPacking = order.stage === 'packing';
-    console.log(`Order ${order.order_number} stage:`, order.stage, 'isPacking:', isPacking);
-    return isPacking;
-  });
-
-  console.log('Filtered packing orders:', packingStageOrders.length);
+  const packingStageOrders = orders.filter(order => order.stage === 'packing');
 
   return (
     <div className="space-y-4">
@@ -122,7 +134,6 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                   <div className="text-sm space-y-1">
                     <p><span className="text-gray-500">Items:</span> {order.order_items.length}</p>
                     <p><span className="text-gray-500">Total:</span> ₹{order.total_amount}</p>
-                    <p><span className="text-gray-500">Printed:</span> {order.printed_at ? new Date(order.printed_at).toLocaleDateString() : 'N/A'}</p>
                     <p><span className="text-gray-500">Stage:</span> <Badge variant="secondary">{order.stage}</Badge></p>
                   </div>
                 </div>
@@ -211,10 +222,6 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
             <CardDescription>
               Orders from the printing stage will appear here for packing
             </CardDescription>
-            <div className="mt-4 text-sm text-gray-500">
-              <p>Total orders received: {orders.length}</p>
-              <p>Orders in packing stage: {packingStageOrders.length}</p>
-            </div>
           </CardContent>
         </Card>
       )}

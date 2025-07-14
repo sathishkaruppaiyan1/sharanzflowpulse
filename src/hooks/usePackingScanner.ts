@@ -27,63 +27,15 @@ export const usePackingScanner = (currentOrder: Order | null) => {
 
       return data;
     },
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
-      
-      // Check if order is complete after this update
-      if (currentOrder && data.packed) {
-        const updatedOrder = await checkAndMoveToTracking(currentOrder.id);
-        if (updatedOrder) {
-          toast.success(`🎉 Order ${currentOrder.order_number} completed and moved to tracking!`);
-        }
-      }
     },
     onError: (error) => {
       console.error('Error updating item status:', error);
       toast.error('Failed to update item status');
     },
   });
-
-  const checkAndMoveToTracking = async (orderId: string) => {
-    try {
-      // Fetch the latest order data to check completion
-      const { data: order, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items(*)
-        `)
-        .eq('id', orderId)
-        .single();
-
-      if (error) throw error;
-
-      const allItemsPacked = order.order_items.every(item => item.packed);
-      
-      if (allItemsPacked) {
-        const { data: updatedOrder, error: updateError } = await supabase
-          .from('orders')
-          .update({ 
-            stage: 'tracking',
-            packed_at: new Date().toISOString()
-          })
-          .eq('id', orderId)
-          .select('*')
-          .single();
-
-        if (updateError) throw updateError;
-        
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        return updatedOrder;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error checking order completion:', error);
-      return null;
-    }
-  };
 
   const scanItem = (sku: string) => {
     if (!currentOrder) {
