@@ -12,7 +12,10 @@ export const supabaseOrderService = {
         *,
         customer:customers(*),
         shipping_address:addresses(*),
-        order_items!inner(*)
+        order_items!inner(
+          *,
+          product:products(*)
+        )
       `)
       .order('created_at', { ascending: false });
 
@@ -22,7 +25,7 @@ export const supabaseOrderService = {
     }
 
     console.log('Raw orders data:', data?.length || 0, 'orders fetched');
-    return data || [];
+    return data as Order[] || [];
   },
 
   async fetchOrdersByStage(stage: OrderStage): Promise<Order[]> {
@@ -34,7 +37,10 @@ export const supabaseOrderService = {
         *,
         customer:customers(*),
         shipping_address:addresses(*),
-        order_items!inner(*)
+        order_items!inner(
+          *,
+          product:products(*)
+        )
       `)
       .eq('stage', stage)
       .order('created_at', { ascending: false });
@@ -45,7 +51,7 @@ export const supabaseOrderService = {
     }
 
     console.log(`Fetched ${data?.length || 0} orders for stage ${stage}`);
-    return data || [];
+    return data as Order[] || [];
   },
 
   async updateOrderStage(orderId: string, stage: OrderStage): Promise<Order> {
@@ -64,7 +70,10 @@ export const supabaseOrderService = {
         *,
         customer:customers(*),
         shipping_address:addresses(*),
-        order_items(*)
+        order_items(
+          *,
+          product:products(*)
+        )
       `)
       .single();
 
@@ -74,7 +83,7 @@ export const supabaseOrderService = {
     }
 
     console.log(`Successfully updated order ${orderId} to stage ${stage}`);
-    return data;
+    return data as Order;
   },
 
   async updateTracking(orderId: string, trackingNumber: string, carrier: CarrierType): Promise<Order> {
@@ -91,7 +100,10 @@ export const supabaseOrderService = {
         *,
         customer:customers(*),
         shipping_address:addresses(*),
-        order_items(*)
+        order_items(
+          *,
+          product:products(*)
+        )
       `)
       .single();
 
@@ -100,7 +112,7 @@ export const supabaseOrderService = {
       throw error;
     }
 
-    return data;
+    return data as Order;
   },
 
   async searchOrders(query: string): Promise<Order[]> {
@@ -110,7 +122,10 @@ export const supabaseOrderService = {
         *,
         customer:customers(*),
         shipping_address:addresses(*),
-        order_items(*)
+        order_items(
+          *,
+          product:products(*)
+        )
       `)
       .or(`order_number.ilike.%${query}%,tracking_number.ilike.%${query}%`)
       .order('created_at', { ascending: false });
@@ -120,7 +135,30 @@ export const supabaseOrderService = {
       throw error;
     }
 
-    return data || [];
+    return data as Order[] || [];
+  },
+
+  async syncShopifyOrderToSupabase(shopifyOrder: any): Promise<string> {
+    console.log('Syncing Shopify order to Supabase:', shopifyOrder.id);
+    
+    // For now, just update the order stage to 'tracking' since we're in the printing context
+    // In a real implementation, this would sync the full Shopify order data
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ 
+        stage: 'tracking' as any,
+        packed_at: new Date().toISOString()
+      })
+      .eq('shopify_order_id', shopifyOrder.id)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error syncing Shopify order:', error);
+      throw error;
+    }
+
+    return data?.id || shopifyOrder.id;
   },
 
   async createSampleOrders(): Promise<void> {

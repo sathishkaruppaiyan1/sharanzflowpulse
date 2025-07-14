@@ -326,24 +326,22 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       console.log('Print initiated successfully');
 
-      // Sync Shopify orders to Supabase and update order stages
+      // Update order stages after successful print
       try {
-        console.log('Syncing orders to Supabase and updating stages...');
+        console.log('Updating order stages to tracking...');
         for (const orderData of ordersToProcess) {
           if (orderData.id) {
             try {
-              console.log('Syncing Shopify order to Supabase:', orderData.id);
-              // First, sync the Shopify order to Supabase using the correct method name
-              const supabaseOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
-              
-              console.log('Successfully synced and updated order:', orderData.id);
+              console.log('Updating order stage:', orderData.id);
+              await supabaseOrderService.updateOrderStage(orderData.id, 'tracking');
+              console.log('Successfully updated order:', orderData.id);
             } catch (orderError) {
-              console.error('Failed to sync/update order:', orderData.id, orderError);
+              console.error('Failed to update order:', orderData.id, orderError);
               // Continue with other orders even if one fails
             }
           }
         }
-        console.log('Order sync and stage updates completed');
+        console.log('Order stage updates completed');
         
         // Refresh all order queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['orders'] });
