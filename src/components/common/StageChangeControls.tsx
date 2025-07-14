@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, ArrowRight, Package, Truck, CheckCircle, Eye } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Package, Truck, CheckCircle, Eye, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
 
   const stages: { value: OrderStage; label: string; icon: React.ReactNode; color: string }[] = [
     { value: 'pending', label: 'Pending', icon: <Eye className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' },
-    { value: 'printing', label: 'Printing', icon: <Package className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
+    { value: 'printing', label: 'Printing', icon: <Printer className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
     { value: 'packing', label: 'Packing', icon: <Package className="h-4 w-4" />, color: 'bg-purple-100 text-purple-800' },
     { value: 'tracking', label: 'Tracking', icon: <Truck className="h-4 w-4" />, color: 'bg-orange-100 text-orange-800' },
     { value: 'shipped', label: 'Shipped', icon: <Truck className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
@@ -29,15 +29,18 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
   const handleStageChange = (newStage: OrderStage) => {
     if (newStage === currentStage) return;
 
+    console.log(`Changing order ${order.order_number} from ${currentStage} to ${newStage}`);
+
     updateOrderStage.mutate(
       { orderId: order.id, stage: newStage },
       {
         onSuccess: () => {
-          toast.success(`Order ${order.order_number} moved to ${newStage} stage`);
+          toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
           onStageChange?.();
         },
-        onError: () => {
-          toast.error('Failed to update order stage');
+        onError: (error) => {
+          console.error('Failed to update order stage:', error);
+          toast.error(`Failed to move order to ${newStage} stage`);
         }
       }
     );
@@ -62,7 +65,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
   const nextStage = getNextStage();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-gray-700">Current Stage:</span>
@@ -87,19 +90,23 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
             className="flex items-center space-x-1"
           >
             <ArrowLeft className="h-3 w-3" />
-            <span className="text-xs">Previous</span>
+            <span className="text-xs">
+              {stages.find(s => s.value === previousStage)?.label}
+            </span>
           </Button>
         )}
         
         {nextStage && (
           <Button
             size="sm"
-            variant="outline"
+            variant="default"
             onClick={() => handleStageChange(nextStage)}
             disabled={updateOrderStage.isPending}
             className="flex items-center space-x-1"
           >
-            <span className="text-xs">Next</span>
+            <span className="text-xs">
+              {stages.find(s => s.value === nextStage)?.label}
+            </span>
             <ArrowRight className="h-3 w-3" />
           </Button>
         )}

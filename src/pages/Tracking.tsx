@@ -45,6 +45,7 @@ const Tracking = () => {
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
+      console.log('Full customer data:', order.customer);
     } else {
       toast.error('Order not found in tracking queue');
       setCurrentOrder(null);
@@ -336,7 +337,7 @@ const Tracking = () => {
                         </DialogHeader>
                         <StageChangeControls 
                           order={currentOrder} 
-                          currentStage="tracking"
+                          currentStage={currentOrder.stage || 'tracking'}
                           onStageChange={() => {
                             setStageDialogOpen(false);
                           }}
