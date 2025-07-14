@@ -112,7 +112,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
       return `
-        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 12px; background: #fff; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.2; color: #000; margin-bottom: 15px; box-sizing: border-box; ${pageBreak}">
+        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 12px; background: #fff; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; line-height: 1.2; color: #000; margin-bottom: 15px; box-sizing: border-box; ${pageBreak}">
           <!-- 1. Barcode Section -->
           <div style="text-align: center; border: 1px solid #000; padding: 8px; background: #f9fafb; margin-bottom: 8px;">
             <div style="background: #fff; padding: 6px; border: 1px solid #d1d5db; margin-bottom: 4px;">
@@ -139,22 +139,22 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <!-- 3. FROM Section and Courier Details - Split Layout -->
           <div style="display: flex; margin-bottom: 8px; gap: 6px;">
             <!-- FROM Section - Left Side -->
-            <div style="flex: 1;">
+            <div style="flex: 1; min-width: 0;">
               <div style="font-weight: bold; margin-bottom: 4px;">FROM:</div>
-              <div style="border: 1px solid #000; padding: 8px; background: #f9fafb; height: 60px; box-sizing: border-box;">
+              <div style="border: 1px solid #000; padding: 8px; background: #f9fafb; min-height: 60px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
                 <div style="font-weight: bold;">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
             </div>
             
             <!-- Courier Details - Right Side -->
-            <div style="flex: 1;">
+            <div style="flex: 1; min-width: 0;">
               <div style="font-weight: bold; margin-bottom: 4px;">COURIER DETAILS:</div>
-              <div style="border: 1px solid #000; padding: 8px; background: #f0f9ff; height: 60px; box-sizing: border-box;">
-                <div>Order: <strong>${orderNumber}</strong></div>
-                <div>Weight: ${totalWeight}</div>
-                <div>Items: ${totalItems}</div>
-                <div>Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
+              <div style="border: 1px solid #000; padding: 8px; background: #f0f9ff; min-height: 60px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word;">
+                <div style="margin-bottom: 2px; font-size: 9px;">Order: <strong>${orderNumber}</strong></div>
+                <div style="margin-bottom: 2px; font-size: 9px;">Weight: ${totalWeight}</div>
+                <div style="margin-bottom: 2px; font-size: 9px;">Items: ${totalItems}</div>
+                <div style="font-size: 9px;">Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
               </div>
             </div>
           </div>
@@ -264,7 +264,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <style>
                   * { margin: 0; padding: 0; box-sizing: border-box; }
                   body { 
-                    font-family: 'Courier New', monospace; 
+                    font-family: Arial, sans-serif; 
+                    font-weight: bold;
                     padding: 15px;
                     background: white;
                     line-height: 1.2;
@@ -441,7 +442,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           )}
           
-          <div className="print-content border-2 border-black bg-white font-mono text-sm" style={{ width: '4in', height: '6in', padding: '12px', boxSizing: 'border-box' }}>
+          <div className="print-content border-2 border-black bg-white font-sans text-sm font-bold" style={{ width: '4in', height: '6in', padding: '12px', boxSizing: 'border-box' }}>
             {/* 1. Barcode Section */}
             <div className="text-center border border-black p-3 bg-gray-50 mb-3">
               <div className="bg-white p-2 border border-gray-300 mb-2">
@@ -471,21 +472,21 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             {/* 3. FROM Section and Courier Details - Split Layout */}
             <div className="flex mb-3 gap-2">
               {/* FROM Section - Left Side */}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="font-bold mb-2 text-sm">FROM:</div>
-                <div className="border border-black p-2 bg-gray-50" style={{ height: '60px' }}>
+                <div className="border border-black p-2 bg-gray-50 break-words overflow-wrap-anywhere" style={{ minHeight: '60px' }}>
                   <div className="font-bold text-sm">Black Lovers</div>
                   <div className="text-xs">WhatsApp: 7990190234</div>
                 </div>
               </div>
               
               {/* Courier Details - Right Side */}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="font-bold mb-2 text-sm">COURIER DETAILS:</div>
-                <div className="border border-black p-2 bg-blue-50" style={{ height: '60px' }}>
-                  <div className="text-xs">Order: <strong>{orderNumber}</strong></div>
-                  <div className="text-xs">Weight: {totalWeight}</div>
-                  <div className="text-xs">Items: {totalItems}</div>
+                <div className="border border-black p-2 bg-blue-50 break-words overflow-wrap-anywhere" style={{ minHeight: '60px' }}>
+                  <div className="text-xs mb-1">Order: <strong>{orderNumber}</strong></div>
+                  <div className="text-xs mb-1">Weight: {totalWeight}</div>
+                  <div className="text-xs mb-1">Items: {totalItems}</div>
                   <div className="text-xs">Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
                 </div>
               </div>
