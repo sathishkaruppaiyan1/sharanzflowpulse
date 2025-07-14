@@ -15,6 +15,7 @@ import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface PackingQueueProps {
   orders: Order[];
+  onItemPacked?: (orderId: string, itemId: string) => void;
 }
 
 const PackingQueue = ({ orders }: PackingQueueProps) => {
