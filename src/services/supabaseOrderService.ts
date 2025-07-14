@@ -281,7 +281,8 @@ export const supabaseOrderService = {
       const { error: cleanCustomersError } = await supabase
         .from('customers')
         .delete()
-        .and('phone.is.null,email.is.null');
+        .is('phone', null)
+        .is('email', null);
 
       if (cleanCustomersError) {
         console.error('Error cleaning up customers:', cleanCustomersError);

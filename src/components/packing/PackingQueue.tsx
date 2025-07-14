@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Database } from 'lucide-react';
-import { StageChangeControls } from '@/components/common/StageChangeControls';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import StageChangeControls from '@/components/common/StageChangeControls';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 
-export const PackingQueue = () => {
+const PackingQueue = () => {
   const { data: packingOrders, isLoading, error } = useOrdersByStage('packing');
   const updateItemPacked = useUpdateItemPacked();
   const deleteOrder = useDeleteOrder();
@@ -101,8 +101,6 @@ export const PackingQueue = () => {
                   <StageChangeControls 
                     order={order}
                     currentStage="packing"
-                    nextStage="tracking"
-                    disabled={!isOrderReadyForShipping(order)}
                   />
                 </div>
               </CardHeader>
@@ -167,3 +165,5 @@ export const PackingQueue = () => {
     </div>
   );
 };
+
+export default PackingQueue;
