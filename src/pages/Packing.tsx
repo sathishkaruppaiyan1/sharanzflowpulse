@@ -8,7 +8,7 @@ import PackingStats from '@/components/packing/PackingStats';
 import PendingOrdersQueue from '@/components/packing/PendingOrdersQueue';
 import QuantitySelector from '@/components/packing/QuantitySelector';
 import StageChangeControls from '@/components/common/StageChangeControls';
-import { useOrdersByStage, useUpdateOrderStage } from '@/hooks/useOrders';
+import { useOrdersByStage, useUpdateOrderStage, useFixOrdersWithoutItems } from '@/hooks/useOrders';
 import { useItemScanning } from '@/hooks/useItemScanning';
 import { useUpdatePartialQuantity } from '@/hooks/usePartialPacking';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,9 +29,10 @@ interface PackingProps {
 }
 
 const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onLogout }: PackingProps) => {
-  const { data: packingOrders = [], isLoading: packingLoading } = useOrdersByStage('packing');
+  const { data: packingOrders = [], isLoading: packingLoading, refetch } = useOrdersByStage('packing');
   const { data: trackingOrders = [] } = useOrdersByStage('tracking');
   const updateOrderStage = useUpdateOrderStage();
+  const fixOrdersWithoutItems = useFixOrdersWithoutItems();
   
   const [orderScanInput, setOrderScanInput] = useState('');
   const [skuScanInput, setSkuScanInput] = useState('');
@@ -218,6 +219,29 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
       
       <div className="flex-1 p-3 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold">Packing Management</h1>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={() => fixOrdersWithoutItems.mutate()}
+                disabled={fixOrdersWithoutItems.isPending}
+                variant="outline"
+                size="sm"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                {fixOrdersWithoutItems.isPending ? 'Fixing...' : 'Fix Orders Without Items'}
+              </Button>
+              <Button 
+                onClick={() => refetch()}
+                disabled={packingLoading}
+                variant="outline"
+                size="sm"
+              >
+                <Package className={`h-4 w-4 mr-2 ${packingLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
           
           {/* Packing Analytics */}
           <PackingStats orders={packingOrders} />

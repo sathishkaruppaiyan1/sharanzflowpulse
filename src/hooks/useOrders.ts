@@ -95,3 +95,19 @@ export const useCreateSampleOrders = () => {
     },
   });
 };
+
+export const useFixOrdersWithoutItems = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: supabaseOrderService.fixOrdersWithoutItems,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Fixed orders without items successfully!');
+    },
+    onError: (error) => {
+      console.error('Error fixing orders without items:', error);
+      toast.error('Failed to fix orders without items');
+    },
+  });
+};
