@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { ShopifyOrder } from '@/hooks/useShopifyOrders';
@@ -6,6 +5,8 @@ import { watiService } from '@/services/watiService';
 
 export const supabaseOrderService = {
   fetchOrders: async (): Promise<Order[]> => {
+    console.log('=== Fetching all orders from Supabase ===');
+    
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -23,7 +24,7 @@ export const supabaseOrderService = {
           postal_code,
           country
         ),
-        order_items (*)
+        order_items!inner (*)
       `)
       .order('created_at', { ascending: false });
 
@@ -32,10 +33,25 @@ export const supabaseOrderService = {
       throw error;
     }
 
+    console.log(`Fetched ${data?.length || 0} orders from database`);
+    
+    // Debug the fetched data
+    data?.forEach(order => {
+      console.log(`Order ${order.order_number}:`, {
+        id: order.id,
+        stage: order.stage,
+        order_items_count: order.order_items?.length || 0,
+        has_customer: !!order.customer,
+        customer_phone: order.customer?.phone
+      });
+    });
+
     return data as Order[];
   },
 
   fetchOrdersByStage: async (stage: OrderStage): Promise<Order[]> => {
+    console.log(`=== Fetching orders for stage: ${stage} ===`);
+    
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -53,7 +69,7 @@ export const supabaseOrderService = {
           postal_code,
           country
         ),
-        order_items (*)
+        order_items!inner (*)
       `)
       .eq('stage', stage)
       .order('created_at', { ascending: false });
@@ -62,6 +78,32 @@ export const supabaseOrderService = {
       console.error(`Error fetching orders in ${stage} stage:`, error);
       throw error;
     }
+
+    console.log(`Fetched ${data?.length || 0} orders in ${stage} stage`);
+    
+    // Enhanced debugging for stage-specific fetch
+    data?.forEach(order => {
+      console.log(`\nStage ${stage} - Order ${order.order_number}:`, {
+        id: order.id,
+        stage: order.stage,
+        order_items_exists: !!order.order_items,
+        order_items_length: order.order_items?.length || 0,
+        order_items_data: order.order_items,
+        customer_phone: order.customer?.phone
+      });
+      
+      if (order.order_items) {
+        order.order_items.forEach((item, index) => {
+          console.log(`  Item ${index + 1}:`, {
+            id: item.id,
+            title: item.title,
+            quantity: item.quantity,
+            packed: item.packed,
+            sku: item.sku
+          });
+        });
+      }
+    });
 
     return data as Order[];
   },

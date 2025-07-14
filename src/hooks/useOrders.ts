@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
@@ -31,14 +32,33 @@ export const useOrdersByStage = (stage: OrderStage) => {
       console.log(`Fetching orders for stage: ${stage}`);
       const orders = await supabaseOrderService.fetchOrdersByStage(stage);
       console.log(`Orders in ${stage} stage:`, orders.length);
+      
+      // Enhanced logging for debugging
       orders.forEach(order => {
-        console.log(`Order ${order.order_number} in ${stage}: items = ${order.order_items?.length || 0}, customer phone = ${order.customer?.phone}`);
-        if (order.order_items) {
-          const totalItems = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
-          const packedItems = order.order_items.filter(item => item.packed).length;
-          console.log(`  - Total items: ${totalItems}, Packed items: ${packedItems}`);
+        console.log(`\n=== Order ${order.order_number} Debug ===`);
+        console.log('- Stage:', order.stage);
+        console.log('- Has order_items:', !!order.order_items);
+        console.log('- Order_items length:', order.order_items?.length || 0);
+        console.log('- Order_items data:', order.order_items);
+        console.log('- Customer phone:', order.customer?.phone);
+        
+        if (order.order_items && order.order_items.length > 0) {
+          let totalQty = 0;
+          let packedQty = 0;
+          order.order_items.forEach(item => {
+            const qty = Number(item.quantity) || 0;
+            totalQty += qty;
+            if (item.packed) {
+              packedQty += qty;
+            }
+            console.log(`  Item: ${item.title}, qty: ${qty}, packed: ${item.packed}`);
+          });
+          console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
+        } else {
+          console.log('  WARNING: No order items found for this order!');
         }
       });
+      
       return orders;
     },
     refetchInterval: 30000,
