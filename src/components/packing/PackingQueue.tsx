@@ -66,12 +66,22 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
 
   const packingStageOrders = orders.filter(order => order.stage === 'packing');
 
+  // Debug function to log customer data
+  const debugCustomerData = (order: Order) => {
+    console.log('Packing - Customer data for order', order.order_number, ':', order.customer);
+    console.log('Packing - Phone number:', order.customer?.phone);
+    console.log('Packing - Shipping address phone:', order.shipping_address);
+  };
+
   return (
     <div className="space-y-4">
       {packingStageOrders.map((order) => {
         const packedItems = order.order_items.filter(item => item.packed).length;
         const totalItems = order.order_items.length;
         const isReady = isOrderReadyForShipping(order);
+        
+        // Debug log for each order
+        debugCustomerData(order);
         
         return (
           <Card key={order.id} className="hover:shadow-md transition-shadow">
@@ -85,6 +95,11 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                       <div className="flex items-center space-x-1 mt-1">
                         <Phone className="h-3 w-3 text-green-600" />
                         <span className="text-green-600">{order.customer.phone}</span>
+                      </div>
+                    ) : order.shipping_address?.phone ? (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Phone className="h-3 w-3 text-green-600" />
+                        <span className="text-green-600">{order.shipping_address.phone}</span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1 mt-1">
@@ -117,7 +132,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                       </DialogHeader>
                       <StageChangeControls 
                         order={order} 
-                        currentStage="packing"
+                        currentStage={order.stage || 'packing'}
                         onStageChange={() => {
                           handleDialogChange(order.id, false);
                         }}

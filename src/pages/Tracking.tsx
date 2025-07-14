@@ -27,6 +27,17 @@ const Tracking = () => {
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
 
+  // Helper function to get phone number from multiple sources
+  const getPhoneNumber = (order: Order) => {
+    if (order.customer?.phone) {
+      return order.customer.phone;
+    }
+    if (order.shipping_address?.phone) {
+      return order.shipping_address.phone;
+    }
+    return null;
+  };
+
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
     
@@ -45,7 +56,8 @@ const Tracking = () => {
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
-      console.log('Full customer data:', order.customer);
+      console.log('Shipping phone:', order.shipping_address?.phone);
+      console.log('Final phone:', getPhoneNumber(order));
     } else {
       toast.error('Order not found in tracking queue');
       setCurrentOrder(null);
@@ -83,7 +95,8 @@ const Tracking = () => {
       });
       
       // Check if customer has phone number to determine WhatsApp status
-      if (currentOrder.customer?.phone) {
+      const phoneNumber = getPhoneNumber(currentOrder);
+      if (phoneNumber) {
         setWhatsappStatus('success');
         toast.success(`Tracking added successfully for order ${currentOrder.order_number}. WhatsApp notification sent!`);
       } else {
@@ -366,17 +379,20 @@ const Tracking = () => {
                         {currentOrder.customer.email && (
                           <p className="text-sm text-gray-600">{currentOrder.customer.email}</p>
                         )}
-                        {currentOrder.customer.phone ? (
-                          <div className="flex items-center space-x-2 mt-1">
-                            <MessageCircle className="h-4 w-4 text-green-600" />
-                            <p className="text-sm text-green-600 font-medium">WhatsApp: {currentOrder.customer.phone}</p>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2 mt-1">
-                            <XCircle className="h-4 w-4 text-red-600" />
-                            <p className="text-sm text-red-600 font-medium">No phone number - WhatsApp unavailable</p>
-                          </div>
-                        )}
+                        {(() => {
+                          const phoneNumber = getPhoneNumber(currentOrder);
+                          return phoneNumber ? (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                              <p className="text-sm text-green-600 font-medium">WhatsApp: {phoneNumber}</p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <p className="text-sm text-red-600 font-medium">No phone number - WhatsApp unavailable</p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                     

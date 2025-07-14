@@ -70,10 +70,26 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
     }
   };
 
+  // Helper function to get phone number from multiple sources
+  const getPhoneNumber = (order: Order) => {
+    // First try customer phone
+    if (order.customer?.phone) {
+      return order.customer.phone;
+    }
+    // Then try shipping address phone
+    if (order.shipping_address?.phone) {
+      return order.shipping_address.phone;
+    }
+    return null;
+  };
+
   // Debug function to log customer data
   const debugCustomerData = (order: Order) => {
-    console.log('Customer data for order', order.order_number, ':', order.customer);
-    console.log('Phone number:', order.customer?.phone);
+    console.log('Tracking - Customer data for order', order.order_number, ':', order.customer);
+    console.log('Tracking - Customer phone:', order.customer?.phone);
+    console.log('Tracking - Shipping address:', order.shipping_address);
+    console.log('Tracking - Shipping address phone:', order.shipping_address?.phone);
+    console.log('Tracking - Final phone number:', getPhoneNumber(order));
   };
 
   if (orders.length === 0) {
@@ -95,6 +111,7 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
       {orders.map((order) => {
         // Debug log for each order
         debugCustomerData(order);
+        const phoneNumber = getPhoneNumber(order);
         
         return (
           <Card key={order.id} className="hover:shadow-md transition-shadow">
@@ -108,8 +125,8 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                     <CardTitle className="text-lg">{order.order_number}</CardTitle>
                     <div className="text-sm text-gray-600">
                       <p>{order.customer?.first_name} {order.customer?.last_name}</p>
-                      {order.customer?.phone ? (
-                        <p className="text-green-600">📱 {order.customer.phone}</p>
+                      {phoneNumber ? (
+                        <p className="text-green-600">📱 {phoneNumber}</p>
                       ) : (
                         <p className="text-red-500">📱 No phone number available</p>
                       )}

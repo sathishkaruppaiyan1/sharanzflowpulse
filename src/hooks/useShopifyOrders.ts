@@ -35,7 +35,7 @@ export interface ShopifyOrder {
     province?: string;
     zip?: string;
     country?: string;
-    phone?: string; // Added this field
+    phone?: string;
   };
   total_weight?: number;
   current_total_price?: string;
@@ -60,11 +60,17 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   const orders = data.orders || [];
   console.log(`Fetched ${orders.length} Shopify orders`);
   
-  // Log phone number data for debugging
+  // Enhanced phone number logging for debugging
   orders.forEach((order: ShopifyOrder) => {
     const shippingPhone = order.shipping_address?.phone;
     const customerPhone = order.customer?.phone;
-    console.log(`Shopify Order ${order.order_number}: shipping_address.phone = ${shippingPhone}, customer.phone = ${customerPhone}`);
+    const hasPhone = shippingPhone || customerPhone;
+    
+    console.log(`Shopify Order ${order.order_number}:`);
+    console.log(`  - shipping_address.phone: ${shippingPhone || 'null'}`);
+    console.log(`  - customer.phone: ${customerPhone || 'null'}`);
+    console.log(`  - has phone: ${hasPhone ? 'YES' : 'NO'}`);
+    console.log(`  - preferred phone: ${shippingPhone || customerPhone || 'none'}`);
   });
 
   return orders;
