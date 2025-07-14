@@ -112,7 +112,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
       return `
-        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 12px; background: #fff; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.2; color: #000; margin-bottom: 15px; box-sizing: border-box; ${pageBreak}">
+        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 12px; background: #fff; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; line-height: 1.2; color: #000; margin-bottom: 15px; box-sizing: border-box; ${pageBreak}">
           <!-- 1. Barcode Section -->
           <div style="text-align: center; border: 1px solid #000; padding: 8px; background: #f9fafb; margin-bottom: 8px;">
             <div style="background: #fff; padding: 6px; border: 1px solid #d1d5db; margin-bottom: 4px;">
@@ -264,7 +264,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <style>
                   * { margin: 0; padding: 0; box-sizing: border-box; }
                   body { 
-                    font-family: 'Courier New', monospace; 
+                    font-family: Arial, sans-serif; 
+                    font-size: 14px;
+                    font-weight: bold;
                     padding: 15px;
                     background: white;
                     line-height: 1.2;
@@ -441,7 +443,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           )}
           
-          <div className="print-content border-2 border-black bg-white font-mono text-sm" style={{ width: '4in', height: '6in', padding: '12px', boxSizing: 'border-box' }}>
+          <div className="print-content border-2 border-black bg-white text-base font-bold" style={{ width: '4in', height: '6in', padding: '12px', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif' }}>
             {/* 1. Barcode Section */}
             <div className="text-center border border-black p-3 bg-gray-50 mb-3">
               <div className="bg-white p-2 border border-gray-300 mb-2">
