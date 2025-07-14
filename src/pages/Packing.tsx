@@ -535,7 +535,7 @@ const Packing = ({ onMenuClick, isMobileMenuOpen, setIsMobileMenuOpen, user, onL
               </p>
             </CardHeader>
             <CardContent>
-              <PackingQueue orders={packingOrders} />
+              <PackingQueue />
             </CardContent>
           </Card>
         </div>
