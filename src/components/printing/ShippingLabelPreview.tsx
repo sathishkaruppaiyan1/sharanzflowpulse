@@ -326,32 +326,32 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       console.log('Print initiated successfully');
 
-      // Update order stages after successful print
+      // Create orders in Supabase and move to packing stage after successful print
       try {
-        console.log('Updating order stages to tracking...');
+        console.log('Creating/syncing orders to Supabase and moving to packing stage...');
         for (const orderData of ordersToProcess) {
           if (orderData.id) {
             try {
-              console.log('Updating order stage:', orderData.id);
-              await supabaseOrderService.updateOrderStage(orderData.id, 'tracking');
-              console.log('Successfully updated order:', orderData.id);
+              console.log('Syncing Shopify order to Supabase:', orderData.id);
+              await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
+              console.log('Successfully synced and moved order to packing:', orderData.id);
             } catch (orderError) {
-              console.error('Failed to update order:', orderData.id, orderError);
+              console.error('Failed to sync order:', orderData.id, orderError);
               // Continue with other orders even if one fails
             }
           }
         }
-        console.log('Order stage updates completed');
+        console.log('Order sync and stage updates completed');
         
         // Refresh all order queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         console.log('Invalidated order queries for UI refresh');
         
       } catch (stageError) {
-        console.warn('Order stage update process failed (but printing succeeded):', stageError);
+        console.warn('Order sync process failed (but printing succeeded):', stageError);
         toast({
           title: "Partial Success",
-          description: "Labels printed successfully, but some order stages may not have been updated.",
+          description: "Labels printed successfully, but some orders may not have been moved to packing stage.",
           variant: "default"
         });
       }
@@ -366,7 +366,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       toast({
         title: "Success",
-        description: `${ordersToProcess.length} label(s) printed successfully!`
+        description: `${ordersToProcess.length} label(s) printed successfully and moved to packing stage!`
       });
       
       // Close dialog after short delay
@@ -420,7 +420,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               disabled={updateOrderStage.isPending}
             >
               <Printer className="h-4 w-4 mr-2" />
-              {updateOrderStage.isPending ? 'Processing...' : 'Print Labels'}
+              {updateOrderStage.isPending ? 'Processing...' : 'Print & Move to Packing'}
             </Button>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -432,7 +432,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           {isBulkPrint && (
             <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-800">
-                <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed in 4x6 format.
+                <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed and orders will be automatically moved to packing stage.
               </p>
               <p className="text-xs text-blue-600 mt-1">
                 Preview shows the first label. All labels will use the same template.

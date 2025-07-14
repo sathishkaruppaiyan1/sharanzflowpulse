@@ -105,6 +105,35 @@ export const useUpdateOrderStage = () => {
   });
 };
 
+export const useUpdateOrderItemPacked = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ itemId, packed }: { itemId: string; packed: boolean }) => {
+      console.log(`=== Updating order item packed status ===`);
+      console.log('Item ID:', itemId);
+      console.log('Packed:', packed);
+      
+      try {
+        await supabaseOrderService.updateOrderItemPacked(itemId, packed);
+        console.log('Order item packed status update successful');
+      } catch (error) {
+        console.error('Error in updateOrderItemPacked mutation:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      console.log('Order item packed status mutation success');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'stage'] });
+    },
+    onError: (error) => {
+      console.error('Order item packed status mutation error:', error);
+      toast.error('Failed to update item packed status');
+    },
+  });
+};
+
 export const useUpdateTracking = () => {
   const queryClient = useQueryClient();
   
