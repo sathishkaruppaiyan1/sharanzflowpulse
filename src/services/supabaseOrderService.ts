@@ -98,7 +98,7 @@ export const supabaseOrderService = {
       .update({ 
         tracking_number: trackingNumber,
         carrier,
-        stage: 'shipped',
+        stage: 'shipped' as OrderStage,
         shipped_at: new Date().toISOString()
       })
       .eq('id', orderId)
@@ -150,7 +150,7 @@ export const supabaseOrderService = {
     const { data, error } = await supabase
       .from('orders')
       .update({ 
-        stage: 'tracking',
+        stage: 'tracking' as OrderStage,
         packed_at: new Date().toISOString()
       })
       .eq('shopify_order_id', shopifyOrder.id)

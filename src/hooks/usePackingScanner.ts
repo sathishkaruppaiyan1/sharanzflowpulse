@@ -39,6 +39,7 @@ export const usePackingScanner = (currentOrder: Order | null) => {
       console.log('Item update mutation success:', data);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders', 'stage', 'packing'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'stage', 'tracking'] });
       toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
     },
     onError: (error) => {
