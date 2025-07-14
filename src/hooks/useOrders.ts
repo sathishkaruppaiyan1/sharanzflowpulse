@@ -145,7 +145,7 @@ export const useUpdateTracking = () => {
     }) => supabaseOrderService.updateTracking(orderId, trackingNumber, carrier),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`Order ${data.order_number} has been shipped! WhatsApp notification sent to customer.`);
+      toast.success(`🚚 Order ${data.order_number} has been shipped! Order moved to shipped stage and customer notified.`);
     },
     onError: (error) => {
       console.error('Error updating tracking:', error);

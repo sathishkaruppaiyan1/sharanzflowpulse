@@ -61,9 +61,10 @@ const PrintQueue = ({
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
 
+    // More prominent notification for stage movement
     toast({
-      title: "Success", 
-      description: "Label printed successfully! Order moved to packing stage."
+      title: "🎉 Order Moved to Packing!", 
+      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
     });
     console.log('Moving order to packing stage:', orderId);
   };
