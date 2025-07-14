@@ -1,243 +1,169 @@
-import React, { useState } from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Order } from '@/types/database';
-import { useUpdateOrderStage, useDeleteOrder } from '@/hooks/useOrders';
+
+import React from 'react';
+import { useOrdersByStage, useDeleteOrder, useCleanupDatabase } from '@/hooks/useOrders';
 import { useUpdateItemPacked } from '@/hooks/useOrderItems';
-import StageChangeControls from '@/components/common/StageChangeControls';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Database } from 'lucide-react';
+import { StageChangeControls } from '@/components/common/StageChangeControls';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
-interface PackingQueueProps {
-  orders: Order[];
-}
-
-const PackingQueue = ({ orders }: PackingQueueProps) => {
-  const updateOrderStage = useUpdateOrderStage();
+export const PackingQueue = () => {
+  const { data: packingOrders, isLoading, error } = useOrdersByStage('packing');
   const updateItemPacked = useUpdateItemPacked();
   const deleteOrder = useDeleteOrder();
-  const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
+  const cleanupDatabase = useCleanupDatabase();
 
-  console.log('PackingQueue received orders:', orders.length, orders);
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <div className="text-red-500">Error loading packing orders</div>;
 
-  const handleToggleItemPacked = (itemId: string, packed: boolean) => {
-    console.log('Toggling item packed:', itemId, packed);
+  console.log('PackingQueue - Orders:', packingOrders?.length || 0);
+  
+  const filteredOrders = packingOrders?.filter(order => {
+    const isPacking = order.stage === 'packing';
+    console.log(`Order ${order.order_number} stage: ${order.stage} isPacking: ${isPacking}`);
+    return isPacking;
+  }) || [];
+
+  console.log('Filtered packing orders:', filteredOrders.length);
+
+  const handleItemPackedChange = (itemId: string, packed: boolean) => {
     updateItemPacked.mutate({ itemId, packed });
   };
 
-  const handleMoveToTracking = (orderId: string, orderNumber: string) => {
-    console.log('Moving order to tracking:', orderId);
-    updateOrderStage.mutate({ orderId, stage: 'tracking' });
-  };
-
   const handleDeleteOrder = (orderId: string, orderNumber: string) => {
-    if (confirm(`Are you sure you want to delete order ${orderNumber}? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to delete order ${orderNumber}?`)) {
+      console.log('User confirmed deletion of order:', orderNumber, 'with ID:', orderId);
       deleteOrder.mutate(orderId);
     }
   };
 
-  const handleDialogChange = (orderId: string, open: boolean) => {
-    setOpenDialogs(prev => ({
-      ...prev,
-      [orderId]: open
-    }));
+  const handleCleanupDatabase = () => {
+    if (window.confirm('Are you sure you want to cleanup the database? This will remove orphaned records and test data.')) {
+      cleanupDatabase.mutate();
+    }
   };
 
-  const isOrderReadyForShipping = (order: Order) => {
-    const allPacked = order.order_items.every(item => item.packed);
-    console.log(`Order ${order.order_number} ready for shipping:`, allPacked);
+  // Check if all items in an order are packed
+  const isOrderReadyForShipping = (order: any) => {
+    if (!order.order_items || order.order_items.length === 0) return false;
+    const allPacked = order.order_items.every((item: any) => item.packed === true);
+    console.log(`Order ${order.order_number} ready for shipping: ${allPacked}`);
     return allPacked;
   };
 
-  // Filter orders to only show those in 'packing' stage
-  const packingStageOrders = orders.filter(order => {
-    const isPacking = order.stage === 'packing';
-    console.log(`Order ${order.order_number} stage:`, order.stage, 'isPacking:', isPacking);
-    return isPacking;
-  });
-
-  console.log('Filtered packing orders:', packingStageOrders.length);
-
   return (
-    <div className="space-y-4">
-      {packingStageOrders.map((order) => {
-        const packedItems = order.order_items.filter(item => item.packed).length;
-        const totalItems = order.order_items.length;
-        const isReady = isOrderReadyForShipping(order);
-        
-        return (
-          <Card key={order.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">{order.order_number}</CardTitle>
-                  <div className="text-sm text-gray-600">
-                    <p>{order.customer?.first_name} {order.customer?.last_name}</p>
-                    {order.customer?.phone ? (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Phone className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">{order.customer.phone}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-1 mt-1">
-                        <AlertTriangle className="h-3 w-3 text-red-500" />
-                        <span className="text-red-500">No phone number</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge 
-                    variant="outline" 
-                    className={`${isReady ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}
-                  >
-                    <Package className="h-3 w-3 mr-1" />
-                    {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Packing Queue</h2>
+        <Button 
+          onClick={handleCleanupDatabase}
+          variant="outline"
+          size="sm"
+          disabled={cleanupDatabase.isPending}
+        >
+          <Database className="h-4 w-4 mr-2" />
+          {cleanupDatabase.isPending ? 'Cleaning...' : 'Cleanup Database'}
+        </Button>
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-muted-foreground text-center">No orders in packing queue</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => (
+            <Card key={order.id} className="relative">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div className="flex items-center space-x-4">
+                  <CardTitle className="text-lg">Order #{order.order_number}</CardTitle>
+                  <Badge variant={isOrderReadyForShipping(order) ? "default" : "secondary"}>
+                    {isOrderReadyForShipping(order) ? 'Ready to Ship' : 'In Progress'}
                   </Badge>
                   {order.order_number === 'BS1843-P1752418767061' && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       size="sm"
                       onClick={() => handleDeleteOrder(order.id, order.order_number)}
                       disabled={deleteOrder.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {deleteOrder.isPending ? 'Deleting...' : 'Delete'}
                     </Button>
                   )}
-                  <Dialog 
-                    open={openDialogs[order.id] || false} 
-                    onOpenChange={(open) => handleDialogChange(order.id, open)}
-                  >
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Change Order Stage</DialogTitle>
-                      </DialogHeader>
-                      <StageChangeControls 
-                        order={order} 
-                        currentStage="packing"
-                        onStageChange={() => {
-                          handleDialogChange(order.id, false);
-                        }}
-                      />
-                    </DialogContent>
-                  </Dialog>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <div className="mobile-grid lg:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-gray-700">Order Details</h4>
-                  <div className="text-sm space-y-1">
-                    <p><span className="text-gray-500">Items:</span> {order.order_items.length}</p>
-                    <p><span className="text-gray-500">Total:</span> ₹{order.total_amount}</p>
-                    <p><span className="text-gray-500">Printed:</span> {order.printed_at ? new Date(order.printed_at).toLocaleDateString() : 'N/A'}</p>
-                    <p><span className="text-gray-500">Stage:</span> <Badge variant="secondary">{order.stage}</Badge></p>
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <StageChangeControls 
+                    order={order}
+                    currentStage="packing"
+                    nextStage="tracking"
+                    disabled={!isOrderReadyForShipping(order)}
+                  />
                 </div>
-                
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-gray-700">Shipping Address</h4>
-                  <div className="text-sm text-gray-600">
-                    {order.shipping_address ? (
-                      <div>
-                        <p>{order.shipping_address.address_line_1}</p>
-                        {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
-                        <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
-                      </div>
-                    ) : (
-                      <p>No shipping address</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm text-gray-700">Items to Pack</h4>
-                <div className="space-y-2">
-                  {order.order_items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          checked={item.packed || false}
-                          onCheckedChange={(checked) => 
-                            handleToggleItemPacked(item.id, checked as boolean)
-                          }
-                          disabled={updateItemPacked.isPending}
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.title}</p>
-                          {item.sku && (
-                            <div className="flex items-center space-x-1 mt-1">
-                              <Hash className="h-3 w-3 text-blue-600" />
-                              <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
-                                {item.sku}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary">x{item.quantity}</Badge>
-                        {item.packed ? (
-                          <CheckSquare className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Square className="h-4 w-4 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Customer</p>
+                      <p className="font-medium">
+                        {order.customer?.first_name} {order.customer?.last_name}
+                      </p>
+                      {order.customer?.phone && (
+                        <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Shipping Address</p>
+                      <div className="text-sm">
+                        <p>{order.shipping_address?.address_line_1}</p>
+                        {order.shipping_address?.address_line_2 && (
+                          <p>{order.shipping_address.address_line_2}</p>
                         )}
+                        <p>
+                          {order.shipping_address?.city}, {order.shipping_address?.state} {order.shipping_address?.postal_code}
+                        </p>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Items to Pack</h4>
+                    <div className="space-y-2">
+                      {order.order_items?.map((item: any) => (
+                        <div key={item.id} className="flex items-center space-x-3 p-2 border rounded">
+                          <Checkbox
+                            id={`item-${item.id}`}
+                            checked={item.packed || false}
+                            onCheckedChange={(checked) => 
+                              handleItemPackedChange(item.id, checked as boolean)
+                            }
+                            disabled={updateItemPacked.isPending}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium">{item.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Quantity: {item.quantity} {item.sku && `| SKU: ${item.sku}`}
+                            </p>
+                          </div>
+                          <Badge variant={item.packed ? "default" : "secondary"}>
+                            {item.packed ? 'Packed' : 'Pending'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <Package className="h-4 w-4" />
-                  <span>{packedItems} of {totalItems} items packed</span>
-                </div>
-                
-                <Button 
-                  onClick={() => handleMoveToTracking(order.id, order.order_number)}
-                  disabled={!isReady || updateOrderStage.isPending}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Dispatch Order
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-      
-      {packingStageOrders.length === 0 && (
-        <Card className="text-center py-8">
-          <CardContent>
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <CardTitle className="text-gray-600 mb-2">No Orders in Packing Queue</CardTitle>
-            <CardDescription>
-              Orders from the printing stage will appear here for packing
-            </CardDescription>
-            <div className="mt-4 text-sm text-gray-500">
-              <p>Total orders received: {orders.length}</p>
-              <p>Orders in packing stage: {packingStageOrders.length}</p>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
 };
-
-export default PackingQueue;

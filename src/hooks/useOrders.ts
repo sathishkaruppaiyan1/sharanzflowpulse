@@ -84,14 +84,33 @@ export const useDeleteOrder = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (orderId: string) => supabaseOrderService.deleteOrder(orderId),
+    mutationFn: (orderId: string) => {
+      console.log('Mutation: Deleting order with ID:', orderId);
+      return supabaseOrderService.deleteOrder(orderId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success('Order deleted successfully!');
     },
     onError: (error) => {
-      console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
+      console.error('Delete order mutation error:', error);
+      toast.error(`Failed to delete order: ${error.message}`);
+    },
+  });
+};
+
+export const useCleanupDatabase = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: supabaseOrderService.cleanupDatabase,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Database cleanup completed successfully!');
+    },
+    onError: (error) => {
+      console.error('Database cleanup error:', error);
+      toast.error(`Failed to cleanup database: ${error.message}`);
     },
   });
 };
