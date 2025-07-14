@@ -296,7 +296,6 @@ export const supabaseOrderService = {
       }
 
       // Create order items
-      console.log(`Creating order items for ${shopifyOrder.order_number}:`, shopifyOrder.line_items);
       if (shopifyOrder.line_items && shopifyOrder.line_items.length > 0) {
         const orderItems = shopifyOrder.line_items.map(item => ({
           order_id: order.id,
@@ -308,8 +307,6 @@ export const supabaseOrderService = {
           shopify_variant_id: item.variant_id ? parseInt(item.variant_id.toString()) : null,
         }));
 
-        console.log(`Inserting ${orderItems.length} items for order ${shopifyOrder.order_number}:`, orderItems);
-
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(orderItems);
@@ -318,32 +315,6 @@ export const supabaseOrderService = {
           console.error('Error creating order items:', itemsError);
           throw itemsError;
         }
-        
-        console.log(`Successfully created ${orderItems.length} items for order ${shopifyOrder.order_number}`);
-      } else {
-        console.warn(`No line_items found for order ${shopifyOrder.order_number}. Line items:`, shopifyOrder.line_items);
-        
-        // Create a default item so the order isn't empty
-        const defaultItem = {
-          order_id: order.id,
-          title: 'Order Item (No details from Shopify)',
-          quantity: 1,
-          price: parseFloat(shopifyOrder.total_amount || '0'),
-          total: parseFloat(shopifyOrder.total_amount || '0'),
-          sku: null,
-          shopify_variant_id: null,
-        };
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert([defaultItem]);
-
-        if (itemsError) {
-          console.error('Error creating default order item:', itemsError);
-          throw itemsError;
-        }
-        
-        console.log(`Created default item for order ${shopifyOrder.order_number} due to missing line_items`);
       }
 
       console.log(`Successfully synced single order ${shopifyOrder.order_number} with phone: ${phoneNumber}`);
@@ -477,57 +448,5 @@ export const supabaseOrderService = {
     }
 
     console.log('Shopify orders sync completed');
-  },
-  // Function to fix orders that have no order_items
-  fixOrdersWithoutItems: async (): Promise<void> => {
-    console.log('Checking for orders without items...');
-    
-    // Find orders that have no order_items
-    const { data: ordersWithoutItems, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        order_number,
-        total_amount,
-        order_items (id)
-      `)
-      .is('order_items.id', null);
-
-    if (error) {
-      console.error('Error finding orders without items:', error);
-      throw error;
-    }
-
-    if (!ordersWithoutItems || ordersWithoutItems.length === 0) {
-      console.log('No orders found without items');
-      return;
-    }
-
-    console.log(`Found ${ordersWithoutItems.length} orders without items:`, ordersWithoutItems.map(o => o.order_number));
-
-    // Create default items for these orders
-    for (const order of ordersWithoutItems) {
-      const defaultItem = {
-        order_id: order.id,
-        title: 'Order Item (Details Missing)',
-        quantity: 1,
-        price: order.total_amount || 0,
-        total: order.total_amount || 0,
-        sku: null,
-        shopify_variant_id: null,
-      };
-
-      const { error: insertError } = await supabase
-        .from('order_items')
-        .insert([defaultItem]);
-
-      if (insertError) {
-        console.error(`Error creating default item for order ${order.order_number}:`, insertError);
-      } else {
-        console.log(`Created default item for order ${order.order_number}`);
-      }
-    }
-
-    console.log('Completed fixing orders without items');
   },
 };
