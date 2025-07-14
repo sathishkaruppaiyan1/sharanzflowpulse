@@ -9,7 +9,28 @@ interface PackingStatsProps {
 }
 
 const PackingStats = ({ orders }: PackingStatsProps) => {
+  console.log('=== PackingStats Debug ===');
   console.log('PackingStats orders:', orders?.length || 0, 'orders received');
+  console.log('Full orders data:', orders);
+  
+  // Debug each order's items
+  orders?.forEach((order, index) => {
+    console.log(`\nOrder ${index + 1} (${order.order_number}):`);
+    console.log('- order_items exists:', !!order.order_items);
+    console.log('- order_items length:', order.order_items?.length || 0);
+    console.log('- order_items data:', order.order_items);
+    
+    if (order.order_items && order.order_items.length > 0) {
+      order.order_items.forEach((item, itemIndex) => {
+        console.log(`  Item ${itemIndex + 1}:`, {
+          title: item.title,
+          quantity: item.quantity,
+          packed: item.packed,
+          id: item.id
+        });
+      });
+    }
+  });
   
   const todaysOrders = orders?.filter(order => 
     new Date(order.created_at).toDateString() === new Date().toDateString()
@@ -21,18 +42,51 @@ const PackingStats = ({ orders }: PackingStatsProps) => {
     return hoursSinceCreated > 48;
   }) || [];
 
+  // Calculate total items with detailed logging
+  let totalItemsDebug = 0;
+  orders?.forEach((order) => {
+    const orderItems = order.order_items || [];
+    console.log(`Processing order ${order.order_number}:`, {
+      hasOrderItems: !!order.order_items,
+      orderItemsLength: orderItems.length,
+      orderItemsArray: orderItems
+    });
+    
+    orderItems.forEach((item) => {
+      const itemQty = Number(item.quantity) || 0;
+      totalItemsDebug += itemQty;
+      console.log(`  Adding item ${item.title}: quantity=${item.quantity}, parsed=${itemQty}, running total=${totalItemsDebug}`);
+    });
+  });
+  
+  console.log('Total items calculated:', totalItemsDebug);
+
   // Calculate total items correctly
   const totalItems = orders?.reduce((sum, order) => {
-    const orderItemCount = order.order_items?.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0) || 0;
+    if (!order.order_items || !Array.isArray(order.order_items)) {
+      console.log(`Order ${order.order_number} has no order_items or it's not an array`);
+      return sum;
+    }
+    
+    const orderItemCount = order.order_items.reduce((itemSum, item) => {
+      const qty = Number(item.quantity) || 0;
+      return itemSum + qty;
+    }, 0);
+    
     console.log(`Order ${order.order_number}: ${orderItemCount} total items`);
     return sum + orderItemCount;
   }, 0) || 0;
 
   const packedItems = orders?.reduce((sum, order) => {
-    const orderPackedCount = order.order_items?.reduce((itemSum, item) => {
-      const packedQty = item.packed ? (item.quantity || 0) : 0;
+    if (!order.order_items || !Array.isArray(order.order_items)) {
+      return sum;
+    }
+    
+    const orderPackedCount = order.order_items.reduce((itemSum, item) => {
+      const packedQty = item.packed ? (Number(item.quantity) || 0) : 0;
       return itemSum + packedQty;
-    }, 0) || 0;
+    }, 0);
+    
     console.log(`Order ${order.order_number}: ${orderPackedCount} packed items`);
     return sum + orderPackedCount;
   }, 0) || 0;
@@ -46,9 +100,10 @@ const PackingStats = ({ orders }: PackingStatsProps) => {
   // Calculate completion rate
   const completionRate = totalItems > 0 ? Math.round((packedItems / totalItems) * 100) : 0;
 
-  console.log('PackingStats calculated:', {
+  console.log('=== Final PackingStats calculated ===', {
     totalOrders: orders?.length || 0,
     totalItems,
+    totalItemsDebug,
     packedItems,
     completionRate,
     todaysOrders: todaysOrders.length,
