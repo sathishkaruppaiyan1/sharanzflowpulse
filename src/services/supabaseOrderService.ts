@@ -171,29 +171,49 @@ export const supabaseOrderService = {
   },
 
   deleteOrder: async (orderId: string): Promise<void> => {
-    // First delete order items
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .delete()
-      .eq('order_id', orderId);
+    try {
+      // First delete order items
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId);
 
-    if (itemsError) {
-      console.error('Error deleting order items:', itemsError);
-      throw itemsError;
+      if (itemsError) {
+        console.error('Error deleting order items:', itemsError);
+        throw new Error(`Failed to delete order items: ${itemsError.message}`);
+      }
+
+      // Delete associated address if it exists
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('shipping_address_id, customer_id')
+        .eq('id', orderId)
+        .single();
+
+      // Delete the order
+      const { error: orderError } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (orderError) {
+        console.error('Error deleting order:', orderError);
+        throw new Error(`Failed to delete order: ${orderError.message}`);
+      }
+
+      // Optionally delete the shipping address if it's not used by other orders
+      if (orderData?.shipping_address_id) {
+        await supabase
+          .from('addresses')
+          .delete()
+          .eq('id', orderData.shipping_address_id);
+      }
+
+      console.log('Order deleted successfully:', orderId);
+    } catch (error) {
+      console.error('Delete order error:', error);
+      throw error;
     }
-
-    // Then delete the order
-    const { error: orderError } = await supabase
-      .from('orders')
-      .delete()
-      .eq('id', orderId);
-
-    if (orderError) {
-      console.error('Error deleting order:', orderError);
-      throw orderError;
-    }
-
-    console.log('Order deleted successfully:', orderId);
   },
 
   createSampleOrders: async (): Promise<void> => {
