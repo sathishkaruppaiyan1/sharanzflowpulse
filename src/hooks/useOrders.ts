@@ -11,7 +11,12 @@ export const useOrders = () => {
       const orders = await supabaseOrderService.fetchOrders();
       console.log('Fetched orders:', orders.length);
       orders.forEach(order => {
-        console.log(`Order ${order.order_number}: customer phone = ${order.customer?.phone}, customer data:`, order.customer);
+        console.log(`Order ${order.order_number}: items = ${order.order_items?.length || 0}, customer phone = ${order.customer?.phone}`);
+        if (order.order_items) {
+          order.order_items.forEach(item => {
+            console.log(`  - Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}`);
+          });
+        }
       });
       return orders;
     },
@@ -27,7 +32,12 @@ export const useOrdersByStage = (stage: OrderStage) => {
       const orders = await supabaseOrderService.fetchOrdersByStage(stage);
       console.log(`Orders in ${stage} stage:`, orders.length);
       orders.forEach(order => {
-        console.log(`Order ${order.order_number} in ${stage}: customer phone = ${order.customer?.phone}`);
+        console.log(`Order ${order.order_number} in ${stage}: items = ${order.order_items?.length || 0}, customer phone = ${order.customer?.phone}`);
+        if (order.order_items) {
+          const totalItems = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+          const packedItems = order.order_items.filter(item => item.packed).length;
+          console.log(`  - Total items: ${totalItems}, Packed items: ${packedItems}`);
+        }
       });
       return orders;
     },
