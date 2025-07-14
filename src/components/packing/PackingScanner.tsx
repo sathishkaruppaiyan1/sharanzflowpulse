@@ -13,9 +13,10 @@ import { useQueryClient } from '@tanstack/react-query';
 interface PackingScannerProps {
   orders: any[];
   onItemPacked: (orderId: string, itemId: string) => void;
+  onOrderSelected?: (order: any | null) => void;
 }
 
-const PackingScanner = ({ orders, onItemPacked }: PackingScannerProps) => {
+const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScannerProps) => {
   const [step, setStep] = useState<'order' | 'sku'>('order');
   const [orderIdInput, setOrderIdInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
@@ -222,150 +223,75 @@ const PackingScanner = ({ orders, onItemPacked }: PackingScannerProps) => {
     }
   };
 
-  const remainingItems = selectedOrder 
-    ? selectedOrder.order_items?.filter((item: any) => !item.packed).length || 0
-    : 0;
+  // Notify parent about selected order
+  React.useEffect(() => {
+    onOrderSelected?.(selectedOrder);
+  }, [selectedOrder, onOrderSelected]);
 
   return (
     <div className="space-y-6">
-      {/* Step 1: Order ID Scanner */}
-      <Card className={step === 'order' ? 'border-blue-500 shadow-md' : 'bg-gray-50'}>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step === 'order' ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
-              }`}>
-                1
-              </div>
-              <CardTitle className={step === 'order' ? 'text-blue-600' : 'text-gray-500'}>
-                Scan Order ID
-              </CardTitle>
-              {selectedOrder && (
-                <Lock className="h-4 w-4 text-green-600" />
-              )}
-            </div>
-            {selectedOrder && (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                Order: {selectedOrder.order_number}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex space-x-2">
-            <Input
-              ref={orderInputRef}
-              placeholder="Scan or enter order number..."
-              value={orderIdInput}
-              onChange={(e) => setOrderIdInput(e.target.value)}
-              onKeyPress={handleOrderKeyPress}
-              disabled={isProcessing || step === 'sku'}
-              className="flex-1"
-            />
+      {/* Order ID Scanner */}
+      <div className="space-y-3">
+        <h3 className="font-medium text-gray-900">Order ID Scanner</h3>
+        <div className="flex space-x-2">
+          <Input
+            ref={orderInputRef}
+            placeholder="Scan or enter Order ID"
+            value={orderIdInput}
+            onChange={(e) => setOrderIdInput(e.target.value)}
+            onKeyPress={handleOrderKeyPress}
+            disabled={isProcessing || step === 'sku'}
+            className="flex-1"
+          />
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={handleOrderScan}
+            disabled={!orderIdInput.trim() || isProcessing || step === 'sku'}
+          >
+            <Scan className="h-4 w-4" />
+          </Button>
+        </div>
+        {step === 'sku' && (
+          <div className="flex justify-end">
             <Button
-              onClick={handleOrderScan}
-              disabled={!orderIdInput.trim() || isProcessing || step === 'sku'}
-              className="flex items-center space-x-2"
+              variant="outline"
+              size="sm"
+              onClick={resetScanner}
+              className="text-xs"
             >
-              <Scan className="h-4 w-4" />
-              <span>{isProcessing ? 'Processing...' : 'Scan'}</span>
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Reset
             </Button>
-            {step === 'sku' && (
-              <Button
-                variant="outline"
-                onClick={resetScanner}
-                className="flex items-center space-x-2"
-              >
-                <RotateCcw className="h-4 w-4" />
-                <span>Reset</span>
-              </Button>
-            )}
           </div>
-          
-          {selectedOrder && (
-            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-              <div className="text-sm space-y-1">
-                <p><strong>Customer:</strong> {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}</p>
-                <p><strong>Total Items:</strong> {selectedOrder.order_items?.length || 0}</p>
-                <p><strong>Remaining to Pack:</strong> {remainingItems}</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
-      {/* Step 2: SKU Scanner */}
-      <Card className={step === 'sku' ? 'border-blue-500 shadow-md' : 'bg-gray-50'}>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step === 'sku' ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
-              }`}>
-                2
-              </div>
-              <CardTitle className={step === 'sku' ? 'text-blue-600' : 'text-gray-500'}>
-                Scan Product SKU
-              </CardTitle>
-            </div>
-            {step === 'sku' && (
-              <Badge variant="outline" className="text-orange-700 bg-orange-50 border-orange-200">
-                {remainingItems} items remaining
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* SKU Scanner - only show if order is selected */}
+      {step === 'sku' && (
+        <div className="space-y-3">
+          <h3 className="font-medium text-gray-900">Product SKU Scanner</h3>
           <div className="flex space-x-2">
             <Input
               ref={skuInputRef}
-              placeholder="Scan or enter product SKU..."
+              placeholder="Scan or enter product SKU"
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
-              disabled={isProcessing || step === 'order'}
+              disabled={isProcessing}
               className="flex-1"
             />
-            <Button
+            <Button 
+              variant="outline" 
+              size="icon"
               onClick={handleSKUScan}
-              disabled={!skuInput.trim() || isProcessing || step === 'order'}
-              className="flex items-center space-x-2"
+              disabled={!skuInput.trim() || isProcessing}
             >
               <Scan className="h-4 w-4" />
-              <span>{isProcessing ? 'Processing...' : 'Scan'}</span>
             </Button>
           </div>
-          
-          {step === 'sku' && selectedOrder && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-gray-700">Items in this order:</h4>
-              <div className="grid gap-2 max-h-40 overflow-y-auto">
-                {selectedOrder.order_items?.map((item: any) => (
-                  <div key={item.id} className={`p-2 rounded border text-sm ${
-                    item.packed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-gray-200'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{item.title}</p>
-                        <p className="text-xs text-gray-500">SKU: {item.sku || 'No SKU'}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary">x{item.quantity}</Badge>
-                        {item.packed ? (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Package className="h-4 w-4 text-gray-400" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

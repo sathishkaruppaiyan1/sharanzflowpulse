@@ -7,11 +7,13 @@ import PackingStats from '@/components/packing/PackingStats';
 import PackingScanner from '@/components/packing/PackingScanner';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   const handleItemPacked = (orderId: string, itemId: string) => {
     console.log('Item packed:', { orderId, itemId });
@@ -62,83 +64,216 @@ const Packing = () => {
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Stats Section */}
-          <PackingStats orders={packingOrders} />
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-white">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-gray-600">Ready for Tracking</h3>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {packingOrders.filter(order => 
+                      order.order_items?.every((item: any) => item.packed)
+                    ).length}
+                  </div>
+                  <p className="text-xs text-gray-500">Packed orders</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-gray-600">In Progress</h3>
+                  <div className="text-2xl font-bold text-green-600">
+                    {packingOrders.filter(order => 
+                      order.order_items?.some((item: any) => item.packed) &&
+                      !order.order_items?.every((item: any) => item.packed)
+                    ).length}
+                  </div>
+                  <p className="text-xs text-gray-500">Partially packed</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-gray-600">Ready for Packing</h3>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {packingOrders.filter(order => 
+                      !order.order_items?.some((item: any) => item.packed)
+                    ).length}
+                  </div>
+                  <p className="text-xs text-gray-500">Printed orders</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-gray-600">Items Today</h3>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {packingOrders.reduce((total, order) => {
+                      return total + (order.order_items?.filter((item: any) => item.packed).length || 0);
+                    }, 0)}
+                  </div>
+                  <p className="text-xs text-gray-500">Items packed</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Main Content with Tabs */}
-          <Tabs defaultValue="scanner" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="scanner" className="flex items-center space-x-2">
-                <Scan className="h-4 w-4" />
-                <span>Item Scanner</span>
-              </TabsTrigger>
-              <TabsTrigger value="queue" className="flex items-center space-x-2">
-                <CheckSquare className="h-4 w-4" />
-                <span>Packing Queue</span>
-              </TabsTrigger>
-            </TabsList>
+          {/* Main Scanner Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Scanner Card */}
+            <Card className="bg-white">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-2">
+                  <Scan className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="text-lg">Packing Assignment Scanner</CardTitle>
+                </div>
+                <CardDescription>
+                  Scan order ID first, then scan product SKU barcode
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PackingScanner 
+                  orders={packingOrders} 
+                  onItemPacked={handleItemPacked}
+                  onOrderSelected={setSelectedOrder}
+                />
+              </CardContent>
+            </Card>
 
-            <TabsContent value="scanner" className="space-y-6">
-              <PackingScanner 
-                orders={packingOrders} 
-                onItemPacked={handleItemPacked}
-              />
-              
-              {/* Quick Stats for Scanner */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Scanning Overview</CardTitle>
-                  <CardDescription>
-                    Scan items to mark them as packed. Orders will automatically move to tracking when all items are packed.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {packingOrders.length}
+            {/* Order Information Card */}
+            <Card className="bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Order Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {selectedOrder ? (
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{selectedOrder.order_number}</h3>
+                        <p className="text-sm text-gray-500">
+                          {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
+                        </p>
                       </div>
-                      <div className="text-sm text-blue-600">Orders in Packing</div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Total Items:</span>
+                          <p className="font-medium">{selectedOrder.order_items?.length || 0}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Packed:</span>
+                          <p className="font-medium text-green-600">
+                            {selectedOrder.order_items?.filter((item: any) => item.packed).length || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Remaining:</span>
+                          <p className="font-medium text-orange-600">
+                            {selectedOrder.order_items?.filter((item: any) => !item.packed).length || 0}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Total Amount:</span>
+                          <p className="font-medium">₹{selectedOrder.total_amount || 0}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {packingOrders.reduce((total, order) => {
-                          return total + (order.order_items?.filter((item: any) => !item.packed).length || 0);
-                        }, 0)}
+                    
+                    <div className="border-t pt-3">
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {selectedOrder.order_items?.map((item: any) => (
+                          <div key={item.id} className={`p-2 rounded text-xs ${
+                            item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
+                          }`}>
+                            <div className="flex justify-between">
+                              <span className="font-medium">{item.title}</span>
+                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
+                                {item.packed ? "Packed" : "Pending"}
+                              </Badge>
+                            </div>
+                            <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-sm text-orange-600">Items to Pack</div>
-                    </div>
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
-                        {packingOrders.reduce((total, order) => {
-                          return total + (order.order_items?.filter((item: any) => item.packed).length || 0);
-                        }, 0)}
-                      </div>
-                      <div className="text-sm text-green-600">Items Packed</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <CheckSquare className="h-12 w-12 text-gray-300 mb-4" />
+                    <p className="text-gray-500 mb-2">No order selected</p>
+                    <p className="text-sm text-gray-400">Scan an order ID to view details</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-            <TabsContent value="queue" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Packing Queue</CardTitle>
-                  <CardDescription>
-                    Manage and track packing progress for all orders. Mark items as packed manually.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PackingQueue 
-                    key={refreshKey}
-                    orders={packingOrders} 
-                    onItemPacked={handleItemPacked}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          {/* Orders Ready for Packing */}
+          <Card className="bg-white">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
+              <CardDescription>
+                {packingOrders.length} orders waiting for packing completion
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {packingOrders.map((order) => {
+                  const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
+                  const totalItems = order.order_items?.length || 0;
+                  const isComplete = packedItems === totalItems;
+                  
+                  return (
+                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <h3 className="font-medium text-gray-900">{order.order_number}</h3>
+                            <p className="text-sm text-gray-500">
+                              {order.customer?.first_name} {order.customer?.last_name}
+                              <span className="mx-2">•</span>
+                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        {isComplete ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            Ready for Tracking
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                            In Progress
+                          </Badge>
+                        )}
+                        <Button variant="outline" size="sm">
+                          Select
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {packingOrders.length === 0 && (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No orders ready for packing</p>
+                    <p className="text-sm text-gray-400 mt-1">Orders from printing stage will appear here</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
