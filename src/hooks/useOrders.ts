@@ -8,20 +8,27 @@ export const useOrders = () => {
   return useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
-      console.log('Fetching orders from Supabase...');
-      const orders = await supabaseOrderService.fetchOrders();
-      console.log('Fetched orders:', orders.length);
-      orders.forEach(order => {
-        console.log(`Order ${order.order_number}: items = ${order.order_items?.length || 0}, customer phone = ${order.customer?.phone}`);
-        if (order.order_items) {
-          order.order_items.forEach(item => {
-            console.log(`  - Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}`);
-          });
-        }
-      });
-      return orders;
+      console.log('=== Fetching all orders ===');
+      try {
+        const orders = await supabaseOrderService.fetchOrders();
+        console.log('Successfully fetched orders:', orders.length);
+        
+        orders.forEach(order => {
+          console.log(`Order ${order.order_number}: stage=${order.stage}, items=${order.order_items?.length || 0}`);
+          if (order.order_items) {
+            order.order_items.forEach(item => {
+              console.log(`  - ${item.title}: qty=${item.quantity}, packed=${item.packed}`);
+            });
+          }
+        });
+        
+        return orders;
+      } catch (error) {
+        console.error('Error in useOrders:', error);
+        throw error;
+      }
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 };
 
@@ -29,37 +36,39 @@ export const useOrdersByStage = (stage: OrderStage) => {
   return useQuery({
     queryKey: ['orders', 'stage', stage],
     queryFn: async () => {
-      console.log(`Fetching orders for stage: ${stage}`);
-      const orders = await supabaseOrderService.fetchOrdersByStage(stage);
-      console.log(`Orders in ${stage} stage:`, orders.length);
-      
-      // Enhanced logging for debugging
-      orders.forEach(order => {
-        console.log(`\n=== Order ${order.order_number} Debug ===`);
-        console.log('- Stage:', order.stage);
-        console.log('- Has order_items:', !!order.order_items);
-        console.log('- Order_items length:', order.order_items?.length || 0);
-        console.log('- Order_items data:', order.order_items);
-        console.log('- Customer phone:', order.customer?.phone);
+      console.log(`=== Fetching orders for stage: ${stage} ===`);
+      try {
+        const orders = await supabaseOrderService.fetchOrdersByStage(stage);
+        console.log(`Successfully fetched ${orders.length} orders for stage ${stage}`);
         
-        if (order.order_items && order.order_items.length > 0) {
-          let totalQty = 0;
-          let packedQty = 0;
-          order.order_items.forEach(item => {
-            const qty = Number(item.quantity) || 0;
-            totalQty += qty;
-            if (item.packed) {
-              packedQty += qty;
-            }
-            console.log(`  Item: ${item.title}, qty: ${qty}, packed: ${item.packed}`);
-          });
-          console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
-        } else {
-          console.log('  WARNING: No order items found for this order!');
-        }
-      });
-      
-      return orders;
+        orders.forEach(order => {
+          console.log(`\n--- Order ${order.order_number} Debug ---`);
+          console.log('Stage:', order.stage);
+          console.log('Order items count:', order.order_items?.length || 0);
+          console.log('Customer phone:', order.customer?.phone);
+          
+          if (order.order_items && order.order_items.length > 0) {
+            let totalQty = 0;
+            let packedQty = 0;
+            order.order_items.forEach(item => {
+              const qty = Number(item.quantity) || 0;
+              totalQty += qty;
+              if (item.packed) {
+                packedQty += qty;
+              }
+              console.log(`  Item: ${item.title}, qty: ${qty}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
+            });
+            console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
+          } else {
+            console.log('  WARNING: No order items found!');
+          }
+        });
+        
+        return orders;
+      } catch (error) {
+        console.error(`Error fetching orders for stage ${stage}:`, error);
+        throw error;
+      }
     },
     refetchInterval: 30000,
   });
@@ -69,14 +78,28 @@ export const useUpdateOrderStage = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ orderId, stage }: { orderId: string; stage: OrderStage }) =>
-      supabaseOrderService.updateOrderStage(orderId, stage),
+    mutationFn: async ({ orderId, stage }: { orderId: string; stage: OrderStage }) => {
+      console.log(`=== Updating order stage ===`);
+      console.log('Order ID:', orderId);
+      console.log('New stage:', stage);
+      
+      try {
+        const result = await supabaseOrderService.updateOrderStage(orderId, stage);
+        console.log('Order stage update successful:', result);
+        return result;
+      } catch (error) {
+        console.error('Error in updateOrderStage mutation:', error);
+        throw error;
+      }
+    },
     onSuccess: (data) => {
+      console.log('Order stage mutation success:', data.order_number, '->', data.stage);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'stage'] });
       toast.success(`Order ${data.order_number} moved to ${data.stage} stage`);
     },
     onError: (error) => {
-      console.error('Error updating order stage:', error);
+      console.error('Order stage mutation error:', error);
       toast.error('Failed to update order stage');
     },
   });

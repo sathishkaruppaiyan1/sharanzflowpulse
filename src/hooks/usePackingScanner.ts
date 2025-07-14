@@ -11,72 +11,102 @@ export const usePackingScanner = (currentOrder: Order | null) => {
 
   const updateItemPacked = useMutation({
     mutationFn: async ({ itemId, packed }: { itemId: string; packed: boolean }) => {
-      console.log('Updating item packed status:', itemId, 'to:', packed);
+      console.log('=== Starting item update ===');
+      console.log('Item ID:', itemId);
+      console.log('Packed status:', packed);
       
-      const { data, error } = await supabase
-        .from('order_items')
-        .update({ packed })
-        .eq('id', itemId)
-        .select('*')
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('order_items')
+          .update({ packed })
+          .eq('id', itemId)
+          .select('*')
+          .single();
 
-      if (error) {
-        console.error('Error updating item packed status:', error);
+        if (error) {
+          console.error('Supabase error updating item:', error);
+          throw error;
+        }
+
+        console.log('Item update successful:', data);
+        return data;
+      } catch (error) {
+        console.error('Error in updateItemPacked mutation:', error);
         throw error;
       }
-
-      return data;
     },
     onSuccess: (data) => {
+      console.log('Item update mutation success:', data);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'stage', 'packing'] });
       toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
     },
     onError: (error) => {
-      console.error('Error updating item status:', error);
+      console.error('Item update mutation error:', error);
       toast.error('Failed to update item status');
     },
   });
 
   const scanItem = (sku: string) => {
+    console.log('=== Starting SKU scan ===');
+    console.log('SKU input:', sku);
+    console.log('Current order:', currentOrder?.order_number);
+    console.log('Scanner locked:', scannerLocked);
+
     if (!currentOrder) {
+      console.log('No order loaded');
       toast.error('No order loaded');
       return false;
     }
 
     if (scannerLocked) {
+      console.log('Scanner is busy');
       toast.warning('Scanner is busy, please wait...');
       return false;
     }
 
-    console.log('Scanning SKU:', sku, 'in order:', currentOrder.order_number);
+    console.log('Order items:', currentOrder.order_items?.length || 0);
+    console.log('Searching for SKU or title match...');
 
     // Find matching item by SKU or title
-    const matchingItem = currentOrder.order_items.find(item => 
-      (item.sku && item.sku.toLowerCase() === sku.toLowerCase()) ||
-      item.title.toLowerCase().includes(sku.toLowerCase())
-    );
+    const matchingItem = currentOrder.order_items.find(item => {
+      const skuMatch = item.sku && item.sku.toLowerCase() === sku.toLowerCase();
+      const titleMatch = item.title.toLowerCase().includes(sku.toLowerCase());
+      console.log(`Item: ${item.title}, SKU: ${item.sku}, SKU match: ${skuMatch}, Title match: ${titleMatch}`);
+      return skuMatch || titleMatch;
+    });
 
     if (!matchingItem) {
+      console.log('No matching item found');
       toast.error(`❌ SKU "${sku}" not found in this order!`);
       return false;
     }
+
+    console.log('Matching item found:', matchingItem.title);
+    console.log('Item already packed:', matchingItem.packed);
 
     if (matchingItem.packed) {
       toast.warning(`✅ ${matchingItem.title} already packed`);
       return true;
     }
 
-    console.log('Item found, marking as packed:', matchingItem.title);
-    
+    console.log('Marking item as packed...');
     setScannerLocked(true);
     updateItemPacked.mutate({ itemId: matchingItem.id, packed: true }, {
-      onSettled: () => setScannerLocked(false)
+      onSettled: () => {
+        console.log('Item update settled, unlocking scanner');
+        setScannerLocked(false);
+      }
     });
     
     return true;
   };
 
   const toggleItemPacked = (itemId: string, packed: boolean) => {
+    console.log('=== Manual toggle item packed ===');
+    console.log('Item ID:', itemId);
+    console.log('New packed status:', packed);
+
     if (scannerLocked) {
       toast.warning('Scanner is busy, please wait...');
       return;

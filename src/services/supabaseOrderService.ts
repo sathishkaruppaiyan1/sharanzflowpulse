@@ -57,14 +57,20 @@ export const supabaseOrderService = {
   async updateOrderStage(orderId: string, stage: OrderStage): Promise<Order> {
     console.log(`Updating order ${orderId} to stage ${stage}`);
     
+    const updateData: any = { stage };
+    
+    // Add timestamp fields based on stage
+    if (stage === 'tracking') {
+      updateData.packed_at = new Date().toISOString();
+    } else if (stage === 'shipped') {
+      updateData.shipped_at = new Date().toISOString();
+    } else if (stage === 'delivered') {
+      updateData.delivered_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
       .from('orders')
-      .update({ 
-        stage: stage as any,
-        ...(stage === 'tracking' && { packed_at: new Date().toISOString() }),
-        ...(stage === 'shipped' && { shipped_at: new Date().toISOString() }),
-        ...(stage === 'delivered' && { delivered_at: new Date().toISOString() })
-      })
+      .update(updateData)
       .eq('id', orderId)
       .select(`
         *,
@@ -91,8 +97,8 @@ export const supabaseOrderService = {
       .from('orders')
       .update({ 
         tracking_number: trackingNumber,
-        carrier: carrier as any,
-        stage: 'shipped' as any,
+        carrier,
+        stage: 'shipped',
         shipped_at: new Date().toISOString()
       })
       .eq('id', orderId)
@@ -141,12 +147,10 @@ export const supabaseOrderService = {
   async syncShopifyOrderToSupabase(shopifyOrder: any): Promise<string> {
     console.log('Syncing Shopify order to Supabase:', shopifyOrder.id);
     
-    // For now, just update the order stage to 'tracking' since we're in the printing context
-    // In a real implementation, this would sync the full Shopify order data
     const { data, error } = await supabase
       .from('orders')
       .update({ 
-        stage: 'tracking' as any,
+        stage: 'tracking',
         packed_at: new Date().toISOString()
       })
       .eq('shopify_order_id', shopifyOrder.id)
@@ -162,7 +166,6 @@ export const supabaseOrderService = {
   },
 
   async createSampleOrders(): Promise<void> {
-    // Sample order creation logic would go here
     console.log('Sample order creation not implemented yet');
   }
 };
