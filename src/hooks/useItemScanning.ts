@@ -87,7 +87,7 @@ export const useItemScanning = (currentOrder: Order | null) => {
           const { error } = await supabase
             .from('orders')
             .update({ 
-              stage: 'tracking'::any,
+              stage: 'tracking' as any,
               packed_at: new Date().toISOString()
             })
             .eq('id', currentOrder.id);
