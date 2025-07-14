@@ -80,6 +80,22 @@ export const useSearchOrders = (query: string) => {
   });
 };
 
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (orderId: string) => supabaseOrderService.deleteOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Order deleted successfully!');
+    },
+    onError: (error) => {
+      console.error('Error deleting order:', error);
+      toast.error('Failed to delete order');
+    },
+  });
+};
+
 export const useCreateSampleOrders = () => {
   const queryClient = useQueryClient();
   

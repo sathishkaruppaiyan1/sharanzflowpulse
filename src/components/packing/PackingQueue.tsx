@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
-import { useUpdateOrderStage } from '@/hooks/useOrders';
+import { useUpdateOrderStage, useDeleteOrder } from '@/hooks/useOrders';
 import { useUpdateItemPacked } from '@/hooks/useOrderItems';
 import StageChangeControls from '@/components/common/StageChangeControls';
 
@@ -17,6 +17,7 @@ interface PackingQueueProps {
 const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
   const updateItemPacked = useUpdateItemPacked();
+  const deleteOrder = useDeleteOrder();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
 
   console.log('PackingQueue received orders:', orders.length, orders);
@@ -29,6 +30,12 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   const handleMoveToTracking = (orderId: string, orderNumber: string) => {
     console.log('Moving order to tracking:', orderId);
     updateOrderStage.mutate({ orderId, stage: 'tracking' });
+  };
+
+  const handleDeleteOrder = (orderId: string, orderNumber: string) => {
+    if (confirm(`Are you sure you want to delete order ${orderNumber}? This action cannot be undone.`)) {
+      deleteOrder.mutate(orderId);
+    }
   };
 
   const handleDialogChange = (orderId: string, open: boolean) => {
@@ -89,6 +96,17 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                     <Package className="h-3 w-3 mr-1" />
                     {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
                   </Badge>
+                  {order.order_number === 'BS1843-P1752418767061' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteOrder(order.id, order.order_number)}
+                      disabled={deleteOrder.isPending}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Dialog 
                     open={openDialogs[order.id] || false} 
                     onOpenChange={(open) => handleDialogChange(order.id, open)}

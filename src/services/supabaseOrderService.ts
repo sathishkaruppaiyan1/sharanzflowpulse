@@ -170,6 +170,32 @@ export const supabaseOrderService = {
     return data as Order[];
   },
 
+  deleteOrder: async (orderId: string): Promise<void> => {
+    // First delete order items
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (itemsError) {
+      console.error('Error deleting order items:', itemsError);
+      throw itemsError;
+    }
+
+    // Then delete the order
+    const { error: orderError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+
+    if (orderError) {
+      console.error('Error deleting order:', orderError);
+      throw orderError;
+    }
+
+    console.log('Order deleted successfully:', orderId);
+  },
+
   createSampleOrders: async (): Promise<void> => {
     // Dummy data for sample orders
     const sampleOrders = [
