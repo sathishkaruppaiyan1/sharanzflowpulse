@@ -59,42 +59,58 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   }, [orders, filters.product]);
 
   const applyFilters = () => {
+    console.log('Applying filters:', filters);
     let filtered = [...orders];
 
     // Apply product filter
     if (filters.product !== 'all') {
+      console.log('Filtering by product:', filters.product);
       filtered = filtered.filter(order => {
-        if (!order.line_items) return false;
+        if (!order.line_items || !Array.isArray(order.line_items)) return false;
         
         if (filters.filterType === 'contains') {
-          return order.line_items.some((item: any) => 
+          // Order contains this product (among possibly others)
+          const hasProduct = order.line_items.some((item: any) => 
             (item.title || item.name) === filters.product
           );
+          console.log(`Order ${order.id} contains product ${filters.product}:`, hasProduct);
+          return hasProduct;
         } else { // only_has
-          return order.line_items.every((item: any) => 
+          // Order ONLY has this product (no other products)
+          const onlyHasProduct = order.line_items.every((item: any) => 
             (item.title || item.name) === filters.product
           );
+          console.log(`Order ${order.id} only has product ${filters.product}:`, onlyHasProduct);
+          return onlyHasProduct;
         }
       });
+      console.log('After product filter:', filtered.length);
     }
 
     // Apply variation filter
     if (filters.variation !== 'all') {
+      console.log('Filtering by variation:', filters.variation);
       filtered = filtered.filter(order => {
-        if (!order.line_items) return false;
-        return order.line_items.some((item: any) => 
+        if (!order.line_items || !Array.isArray(order.line_items)) return false;
+        const hasVariation = order.line_items.some((item: any) => 
           item.variant_title === filters.variation
         );
+        console.log(`Order ${order.id} has variation ${filters.variation}:`, hasVariation);
+        return hasVariation;
       });
+      console.log('After variation filter:', filtered.length);
     }
 
     // Apply date filter
     if (filters.orderDate) {
+      console.log('Filtering by date:', filters.orderDate);
       const filterDate = new Date(filters.orderDate);
       filtered = filtered.filter(order => {
         const orderDate = new Date(order.created_at);
-        return orderDate.toDateString() === filterDate.toDateString();
+        const matches = orderDate.toDateString() === filterDate.toDateString();
+        return matches;
       });
+      console.log('After date filter:', filtered.length);
     }
 
     // Apply sorting
@@ -109,6 +125,7 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       }
     });
 
+    console.log('Final filtered orders:', filtered.length);
     onFilterChange(filtered);
   };
 

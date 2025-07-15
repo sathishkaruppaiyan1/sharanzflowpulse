@@ -113,10 +113,6 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       // Generate exact same barcode as in preview
       const barcodeHTML = generateBarcodeHTML(trackingNumber);
 
-      // Calculate dynamic heights based on content
-      const productCount = orderData.line_items ? orderData.line_items.length : 1;
-      const productSectionHeight = Math.max(60, Math.min(120, productCount * 20));
-
       // Only add page break if it's not the last item in bulk print, or if it's a single print
       const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
@@ -136,10 +132,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <div style="margin-bottom: 4px; flex-shrink: 0;">
             <div style="font-weight: bold; margin-bottom: 2px;">📍 TO:</div>
             <div style="border: 1px solid #000; padding: 4px; background: #fffbeb;">
-              <div style="font-weight: bold; font-size: 11px; word-wrap: break-word;">${customerName.toUpperCase()}</div>
-              <div style="margin-top: 1px; font-size: 9px; word-wrap: break-word;">${shippingAddress.address1}</div>
-              ${shippingAddress.address2 ? `<div style="font-size: 9px; word-wrap: break-word;">${shippingAddress.address2}</div>` : ''}
-              <div style="font-size: 9px;">${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
+              <div style="font-weight: bold; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word;">${customerName.toUpperCase()}</div>
+              <div style="margin-top: 1px; font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address1}</div>
+              ${shippingAddress.address2 ? `<div style="font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address2}</div>` : ''}
+              <div style="font-size: 9px; word-wrap: break-word;">${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
               <div style="font-size: 9px;">${shippingAddress.country}</div>
               <div style="font-size: 9px;">Ph: ${shippingAddress.phone || 'N/A'}</div>
             </div>
@@ -168,12 +164,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- 4. Products - Flexible Height -->
-          <div style="margin-bottom: 4px; flex: 1; display: flex; flex-direction: column;">
+          <!-- 4. Products - Constrained Height -->
+          <div style="margin-bottom: 4px; flex: 1; display: flex; flex-direction: column; min-height: 0;">
             <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 4px; flex: 1; overflow: hidden; font-size: 8px;">
+            <div style="border: 1px solid #000; padding: 4px; flex: 1; overflow: hidden; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => 
-                `<div style="margin-bottom: 1px; word-wrap: break-word;">• ${item.title || item.name} (Qty: <strong>${item.quantity || 1}</strong>)</div>`
+                `<div style="margin-bottom: 1px; word-wrap: break-word; overflow-wrap: break-word;">• ${item.title || item.name} (Qty: <strong>${item.quantity || 1}</strong>)</div>`
               ).join('') : '<div>• Order Items</div>'}
             </div>
           </div>
@@ -444,7 +440,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed and orders will be automatically moved to packing stage.
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Preview shows the first label. All labels will use the same template with full-width layout.
+                Preview shows the first label. All labels will use the same template with constrained layout.
               </p>
             </div>
           )}
@@ -465,12 +461,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <span className="font-bold text-xs">TO:</span>
               </div>
               <div className="border border-black p-2 bg-yellow-50">
-                <div className="font-bold text-sm break-words">
+                <div className="font-bold text-sm break-words overflow-wrap-anywhere">
                   {customerName.toUpperCase()}
                 </div>
-                <div className="text-xs break-words">{shippingAddress.address1}</div>
-                {shippingAddress.address2 && <div className="text-xs break-words">{shippingAddress.address2}</div>}
-                <div className="text-xs">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
+                <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address1}</div>
+                {shippingAddress.address2 && <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address2}</div>}
+                <div className="text-xs break-words">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
                 <div className="text-xs">{shippingAddress.country}</div>
                 <div className="text-xs">Ph: {shippingAddress.phone || 'N/A'}</div>
               </div>
@@ -499,12 +495,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* 4. Products - Flexible Height */}
-            <div className="mb-2 flex flex-col flex-1">
+            {/* 4. Products - Constrained Height */}
+            <div className="mb-2 flex flex-col flex-1 min-h-0">
               <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
-              <div className="border border-black p-2 flex-1 overflow-hidden text-xs">
+              <div className="border border-black p-2 flex-1 overflow-hidden text-xs break-words overflow-wrap-anywhere">
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
-                  <div key={index} className="mb-0.5 break-words">• {item.title || item.name} (Qty: <strong>{item.quantity || 1}</strong>)</div>
+                  <div key={index} className="mb-0.5 break-words overflow-wrap-anywhere">• {item.title || item.name} (Qty: <strong>{item.quantity || 1}</strong>)</div>
                 )) : (
                   <div>• Order Items</div>
                 )}
