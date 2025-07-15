@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [] } = useOrdersByStage('packing');
+  const { data: packingOrders = [] } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -35,13 +35,13 @@ const Printing = () => {
     });
   }, [rawShopifyOrders]);
 
-  // Fetch synced Shopify order IDs to exclude from printing stage
+  // Fetch synced Shopify order IDs but allow orders in printing stage to show
   useEffect(() => {
     const fetchSyncedOrders = async () => {
       try {
         const { data: syncedOrders, error } = await supabase
           .from('orders')
-          .select('shopify_order_id')
+          .select('shopify_order_id, stage')
           .not('shopify_order_id', 'is', null);
           
         if (error) {
@@ -49,9 +49,15 @@ const Printing = () => {
           return;
         }
         
-        const syncedIds = new Set(syncedOrders.map(order => order.shopify_order_id).filter(Boolean));
+        // Only exclude orders that are NOT in printing stage
+        const syncedIds = new Set(
+          syncedOrders
+            .filter(order => order.stage !== 'printing') // Allow printing stage orders to show
+            .map(order => order.shopify_order_id)
+            .filter(Boolean)
+        );
         setSyncedShopifyOrderIds(syncedIds);
-        console.log('Synced Shopify order IDs:', Array.from(syncedIds));
+        console.log('Synced Shopify order IDs (excluding printing stage):', Array.from(syncedIds));
       } catch (error) {
         console.error('Error in fetchSyncedOrders:', error);
       }
@@ -60,13 +66,13 @@ const Printing = () => {
     fetchSyncedOrders();
   }, [packingOrders]);
 
-  // Calculate today's printed orders count
+  // Calculate today's printed orders count from packing stage
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const todayPrinted = packingOrders.filter(order => {
-      if (!order.printed_at) return false;
+      if (!order.printed_at || order.stage !== 'packing') return false;
       const printedDate = new Date(order.printed_at);
       printedDate.setHours(0, 0, 0, 0);
       return printedDate.getTime() === today.getTime();
@@ -75,22 +81,64 @@ const Printing = () => {
     setTodayPrintedCount(todayPrinted.length);
   }, [packingOrders]);
 
-  // Process and filter orders without causing re-renders
+  // Process and filter orders including orders moved back to printing stage
   const getBaseFilteredOrders = useCallback(() => {
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
     
+    // Get orders from Supabase that are in printing stage
+    const supabaseOrdersInPrinting = packingOrders.filter(order => order.stage === 'printing');
+    console.log('Supabase orders in printing stage:', supabaseOrdersInPrinting.length);
+    
+    // Convert Supabase orders to Shopify-like format for consistency
+    const supabaseOrdersFormatted = supabaseOrdersInPrinting.map(order => ({
+      id: order.shopify_order_id?.toString() || order.id,
+      order_number: order.order_number,
+      created_at: order.created_at,
+      fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
+      current_total_price: order.total_amount,
+      currency: order.currency || 'INR',
+      customer: order.customer ? {
+        first_name: order.customer.first_name,
+        last_name: order.customer.last_name,
+        phone: order.customer.phone,
+        email: order.customer.email
+      } : null,
+      shipping_address: order.shipping_address ? {
+        address1: order.shipping_address.address_line_1,
+        address2: order.shipping_address.address_line_2,
+        city: order.shipping_address.city,
+        province: order.shipping_address.state,
+        zip: order.shipping_address.postal_code,
+        country: order.shipping_address.country,
+        phone: order.customer?.phone
+      } : null,
+      line_items: order.order_items?.map(item => ({
+        title: item.title,
+        name: item.title,
+        variant_title: item.sku,
+        quantity: item.quantity,
+        price: item.price,
+        product_id: item.product_id,
+        variant_id: item.shopify_variant_id,
+        sku: item.sku
+      })) || []
+    }));
+
     let readyToPrintOrders = shopifyOrders.filter(order => {
       // Exclude orders that are already fulfilled
       const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
       
-      // Exclude orders that have already been synced to Supabase (already printed)
+      // Exclude orders that have already been synced to Supabase (but not in printing stage)
       const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
       
       console.log(`Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
       
       return isUnfulfilled && isNotSynced;
     });
+
+    // Combine Shopify orders with Supabase orders that are in printing stage
+    readyToPrintOrders = [...readyToPrintOrders, ...supabaseOrdersFormatted];
 
     console.log('Orders ready for printing after filtering:', readyToPrintOrders.length);
 
@@ -115,7 +163,7 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders]);
 
   // Initialize filtered orders
   useEffect(() => {
@@ -211,7 +259,7 @@ const Printing = () => {
     );
   }
 
-  const readyForPacking = packingOrders.length;
+  const readyForPacking = packingOrders.filter(order => order.stage === 'packing').length;
 
   return (
     <div className="flex flex-col h-full">

@@ -113,13 +113,22 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   };
 
   const clearFilters = () => {
-    setFilters({
+    const clearedFilters = {
       filterType: 'contains',
       product: 'all',
       variation: 'all',
       orderDate: '',
       sortOrder: 'newest'
+    };
+    setFilters(clearedFilters);
+    // Apply cleared filters immediately
+    let filtered = [...orders];
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA; // Newest first (default)
     });
+    onFilterChange(filtered);
   };
 
   // Reset variation when product changes
@@ -132,13 +141,22 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     }
   }, [filters.product, filteredVariations, filters.variation]);
 
+  // Initialize with all orders on mount
   useEffect(() => {
-    applyFilters();
-  }, [filters, orders]);
+    if (orders.length > 0) {
+      let filtered = [...orders];
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA; // Newest first (default)
+      });
+      onFilterChange(filtered);
+    }
+  }, [orders]);
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Filter Type</label>
           <Select
@@ -189,18 +207,28 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Order Date</label>
+          <Input
+            type="date"
+            value={filters.orderDate}
+            onChange={(e) => setFilters({ ...filters, orderDate: e.target.value })}
+            placeholder="dd-mm-yyyy"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Actions</label>
           <div className="flex space-x-2">
-            <Input
-              type="date"
-              value={filters.orderDate}
-              onChange={(e) => setFilters({ ...filters, orderDate: e.target.value })}
-              placeholder="dd-mm-yyyy"
-            />
+            <Button
+              onClick={applyFilters}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Filter
+            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={clearFilters}
-              className="whitespace-nowrap"
             >
               Clear
             </Button>

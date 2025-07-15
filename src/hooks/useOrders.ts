@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
@@ -32,16 +31,29 @@ export const useOrders = () => {
   });
 };
 
-export const useOrdersByStage = (stage: OrderStage) => {
+export const useOrdersByStage = (stage: OrderStage | OrderStage[]) => {
   return useQuery({
     queryKey: ['orders', 'stage', stage],
     queryFn: async () => {
-      console.log(`=== Fetching orders for stage: ${stage} ===`);
+      const stages = Array.isArray(stage) ? stage : [stage];
+      console.log(`=== Fetching orders for stages: ${stages.join(', ')} ===`);
       try {
-        const orders = await supabaseOrderService.fetchOrdersByStage(stage);
-        console.log(`Successfully fetched ${orders.length} orders for stage ${stage}`);
+        let allOrders: Order[] = [];
         
-        orders.forEach(order => {
+        for (const s of stages) {
+          const orders = await supabaseOrderService.fetchOrdersByStage(s);
+          allOrders = [...allOrders, ...orders];
+          console.log(`Successfully fetched ${orders.length} orders for stage ${s}`);
+        }
+        
+        // Remove duplicates if any
+        const uniqueOrders = allOrders.filter((order, index, self) => 
+          index === self.findIndex(o => o.id === order.id)
+        );
+        
+        console.log(`Total unique orders fetched: ${uniqueOrders.length}`);
+        
+        uniqueOrders.forEach(order => {
           console.log(`\n--- Order ${order.order_number} Debug ---`);
           console.log('Stage:', order.stage);
           console.log('Order items count:', order.order_items?.length || 0);
@@ -64,9 +76,9 @@ export const useOrdersByStage = (stage: OrderStage) => {
           }
         });
         
-        return orders;
+        return uniqueOrders;
       } catch (error) {
-        console.error(`Error fetching orders for stage ${stage}:`, error);
+        console.error(`Error fetching orders for stages ${stages.join(', ')}:`, error);
         throw error;
       }
     },
