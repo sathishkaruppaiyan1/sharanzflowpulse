@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -96,13 +95,18 @@ const Printing = () => {
       order_number: order.order_number,
       created_at: order.created_at,
       fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
-      current_total_price: order.total_amount,
+      current_total_price: order.total_amount?.toString() || '0',
       currency: order.currency || 'INR',
+      // Add missing required properties
+      customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
+      total_amount: order.total_amount?.toString() || '0',
+      financial_status: 'paid', // Assume paid for orders in system
       customer: order.customer ? {
         first_name: order.customer.first_name,
         last_name: order.customer.last_name,
         phone: order.customer.phone,
-        email: order.customer.email
+        email: order.customer.email,
+        id: order.customer.id
       } : null,
       shipping_address: order.shipping_address ? {
         address1: order.shipping_address.address_line_1,
@@ -122,7 +126,8 @@ const Printing = () => {
         product_id: item.product_id,
         variant_id: item.shopify_variant_id,
         sku: item.sku
-      })) || []
+      })) || [],
+      total_weight: 0 // Default weight
     }));
 
     let readyToPrintOrders = shopifyOrders.filter(order => {
