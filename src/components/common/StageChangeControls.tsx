@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StageChangeControlsProps {
   order: Order;
@@ -26,24 +27,69 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
     { value: 'delivered', label: 'Delivered', icon: <CheckCircle className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
   ];
 
-  const handleStageChange = (newStage: OrderStage) => {
+  const handleStageChange = async (newStage: OrderStage) => {
     if (newStage === currentStage) return;
 
     console.log(`Changing order ${order.order_number} from ${currentStage} to ${newStage}`);
 
-    updateOrderStage.mutate(
-      { orderId: order.id, stage: newStage },
-      {
-        onSuccess: () => {
-          toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
-          onStageChange?.();
-        },
-        onError: (error) => {
-          console.error('Failed to update order stage:', error);
-          toast.error(`Failed to move order to ${newStage} stage`);
-        }
+    try {
+      // Handle special cases when moving to certain stages
+      if (newStage === 'packing') {
+        // When moving to packing, reset all items to unpacked and set printed_at
+        await supabase
+          .from('order_items')
+          .update({ packed: false })
+          .eq('order_id', order.id);
+        
+        // Update order with printed_at timestamp
+        await supabase
+          .from('orders')
+          .update({ 
+            stage: newStage,
+            printed_at: new Date().toISOString(),
+            packed_at: null, // Reset packed_at when going back to packing
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage! All items marked as unpacked.`);
+      } else if (newStage === 'tracking') {
+        // When moving to tracking, set packed_at timestamp
+        await supabase
+          .from('orders')
+          .update({ 
+            stage: newStage,
+            packed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
+      } else {
+        // For other stages, use the mutation
+        updateOrderStage.mutate(
+          { orderId: order.id, stage: newStage },
+          {
+            onSuccess: () => {
+              toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
+              onStageChange?.();
+            },
+            onError: (error) => {
+              console.error('Failed to update order stage:', error);
+              toast.error(`Failed to move order to ${newStage} stage`);
+            }
+          }
+        );
+        return; // Exit early for regular stage changes
       }
-    );
+
+      // For special cases, manually trigger the callback
+      onStageChange?.();
+      
+    } catch (error) {
+      console.error('Failed to update order stage:', error);
+      toast.error(`Failed to move order to ${newStage} stage`);
+    }
   };
 
   const getCurrentStageInfo = () => {

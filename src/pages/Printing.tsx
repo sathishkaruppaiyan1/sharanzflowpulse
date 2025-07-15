@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Printer, Filter, RefreshCw, Search } from 'lucide-react';
+import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PrintQueue from '@/components/printing/PrintQueue';
 import PrintingFilters from '@/components/printing/PrintingFilters';
@@ -24,6 +24,7 @@ const Printing = () => {
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
   const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
+  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
 
   // Sort Shopify orders by newest first (created_at descending)
   const shopifyOrders = React.useMemo(() => {
@@ -57,7 +58,7 @@ const Printing = () => {
     };
 
     fetchSyncedOrders();
-  }, [packingOrders]); // Refetch when packing orders change
+  }, [packingOrders]);
 
   // Calculate today's printed orders count
   useEffect(() => {
@@ -75,7 +76,7 @@ const Printing = () => {
   }, [packingOrders]);
 
   // Process and filter orders without causing re-renders
-  const getFilteredOrders = useCallback(() => {
+  const getBaseFilteredOrders = useCallback(() => {
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
     
@@ -116,10 +117,13 @@ const Printing = () => {
     return readyToPrintOrders;
   }, [shopifyOrders, searchQuery, syncedShopifyOrderIds]);
 
-  const filteredOrders = getFilteredOrders();
+  // Initialize filtered orders
+  useEffect(() => {
+    setFilteredOrders(getBaseFilteredOrders());
+  }, [getBaseFilteredOrders]);
 
   const handleFilterChange = (filtered: any[]) => {
-    // This will be handled by the PrintingFilters component internally
+    setFilteredOrders(filtered);
     console.log('Filter changed:', filtered.length);
   };
 
@@ -221,6 +225,15 @@ const Printing = () => {
             </p>
           </div>
           <div className="flex items-center space-x-3">
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-2"
+            >
+              <Filter className="h-4 w-4" />
+              <span>Filters</span>
+            </Button>
             <Button
               onClick={refetch}
               variant="outline"
@@ -332,12 +345,12 @@ const Printing = () => {
                   <CardTitle className="text-lg">Smart Product & Variation Filtering</CardTitle>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Filter orders by products, variations, and date for efficient batch processing
+                  Filter orders by products, variations, date and sort order for efficient batch processing
                 </p>
               </CardHeader>
               <CardContent>
                 <PrintingFilters 
-                  orders={filteredOrders} 
+                  orders={getBaseFilteredOrders()} 
                   onFilterChange={handleFilterChange}
                 />
               </CardContent>
