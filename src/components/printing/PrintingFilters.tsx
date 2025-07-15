@@ -37,7 +37,7 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
               
               // Map variations to products
               if (!productVariationsMap.has(productName)) {
-                productVariationsMap.set(productName, new Set());
+                productVariationsMap.set(productName, new Set<string>());
               }
               productVariationsMap.get(productName)?.add(item.variant_title);
             }
@@ -47,8 +47,8 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     });
 
     // Get variations for selected product
-    const productSpecificVariations = filters.product !== 'all' && productVariationsMap.has(filters.product)
-      ? Array.from(productVariationsMap.get(filters.product) || new Set())
+    const productSpecificVariations: string[] = filters.product !== 'all' && productVariationsMap.has(filters.product)
+      ? Array.from(productVariationsMap.get(filters.product) || new Set<string>())
       : Array.from(allVariations);
 
     return {
