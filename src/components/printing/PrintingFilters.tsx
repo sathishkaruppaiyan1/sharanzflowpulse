@@ -183,8 +183,8 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
             <SelectContent>
               <SelectItem value="newest">Newest First</SelectItem>
               <SelectItem value="oldest">Oldest First</SelectItem>
-            </Select>
-          </SelectContent>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
