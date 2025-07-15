@@ -101,6 +101,7 @@ const Printing = () => {
       customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
       total_amount: order.total_amount?.toString() || '0',
       financial_status: 'paid', // Assume paid for orders in system
+      total_weight: 0, // Default weight
       customer: order.customer ? {
         first_name: order.customer.first_name,
         last_name: order.customer.last_name,
@@ -126,8 +127,7 @@ const Printing = () => {
         product_id: item.product_id,
         variant_id: item.shopify_variant_id,
         sku: item.sku
-      })) || [],
-      total_weight: 0 // Default weight
+      })) || []
     }));
 
     let readyToPrintOrders = shopifyOrders.filter(order => {
@@ -170,14 +170,21 @@ const Printing = () => {
     return readyToPrintOrders;
   }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders]);
 
-  // Initialize filtered orders
+  // Initialize filtered orders with default sorting only
   useEffect(() => {
-    setFilteredOrders(getBaseFilteredOrders());
+    const baseOrders = getBaseFilteredOrders();
+    // Apply default sorting (newest first)
+    const sorted = [...baseOrders].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA; // Newest first
+    });
+    setFilteredOrders(sorted);
   }, [getBaseFilteredOrders]);
 
   const handleFilterChange = (filtered: any[]) => {
     setFilteredOrders(filtered);
-    console.log('Filter changed:', filtered.length);
+    console.log('Filter applied, showing orders:', filtered.length);
   };
 
   const handleSelectedCountChange = (count: number, selectedIds: Set<string>) => {

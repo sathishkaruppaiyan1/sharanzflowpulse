@@ -87,7 +87,7 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       console.log('After product filter:', filtered.length);
     }
 
-    // Apply variation filter
+    // Apply variation filter - Only if a specific variation is selected
     if (filters.variation !== 'all') {
       console.log('Filtering by variation:', filters.variation);
       filtered = filtered.filter(order => {
@@ -138,7 +138,7 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       sortOrder: 'newest'
     };
     setFilters(clearedFilters);
-    // Apply cleared filters immediately
+    // Apply cleared filters immediately - show all orders with default sorting
     let filtered = [...orders];
     filtered.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
@@ -158,18 +158,8 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     }
   }, [filters.product, filteredVariations, filters.variation]);
 
-  // Initialize with all orders on mount
-  useEffect(() => {
-    if (orders.length > 0) {
-      let filtered = [...orders];
-      filtered.sort((a, b) => {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        return dateB - dateA; // Newest first (default)
-      });
-      onFilterChange(filtered);
-    }
-  }, [orders]);
+  // Don't auto-apply filters on mount - let user manually trigger filtering
+  // This prevents the automatic filtering from overriding manual filter clicks
 
   return (
     <div className="space-y-4">
