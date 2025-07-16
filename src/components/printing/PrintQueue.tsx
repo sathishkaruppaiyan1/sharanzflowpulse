@@ -62,7 +62,7 @@ const PrintQueue = ({
   };
 
   const getOrderStatus = (order: any) => {
-    return 'Ready for Packing';
+    return 'Ready for Printing';
   };
 
   const getStatusBadgeColor = (status: string) => {
