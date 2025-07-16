@@ -28,17 +28,50 @@ const Packing = () => {
   // Helper function to get product display name with variation
   const getProductDisplayName = (item: any) => {
     console.log('Processing item for display in packing:', item);
+    
+    // Try to extract variation from title or use shopify_variant_id
+    let variation = '';
+    
+    // Check if title contains size information (common patterns)
+    const sizeMatches = item.title.match(/\b(XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL|\d+)\b/i);
+    if (sizeMatches) {
+      variation = sizeMatches[0];
+    }
+    
+    // If no size found, try to use shopify_variant_id as variation
+    if (!variation && item.shopify_variant_id) {
+      variation = `Variant ${item.shopify_variant_id}`;
+    }
+    
+    // If we have SKU, use it as variation
+    if (item.sku && item.sku.trim() !== '') {
+      variation = item.sku;
+    }
+    
     const name = item.title || 'Product';
-    const variant = item.sku || '';
-    const displayName = variant ? `${name} - ${variant}` : name;
+    const displayName = variation ? `${name} - ${variation}` : name;
     console.log(`Display name in packing: ${displayName}`);
     return displayName;
   };
 
-  // Helper function to get customer phone number
+  // Helper function to get customer phone number - check multiple sources
   const getCustomerPhone = (order: any) => {
-    // Check customer phone first, then shipping address phone
-    return order.customer?.phone || order.shipping_address?.phone || null;
+    console.log('Getting phone for order:', order.order_number);
+    console.log('Customer data:', order.customer);
+    console.log('Shipping address data:', order.shipping_address);
+    
+    // Try multiple sources for phone number
+    const customerPhone = order.customer?.phone;
+    const shippingPhone = order.shipping_address?.phone;
+    
+    console.log('Customer phone:', customerPhone);
+    console.log('Shipping phone:', shippingPhone);
+    
+    // Return the first available phone number
+    const finalPhone = customerPhone || shippingPhone || null;
+    console.log('Final phone:', finalPhone);
+    
+    return finalPhone;
   };
 
   if (isLoading) {
@@ -238,21 +271,19 @@ const Packing = () => {
                                     {item.packed ? "Packed" : "Pending"}
                                   </Badge>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                                <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
                                   <div>
                                     <span className="font-medium">SKU:</span>
                                     <p className="text-gray-800">{item.sku || 'N/A'}</p>
                                   </div>
                                   <div>
-                                    <span className="font-medium">Quantity:</span>
+                                    <span className="font-medium">Qty:</span>
                                     <p className="text-gray-800">{item.quantity}</p>
                                   </div>
-                                  {item.price && (
-                                    <div className="col-span-2">
-                                      <span className="font-medium">Price:</span>
-                                      <p className="text-gray-800">₹{item.price}</p>
-                                    </div>
-                                  )}
+                                  <div>
+                                    <span className="font-medium">Price:</span>
+                                    <p className="text-gray-800">₹{item.price || 0}</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -298,10 +329,15 @@ const Packing = () => {
                               <span>
                                 {order.customer?.first_name} {order.customer?.last_name}
                               </span>
-                              {customerPhone && (
+                              {customerPhone ? (
                                 <div className="flex items-center space-x-1">
                                   <Phone className="h-3 w-3 text-green-600" />
                                   <span className="text-green-600">{customerPhone}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-1">
+                                  <Phone className="h-3 w-3 text-red-500" />
+                                  <span className="text-red-500">No phone</span>
                                 </div>
                               )}
                               <span>•</span>

@@ -22,9 +22,31 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
 
   const getProductDisplayName = (item: any) => {
+    console.log('Processing item in PackingQueue:', item);
+    
+    // Try to extract variation from title or use shopify_variant_id
+    let variation = '';
+    
+    // Check if title contains size information (common patterns)
+    const sizeMatches = item.title.match(/\b(XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL|\d+)\b/i);
+    if (sizeMatches) {
+      variation = sizeMatches[0];
+    }
+    
+    // If no size found, try to use shopify_variant_id as variation
+    if (!variation && item.shopify_variant_id) {
+      variation = `Variant ${item.shopify_variant_id}`;
+    }
+    
+    // If we have SKU, use it as variation
+    if (item.sku && item.sku.trim() !== '') {
+      variation = item.sku;
+    }
+    
     const name = item.title || 'Product';
-    const variant = item.sku || '';
-    return variant ? `${name} - ${variant}` : name;
+    const displayName = variation ? `${name} - ${variation}` : name;
+    console.log(`PackingQueue display name: ${displayName}`);
+    return displayName;
   };
 
   const handleViewOrder = (order: Order) => {
@@ -160,14 +182,18 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                                   )}
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                              <div className="grid grid-cols-3 gap-3 text-xs text-gray-600">
                                 <div>
                                   <span className="font-medium">SKU:</span>
                                   <p className="text-gray-800">{item.sku || 'N/A'}</p>
                                 </div>
                                 <div>
-                                  <span className="font-medium">Quantity:</span>
+                                  <span className="font-medium">Qty:</span>
                                   <p className="text-gray-800">{item.quantity}</p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Price:</span>
+                                  <p className="text-gray-800">₹{item.price || 0}</p>
                                 </div>
                               </div>
                             </div>
