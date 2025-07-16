@@ -25,18 +25,57 @@ const Packing = () => {
     setRefreshKey(prev => prev + 1);
   };
 
-  // Helper function to get phone number from order
+  // Enhanced helper function to get phone number from order with debugging
   const getPhoneNumber = (order: any) => {
-    // First try customer phone
-    if (order.customer?.phone) {
-      return order.customer.phone;
-    }
-    // Then try shipping address phone
-    if (order.shipping_address?.phone) {
-      return order.shipping_address.phone;
-    }
-    return null;
+    console.log('=== Phone Number Debug for Order', order.order_number, '===');
+    console.log('Full order object:', order);
+    console.log('Customer object:', order.customer);
+    console.log('Shipping address object:', order.shipping_address);
+    
+    // Check customer phone
+    const customerPhone = order.customer?.phone;
+    console.log('Customer phone:', customerPhone);
+    
+    // Check shipping address phone  
+    const shippingPhone = order.shipping_address?.phone;
+    console.log('Shipping address phone:', shippingPhone);
+    
+    // Try multiple phone field variations
+    const altCustomerPhone = order.customer_phone;
+    const altShippingPhone = order.shipping_phone;
+    console.log('Alternative customer phone field:', altCustomerPhone);
+    console.log('Alternative shipping phone field:', altShippingPhone);
+    
+    // Return the first available phone number
+    const finalPhone = customerPhone || shippingPhone || altCustomerPhone || altShippingPhone || null;
+    console.log('Final phone number selected:', finalPhone);
+    console.log('=== End Phone Debug ===');
+    
+    return finalPhone;
   };
+
+  // Debug function to log all order data
+  React.useEffect(() => {
+    if (packingOrders.length > 0) {
+      console.log('=== PACKING ORDERS DEBUG ===');
+      packingOrders.forEach((order, index) => {
+        console.log(`Order ${index + 1}:`, order.order_number);
+        console.log('  Customer:', order.customer);
+        console.log('  Shipping Address:', order.shipping_address);
+        console.log('  Raw order object keys:', Object.keys(order));
+        if (order.customer) {
+          console.log('  Customer keys:', Object.keys(order.customer));
+        }
+        if (order.shipping_address) {
+          console.log('  Shipping address keys:', Object.keys(order.shipping_address));
+        }
+        const phone = getPhoneNumber(order);
+        console.log('  Extracted phone:', phone);
+        console.log('---');
+      });
+      console.log('=== END DEBUG ===');
+    }
+  }, [packingOrders]);
 
   if (isLoading) {
     return (
@@ -182,7 +221,7 @@ const Packing = () => {
                           return phoneNumber ? (
                             <p className="text-sm text-green-600 font-medium">📱 {phoneNumber}</p>
                           ) : (
-                            <p className="text-sm text-red-500">📱 No phone number</p>
+                            <p className="text-sm text-red-500">📱 No phone number available</p>
                           );
                         })()}
                       </div>
@@ -265,8 +304,10 @@ const Packing = () => {
                             <h3 className="font-medium text-gray-900">{order.order_number}</h3>
                             <p className="text-sm text-gray-500">
                               {order.customer?.first_name} {order.customer?.last_name}
-                              {phoneNumber && (
-                                <span className="ml-2 text-green-600">📱 {phoneNumber}</span>
+                              {phoneNumber ? (
+                                <span className="ml-2 text-green-600 font-medium">📱 {phoneNumber}</span>
+                              ) : (
+                                <span className="ml-2 text-red-500">📱 No phone</span>
                               )}
                               <span className="mx-2">•</span>
                               {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
