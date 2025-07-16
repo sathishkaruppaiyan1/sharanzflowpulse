@@ -1,12 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
-import { Eye, Printer, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import OrderDetails from '@/components/orders/OrderDetails';
-import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
+import { Card, CardContent } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
+import ShippingLabelPreview from './ShippingLabelPreview';
 
 interface PrintQueueProps {
   orders: any[];
@@ -23,220 +23,173 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll
 }: PrintQueueProps) => {
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [showLabelPreview, setShowLabelPreview] = useState(false);
-  const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
+  const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
+  const [previewOrder, setPreviewOrder] = useState<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const effectiveSelectedIds = selectedOrderIds.size > 0 ? selectedOrderIds : localSelectedIds;
+  // Update local state when external selectedOrderIds changes
+  useEffect(() => {
+    setSelectedOrders(selectedOrderIds);
+  }, [selectedOrderIds]);
 
-  const getProductDisplayName = (item: any) => {
-    const name = item.title || item.name || 'Product';
-    const variant = item.variant_title || item.sku || '';
-    return variant ? `${name} - ${variant}` : name;
-  };
-
-  const handleOrderSelect = useCallback((orderId: string, checked: boolean) => {
-    const newSelectedIds = new Set(effectiveSelectedIds);
-    
+  const handleSelectOrder = (orderId: string, checked: boolean) => {
+    const newSelected = new Set(selectedOrders);
     if (checked) {
-      newSelectedIds.add(orderId);
+      newSelected.add(orderId);
     } else {
-      newSelectedIds.delete(orderId);
+      newSelected.delete(orderId);
     }
-    
-    if (selectedOrderIds.size > 0) {
-      // Using parent's state
-      onSelectedCountChange?.(newSelectedIds.size, newSelectedIds);
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
+  };
+
+  const handlePrintSingle = (order: any) => {
+    console.log('Opening print preview for order:', order.id);
+    setPreviewOrder(order);
+    setShowPreview(true);
+  };
+
+  const handlePrintComplete = (orderId: string) => {
+    // Remove from selected orders after successful print
+    const newSelected = new Set(selectedOrders);
+    if (Array.isArray(orderId)) {
+      orderId.forEach(id => newSelected.delete(id));
     } else {
-      // Using local state
-      setLocalSelectedIds(newSelectedIds);
-      onSelectedCountChange?.(newSelectedIds.size, newSelectedIds);
+      newSelected.delete(orderId);
     }
-  }, [effectiveSelectedIds, selectedOrderIds.size, onSelectedCountChange]);
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
 
-  const handleViewOrder = (order: any) => {
-    setSelectedOrder(order);
-    setShowOrderDetails(true);
+    // More prominent notification for stage movement
+    toast({
+      title: "🎉 Order Moved to Packing!", 
+      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
+    });
+    console.log('Moving order to packing stage:', orderId);
   };
 
-  const handlePrintLabel = (order: any) => {
-    setSelectedOrder(order);
-    setShowLabelPreview(true);
-  };
-
-  const getOrderStatus = (order: any) => {
-    if (isShopifyOrders) {
-      return order.fulfillment_status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled';
-    }
-    return order.stage || 'pending';
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case 'fulfilled':
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'unfulfilled':
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'printing':
-        return 'bg-blue-100 text-blue-800';
-      case 'packing':
-        return 'bg-purple-100 text-purple-800';
-      case 'tracking':
-      case 'shipped':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (orders.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">
-            <Printer className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>No orders found for printing</p>
-            <p className="text-sm mt-1">Orders will appear here when they're ready for label printing</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isPrinting = (orderId: string) => printingOrders.has(orderId);
 
   return (
     <>
-      <div className="space-y-3">
-        {orders.map((order) => {
-          const orderNumber = order.order_number || order.name || `#${order.id}`;
-          const customerName = order.customer_name || 
-            `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 
-            'Guest Customer';
-          
-          const totalItems = order.line_items ? 
-            order.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
-          
-          const orderTotal = order.total_amount || order.current_total_price;
-          const isSelected = effectiveSelectedIds.has(order.id);
-          const status = getOrderStatus(order);
+      <div className="space-y-2">
+        {orders.map((order) => (
+          <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
+            <div className="grid grid-cols-12 gap-3 items-start">
+              {/* Checkbox and Order Info */}
+              <div className="col-span-2 flex items-start space-x-2">
+                <Checkbox
+                  checked={selectedOrders.has(order.id)}
+                  onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
+                  <p className="text-gray-600 text-xs">
+                    {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
+                  </p>
+                </div>
+              </div>
 
-          return (
-            <Card key={order.id} className={`hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) => handleOrderSelect(order.id, checked as boolean)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <CardTitle className="text-lg">{orderNumber}</CardTitle>
-                      <CardDescription>
-                        Customer: {customerName}
-                      </CardDescription>
+              {/* Products */}
+              <div className="col-span-3">
+                <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
+                <div className="space-y-0.5">
+                  {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
+                    <div key={index} className="text-xs text-gray-900">
+                      {item.title || item.name}
+                    </div>
+                  )) : (
+                    <div className="text-xs text-gray-900">Order Items</div>
+                  )}
+                  {order.line_items && order.line_items.length > 2 && (
+                    <div className="text-xs text-gray-500">+{order.line_items.length - 2} more</div>
+                  )}
+                </div>
+                {order.line_items && order.line_items.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-xs text-gray-500 mb-1">Variations:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {order.line_items.slice(0, 3).map((item: any, index: number) => (
+                        item.variant_title && (
+                          <Badge key={index} variant="outline" className="text-xs px-1 py-0 h-4 text-[10px]">
+                            {item.variant_title}
+                          </Badge>
+                        )
+                      ))}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getStatusBadgeColor(status)}>
-                      {status}
-                    </Badge>
+                )}
+              </div>
+
+              {/* Details */}
+              <div className="col-span-2">
+                <h4 className="text-xs font-medium text-gray-500 mb-1">Details:</h4>
+                <div className="space-y-0.5 text-xs">
+                  <div className="text-gray-900">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                  <div className="font-medium text-gray-900">₹{order.total_amount || order.current_total_price}</div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(order.created_at).toLocaleDateString('en-IN')}
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-700">Items:</span>
-                      <span className="ml-2">{totalItems}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Total:</span>
-                      <span className="ml-2">₹{orderTotal}</span>
-                    </div>
-                  </div>
+              </div>
 
-                  {/* Product List with Variations */}
-                  <div>
-                    <h4 className="font-medium text-gray-700 mb-2">Products:</h4>
-                    <div className="space-y-1">
-                      {order.line_items ? order.line_items.map((item: any, index: number) => {
-                        const displayName = getProductDisplayName(item);
-                        return (
-                          <div key={index} className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            <div className="font-medium">{displayName}</div>
-                            <div className="text-xs text-gray-500">
-                              Qty: {item.quantity || 1} | Price: ₹{item.price}
-                            </div>
-                          </div>
-                        );
-                      }) : (
-                        <div className="text-sm text-gray-500">No items details available</div>
+              {/* Address */}
+              <div className="col-span-4">
+                <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
+                <div className="text-xs text-gray-900">
+                  {order.shipping_address ? (
+                    <>
+                      <div>{order.shipping_address.address1}</div>
+                      {order.shipping_address.address2 && <div>{order.shipping_address.address2}</div>}
+                      <div>{order.shipping_address.city}, {order.shipping_address.province}</div>
+                      <div>{order.shipping_address.zip} {order.shipping_address.country}</div>
+                      {order.shipping_address.phone && (
+                        <div className="flex items-center mt-0.5 text-red-600">
+                          <Phone className="h-2.5 w-2.5 mr-1" />
+                          <span>{order.shipping_address.phone}</span>
+                        </div>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2 pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewOrder(order)}
-                      className="flex items-center space-x-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span>View Details</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white flex items-center space-x-1"
-                      onClick={() => handlePrintLabel(order)}
-                    >
-                      <Printer className="h-4 w-4" />
-                      <span>Print Label</span>
-                    </Button>
-                  </div>
+                    </>
+                  ) : (
+                    <div className="text-gray-500">Address not available</div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+              </div>
+
+              {/* Print Button */}
+              <div className="col-span-1 flex justify-end">
+                <Button 
+                  onClick={() => handlePrintSingle(order)}
+                  disabled={isPrinting(order.id)}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center space-x-1 h-7 px-2"
+                >
+                  <Printer className="h-3 w-3" />
+                  <span className="text-xs">Print</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {orders.length === 0 && (
+          <Card className="text-center py-8">
+            <CardContent>
+              <div className="text-gray-500">No orders found matching your criteria</div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Order Details Dialog */}
-      {selectedOrder && (
-        <OrderDetails
-          order={selectedOrder}
-          open={showOrderDetails}
-          onClose={() => {
-            setShowOrderDetails(false);
-            setSelectedOrder(null);
-          }}
-        />
-      )}
-
-      {/* Shipping Label Preview */}
-      {selectedOrder && (
-        <ShippingLabelPreview
-          open={showLabelPreview}
-          onClose={() => {
-            setShowLabelPreview(false);
-            setSelectedOrder(null);
-          }}
-          order={selectedOrder}
-          onPrintComplete={() => {
-            setShowLabelPreview(false);
-            setSelectedOrder(null);
-            // Remove from selection after printing
-            if (effectiveSelectedIds.has(selectedOrder.id)) {
-              handleOrderSelect(selectedOrder.id, false);
-            }
-          }}
-        />
-      )}
+      <ShippingLabelPreview 
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        order={previewOrder}
+        onPrintComplete={handlePrintComplete}
+      />
     </>
   );
 };
