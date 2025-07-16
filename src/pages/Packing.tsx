@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings, Phone } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -23,55 +23,6 @@ const Packing = () => {
     console.log('Item packed:', { orderId, itemId });
     // Force a refresh of the data
     setRefreshKey(prev => prev + 1);
-  };
-
-  // Helper function to get product display name with variation
-  const getProductDisplayName = (item: any) => {
-    console.log('Processing item for display in packing:', item);
-    
-    // Try to extract variation from title or use shopify_variant_id
-    let variation = '';
-    
-    // Check if title contains size information (common patterns)
-    const sizeMatches = item.title.match(/\b(XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL|\d+)\b/i);
-    if (sizeMatches) {
-      variation = sizeMatches[0];
-    }
-    
-    // If no size found, try to use shopify_variant_id as variation
-    if (!variation && item.shopify_variant_id) {
-      variation = `Variant ${item.shopify_variant_id}`;
-    }
-    
-    // If we have SKU, use it as variation
-    if (item.sku && item.sku.trim() !== '') {
-      variation = item.sku;
-    }
-    
-    const name = item.title || 'Product';
-    const displayName = variation ? `${name} - ${variation}` : name;
-    console.log(`Display name in packing: ${displayName}`);
-    return displayName;
-  };
-
-  // Helper function to get customer phone number - check multiple sources
-  const getCustomerPhone = (order: any) => {
-    console.log('Getting phone for order:', order.order_number);
-    console.log('Customer data:', order.customer);
-    console.log('Shipping address data:', order.shipping_address);
-    
-    // Try multiple sources for phone number
-    const customerPhone = order.customer?.phone;
-    const shippingPhone = order.shipping_address?.phone;
-    
-    console.log('Customer phone:', customerPhone);
-    console.log('Shipping phone:', shippingPhone);
-    
-    // Return the first available phone number
-    const finalPhone = customerPhone || shippingPhone || null;
-    console.log('Final phone:', finalPhone);
-    
-    return finalPhone;
   };
 
   if (isLoading) {
@@ -213,20 +164,11 @@ const Packing = () => {
                         <p className="text-sm text-gray-500">
                           {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
                         </p>
-                        {(() => {
-                          const customerPhone = getCustomerPhone(selectedOrder);
-                          return customerPhone ? (
-                            <div className="flex items-center space-x-1 text-sm">
-                              <Phone className="h-3 w-3 text-green-600" />
-                              <span className="text-green-600 font-medium">{customerPhone}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center space-x-1 text-sm">
-                              <Phone className="h-3 w-3 text-red-500" />
-                              <span className="text-red-500">No phone number</span>
-                            </div>
-                          );
-                        })()}
+                        {selectedOrder.customer?.phone ? (
+                          <p className="text-sm text-green-600 font-medium">📱 {selectedOrder.customer.phone}</p>
+                        ) : (
+                          <p className="text-sm text-red-500">📱 No phone number</p>
+                        )}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -254,41 +196,21 @@ const Packing = () => {
                     </div>
                     
                     <div className="border-t pt-3">
-                      <h4 className="font-medium text-sm text-gray-700 mb-3">Items to Pack:</h4>
-                      <div className="space-y-3 max-h-40 overflow-y-auto">
-                        {selectedOrder.order_items?.map((item: any) => {
-                          const displayName = getProductDisplayName(item);
-                          return (
-                            <div key={item.id} className={`p-3 rounded-lg border ${
-                              item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                            }`}>
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <h5 className="font-medium text-gray-900 text-sm">{displayName}</h5>
-                                  </div>
-                                  <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
-                                    {item.packed ? "Packed" : "Pending"}
-                                  </Badge>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                                  <div>
-                                    <span className="font-medium">SKU:</span>
-                                    <p className="text-gray-800">{item.sku || 'N/A'}</p>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Qty:</span>
-                                    <p className="text-gray-800">{item.quantity}</p>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Price:</span>
-                                    <p className="text-gray-800">₹{item.price || 0}</p>
-                                  </div>
-                                </div>
-                              </div>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {selectedOrder.order_items?.map((item: any) => (
+                          <div key={item.id} className={`p-2 rounded text-xs ${
+                            item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
+                          }`}>
+                            <div className="flex justify-between">
+                              <span className="font-medium">{item.title}</span>
+                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
+                                {item.packed ? "Packed" : "Pending"}
+                              </Badge>
                             </div>
-                          );
-                        })}
+                            <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -317,7 +239,6 @@ const Packing = () => {
                   const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
                   const totalItems = order.order_items?.length || 0;
                   const isComplete = packedItems === totalItems;
-                  const customerPhone = getCustomerPhone(order);
                   
                   return (
                     <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -325,24 +246,14 @@ const Packing = () => {
                         <div className="flex items-center space-x-3">
                           <div>
                             <h3 className="font-medium text-gray-900">{order.order_number}</h3>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>
-                                {order.customer?.first_name} {order.customer?.last_name}
-                              </span>
-                              {customerPhone ? (
-                                <div className="flex items-center space-x-1">
-                                  <Phone className="h-3 w-3 text-green-600" />
-                                  <span className="text-green-600">{customerPhone}</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center space-x-1">
-                                  <Phone className="h-3 w-3 text-red-500" />
-                                  <span className="text-red-500">No phone</span>
-                                </div>
+                            <p className="text-sm text-gray-500">
+                              {order.customer?.first_name} {order.customer?.last_name}
+                              {order.customer?.phone && (
+                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
                               )}
-                              <span>•</span>
-                              <span>{isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}</span>
-                            </div>
+                              <span className="mx-2">•</span>
+                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
+                            </p>
                           </div>
                         </div>
                       </div>

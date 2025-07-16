@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import OrderDetails from '@/components/orders/OrderDetails';
 import PackingScanner from '@/components/packing/PackingScanner';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
@@ -22,31 +21,9 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
 
   const getProductDisplayName = (item: any) => {
-    console.log('Processing item in PackingQueue:', item);
-    
-    // Try to extract variation from title or use shopify_variant_id
-    let variation = '';
-    
-    // Check if title contains size information (common patterns)
-    const sizeMatches = item.title.match(/\b(XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL|\d+)\b/i);
-    if (sizeMatches) {
-      variation = sizeMatches[0];
-    }
-    
-    // If no size found, try to use shopify_variant_id as variation
-    if (!variation && item.shopify_variant_id) {
-      variation = `Variant ${item.shopify_variant_id}`;
-    }
-    
-    // If we have SKU, use it as variation
-    if (item.sku && item.sku.trim() !== '') {
-      variation = item.sku;
-    }
-    
     const name = item.title || 'Product';
-    const displayName = variation ? `${name} - ${variation}` : name;
-    console.log(`PackingQueue display name: ${displayName}`);
-    return displayName;
+    const variant = item.sku || '';
+    return variant ? `${name} - ${variant}` : name;
   };
 
   const handleViewOrder = (order: Order) => {
@@ -61,11 +38,6 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
 
   const handleMoveToTracking = (order: Order) => {
     updateOrderStage.mutate({ orderId: order.id, stage: 'tracking' });
-  };
-
-  const handleItemPacked = (orderId: string, itemId: string) => {
-    console.log('Item packed:', { orderId, itemId });
-    // The PackingScanner will handle the actual update
   };
 
   const getPackingProgress = (order: Order): { packed: number; total: number; percentage: number } => {
@@ -163,38 +135,25 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                         const displayName = getProductDisplayName(item);
                         return (
                           <div key={index} className={`p-3 rounded-lg border ${item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{displayName}</div>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  {item.packed ? (
-                                    <Badge className="bg-green-100 text-green-800">
-                                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                                      Packed
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-yellow-100 text-yellow-800">
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      Pending
-                                    </Badge>
-                                  )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{displayName}</div>
+                                <div className="text-sm text-gray-600">
+                                  SKU: {item.sku || 'N/A'} | Qty: {item.quantity}
                                 </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-3 text-xs text-gray-600">
-                                <div>
-                                  <span className="font-medium">SKU:</span>
-                                  <p className="text-gray-800">{item.sku || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Qty:</span>
-                                  <p className="text-gray-800">{item.quantity}</p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Price:</span>
-                                  <p className="text-gray-800">₹{item.price || 0}</p>
-                                </div>
+                              <div className="flex items-center space-x-2">
+                                {item.packed ? (
+                                  <Badge className="bg-green-100 text-green-800">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Packed
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-yellow-100 text-yellow-800">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    Pending
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -258,18 +217,16 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
       )}
 
       {/* Packing Scanner Dialog */}
-      <Dialog open={showScanner} onOpenChange={setShowScanner}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Packing Scanner</DialogTitle>
-          </DialogHeader>
-          <PackingScanner
-            orders={orders}
-            onItemPacked={handleItemPacked}
-            onOrderSelected={(order) => setSelectedOrder(order)}
-          />
-        </DialogContent>
-      </Dialog>
+      {selectedOrder && (
+        <PackingScanner
+          order={selectedOrder}
+          open={showScanner}
+          onClose={() => {
+            setShowScanner(false);
+            setSelectedOrder(null);
+          }}
+        />
+      )}
     </>
   );
 };
