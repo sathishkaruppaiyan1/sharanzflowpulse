@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,13 +15,10 @@ import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface PackingQueueProps {
   orders: Order[];
-  selectedOrderId?: string;
-  onOrderUpdate: () => void;
-  showOrderHeader?: boolean;
   onItemPacked?: (orderId: string, itemId: string) => void;
 }
 
-const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader = true }: PackingQueueProps) => {
+const PackingQueue = ({ orders }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
   const queryClient = useQueryClient();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
@@ -39,7 +37,6 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      onOrderUpdate();
       toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
     },
     onError: (error) => {
@@ -73,17 +70,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
   const debugCustomerData = (order: Order) => {
     console.log('Packing - Customer data for order', order.order_number, ':', order.customer);
     console.log('Packing - Phone number:', order.customer?.phone);
-    console.log('Packing - Shipping address:', order.shipping_address);
-  };
-
-  // Helper function to get phone number from order
-  const getPhoneNumber = (order: Order) => {
-    // Only check customer phone since shipping_address doesn't have phone field
-    if (order.customer?.phone) {
-      return order.customer.phone;
-    }
-    
-    return null;
+    console.log('Packing - Shipping address phone:', order.shipping_address);
   };
 
   return (
@@ -92,96 +79,91 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
         const packedItems = order.order_items.filter(item => item.packed).length;
         const totalItems = order.order_items.length;
         const isReady = isOrderReadyForShipping(order);
-        const phoneNumber = getPhoneNumber(order);
         
         // Debug log for each order
         debugCustomerData(order);
         
         return (
           <Card key={order.id} className="hover:shadow-md transition-shadow">
-            {showOrderHeader && (
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{order.order_number}</CardTitle>
-                    <div className="text-sm text-gray-600">
-                      <p>{order.customer?.first_name} {order.customer?.last_name}</p>
-                      {phoneNumber ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Phone className="h-3 w-3 text-green-600" />
-                          <span className="text-green-600">{phoneNumber}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
-                          <span className="text-red-500">No phone number</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`${isReady ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}
-                    >
-                      <Package className="h-3 w-3 mr-1" />
-                      {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
-                    </Badge>
-                    <Dialog 
-                      open={openDialogs[order.id] || false} 
-                      onOpenChange={(open) => handleDialogChange(order.id, open)}
-                    >
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Change Order Stage</DialogTitle>
-                        </DialogHeader>
-                        <StageChangeControls 
-                          order={order} 
-                          currentStage={order.stage || 'packing'}
-                          onStageChange={() => {
-                            handleDialogChange(order.id, false);
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">{order.order_number}</CardTitle>
+                  <div className="text-sm text-gray-600">
+                    <p>{order.customer?.first_name} {order.customer?.last_name}</p>
+                    {order.customer?.phone ? (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Phone className="h-3 w-3 text-green-600" />
+                        <span className="text-green-600">{order.customer.phone}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 text-red-500" />
+                        <span className="text-red-500">No phone number</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </CardHeader>
-            )}
+                <div className="flex items-center space-x-2">
+                  <Badge 
+                    variant="outline" 
+                    className={`${isReady ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}
+                  >
+                    <Package className="h-3 w-3 mr-1" />
+                    {isReady ? 'Ready for Dispatch' : `${packedItems}/${totalItems} Packed`}
+                  </Badge>
+                  <Dialog 
+                    open={openDialogs[order.id] || false} 
+                    onOpenChange={(open) => handleDialogChange(order.id, open)}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Change Order Stage</DialogTitle>
+                      </DialogHeader>
+                      <StageChangeControls 
+                        order={order} 
+                        currentStage={order.stage || 'packing'}
+                        onStageChange={() => {
+                          handleDialogChange(order.id, false);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
             
             <CardContent className="space-y-4">
-              {showOrderHeader && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-gray-700">Order Details</h4>
-                    <div className="text-sm space-y-1">
-                      <p><span className="text-gray-500">Items:</span> {order.order_items.length}</p>
-                      <p><span className="text-gray-500">Total:</span> ₹{order.total_amount}</p>
-                      <p><span className="text-gray-500">Stage:</span> <Badge variant="secondary">{order.stage}</Badge></p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-gray-700">Shipping Address</h4>
-                    <div className="text-sm text-gray-600">
-                      {order.shipping_address ? (
-                        <div>
-                          <p>{order.shipping_address.address_line_1}</p>
-                          {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
-                          <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
-                        </div>
-                      ) : (
-                        <p>No shipping address</p>
-                      )}
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700">Order Details</h4>
+                  <div className="text-sm space-y-1">
+                    <p><span className="text-gray-500">Items:</span> {order.order_items.length}</p>
+                    <p><span className="text-gray-500">Total:</span> ₹{order.total_amount}</p>
+                    <p><span className="text-gray-500">Stage:</span> <Badge variant="secondary">{order.stage}</Badge></p>
                   </div>
                 </div>
-              )}
+                
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-gray-700">Shipping Address</h4>
+                  <div className="text-sm text-gray-600">
+                    {order.shipping_address ? (
+                      <div>
+                        <p>{order.shipping_address.address_line_1}</p>
+                        {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
+                        <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
+                      </div>
+                    ) : (
+                      <p>No shipping address</p>
+                    )}
+                  </div>
+                </div>
+              </div>
               
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-gray-700">Items to Pack</h4>
@@ -221,25 +203,23 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                 </div>
               </div>
               
-              {showOrderHeader && (
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <Package className="h-4 w-4" />
-                    <span>{packedItems} of {totalItems} items packed</span>
-                  </div>
-                  
-                  <Button 
-                    onClick={() => handleMoveToTracking(order.id, order.order_number)}
-                    disabled={!isReady || updateOrderStage.isPending}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Dispatch Order
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <Package className="h-4 w-4" />
+                  <span>{packedItems} of {totalItems} items packed</span>
                 </div>
-              )}
+                
+                <Button 
+                  onClick={() => handleMoveToTracking(order.id, order.order_number)}
+                  disabled={!isReady || updateOrderStage.isPending}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Dispatch Order
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         );
