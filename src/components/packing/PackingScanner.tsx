@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback } from 'react';
 import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,11 +12,11 @@ import { useQueryClient } from '@tanstack/react-query';
 
 interface PackingScannerProps {
   orders: any[];
-  onItemPacked: (orderId: string, itemId: string) => void;
+  onOrderUpdate: () => void;
   onOrderSelected?: (order: any | null) => void;
 }
 
-const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScannerProps) => {
+const PackingScanner = ({ orders, onOrderUpdate, onOrderSelected }: PackingScannerProps) => {
   const [step, setStep] = useState<'order' | 'sku'>('order');
   const [orderIdInput, setOrderIdInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
@@ -172,7 +171,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       // If item is complete, mark it as packed
       if (isItemComplete) {
         await supabaseOrderService.updateOrderItemPacked(item.id, true);
-        onItemPacked(selectedOrder.id, item.id);
+        onOrderUpdate();
         queryClient.invalidateQueries({ queryKey: ['orders'] });
       }
 
