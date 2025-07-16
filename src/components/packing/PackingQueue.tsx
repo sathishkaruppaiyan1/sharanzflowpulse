@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Package, Eye, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import OrderDetails from '@/components/orders/OrderDetails';
 import PackingScanner from '@/components/packing/PackingScanner';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
@@ -222,18 +222,18 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
       )}
 
       {/* Packing Scanner Dialog */}
-      {selectedOrder && (
-        <PackingScanner
-          orders={orders}
-          onItemPacked={handleItemPacked}
-          onOrderSelected={(order) => setSelectedOrder(order)}
-          open={showScanner}
-          onClose={() => {
-            setShowScanner(false);
-            setSelectedOrder(null);
-          }}
-        />
-      )}
+      <Dialog open={showScanner} onOpenChange={setShowScanner}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Packing Scanner</DialogTitle>
+          </DialogHeader>
+          <PackingScanner
+            orders={orders}
+            onItemPacked={handleItemPacked}
+            onOrderSelected={(order) => setSelectedOrder(order)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
