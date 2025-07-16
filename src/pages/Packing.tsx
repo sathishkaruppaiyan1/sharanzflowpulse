@@ -35,6 +35,12 @@ const Packing = () => {
     return displayName;
   };
 
+  // Helper function to get customer phone number
+  const getCustomerPhone = (order: any) => {
+    // Check customer phone first, then shipping address phone
+    return order.customer?.phone || order.shipping_address?.phone || null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -174,17 +180,20 @@ const Packing = () => {
                         <p className="text-sm text-gray-500">
                           {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
                         </p>
-                        {selectedOrder.customer?.phone ? (
-                          <div className="flex items-center space-x-1 text-sm">
-                            <Phone className="h-3 w-3 text-green-600" />
-                            <span className="text-green-600 font-medium">{selectedOrder.customer.phone}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-1 text-sm">
-                            <Phone className="h-3 w-3 text-red-500" />
-                            <span className="text-red-500">No phone number</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const customerPhone = getCustomerPhone(selectedOrder);
+                          return customerPhone ? (
+                            <div className="flex items-center space-x-1 text-sm">
+                              <Phone className="h-3 w-3 text-green-600" />
+                              <span className="text-green-600 font-medium">{customerPhone}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-1 text-sm">
+                              <Phone className="h-3 w-3 text-red-500" />
+                              <span className="text-red-500">No phone number</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -212,28 +221,39 @@ const Packing = () => {
                     </div>
                     
                     <div className="border-t pt-3">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items with Variations:</h4>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                      <h4 className="font-medium text-sm text-gray-700 mb-3">Items to Pack:</h4>
+                      <div className="space-y-3 max-h-40 overflow-y-auto">
                         {selectedOrder.order_items?.map((item: any) => {
                           const displayName = getProductDisplayName(item);
                           return (
-                            <div key={item.id} className={`p-3 rounded-lg text-sm ${
-                              item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
+                            <div key={item.id} className={`p-3 rounded-lg border ${
+                              item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
                             }`}>
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <span className="font-medium text-gray-900 block">{displayName}</span>
-                                  <div className="text-xs text-gray-600 mt-1 space-y-1">
-                                    <p><span className="font-medium">SKU:</span> {item.sku || 'N/A'}</p>
-                                    <p><span className="font-medium">Quantity:</span> {item.quantity}</p>
-                                    {item.price && (
-                                      <p><span className="font-medium">Price:</span> ₹{item.price}</p>
-                                    )}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <h5 className="font-medium text-gray-900 text-sm">{displayName}</h5>
                                   </div>
+                                  <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
+                                    {item.packed ? "Packed" : "Pending"}
+                                  </Badge>
                                 </div>
-                                <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
-                                  {item.packed ? "Packed" : "Pending"}
-                                </Badge>
+                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                                  <div>
+                                    <span className="font-medium">SKU:</span>
+                                    <p className="text-gray-800">{item.sku || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Quantity:</span>
+                                    <p className="text-gray-800">{item.quantity}</p>
+                                  </div>
+                                  {item.price && (
+                                    <div className="col-span-2">
+                                      <span className="font-medium">Price:</span>
+                                      <p className="text-gray-800">₹{item.price}</p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
@@ -266,6 +286,7 @@ const Packing = () => {
                   const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
                   const totalItems = order.order_items?.length || 0;
                   const isComplete = packedItems === totalItems;
+                  const customerPhone = getCustomerPhone(order);
                   
                   return (
                     <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -277,10 +298,10 @@ const Packing = () => {
                               <span>
                                 {order.customer?.first_name} {order.customer?.last_name}
                               </span>
-                              {order.customer?.phone && (
+                              {customerPhone && (
                                 <div className="flex items-center space-x-1">
                                   <Phone className="h-3 w-3 text-green-600" />
-                                  <span className="text-green-600">{order.customer.phone}</span>
+                                  <span className="text-green-600">{customerPhone}</span>
                                 </div>
                               )}
                               <span>•</span>

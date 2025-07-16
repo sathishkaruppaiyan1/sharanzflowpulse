@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Package, Eye, CheckCircle2, Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -140,25 +141,34 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                         const displayName = getProductDisplayName(item);
                         return (
                           <div key={index} className={`p-3 rounded-lg border ${item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-900">{displayName}</div>
-                                <div className="text-sm text-gray-600">
-                                  SKU: {item.sku || 'N/A'} | Qty: {item.quantity}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">{displayName}</div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {item.packed ? (
+                                    <Badge className="bg-green-100 text-green-800">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Packed
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-yellow-100 text-yellow-800">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      Pending
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                {item.packed ? (
-                                  <Badge className="bg-green-100 text-green-800">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    Packed
-                                  </Badge>
-                                ) : (
-                                  <Badge className="bg-yellow-100 text-yellow-800">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    Pending
-                                  </Badge>
-                                )}
+                              <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                                <div>
+                                  <span className="font-medium">SKU:</span>
+                                  <p className="text-gray-800">{item.sku || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">Quantity:</span>
+                                  <p className="text-gray-800">{item.quantity}</p>
+                                </div>
                               </div>
                             </div>
                           </div>
