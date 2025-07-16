@@ -24,51 +24,71 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   if (!order && !orders?.length) return null;
 
-  const generateBarcode = (text: string) => {
-    // Clean the text to make it more scannable
+  // Generate proper Code 128 barcode using Code 128B
+  const generateCode128Barcode = (text: string) => {
     const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const barPattern = [];
     
-    // Start pattern
-    barPattern.push(3, 1, 1, 1, 3, 1);
+    // Code 128B character set mapping (partial for alphanumeric)
+    const code128B = {
+      ' ': [2,1,2,2,2,2], '!': [2,1,2,3,1,2], '"': [2,1,2,2,3,1], '#': [1,2,1,3,2,2],
+      '$': [1,2,1,2,3,2], '%': [1,2,1,2,2,3], '&': [1,1,2,3,2,2], "'": [1,1,2,2,3,2],
+      '(': [1,1,2,2,2,3], ')': [2,2,1,3,1,2], '*': [2,2,1,2,2,2], '+': [2,2,1,2,3,1],
+      ',': [1,1,3,2,2,2], '-': [1,1,3,2,1,3], '.': [1,1,3,1,2,3], '/': [1,2,2,3,1,2],
+      '0': [2,2,2,1,1,3], '1': [2,2,2,2,1,2], '2': [2,2,2,1,2,2], '3': [1,2,1,2,2,3],
+      '4': [1,2,1,3,2,2], '5': [1,2,1,2,3,2], '6': [1,1,2,2,2,3], '7': [1,2,2,3,2,1],
+      '8': [1,2,2,2,3,1], '9': [2,2,1,2,3,1], ':': [2,2,1,1,3,2], ';': [2,2,1,2,1,3],
+      '<': [2,1,3,2,1,2], '=': [2,1,3,1,1,3], '>': [2,1,3,1,2,2], '?': [1,1,2,1,3,3],
+      '@': [1,1,2,3,1,3], 'A': [1,3,2,1,3,1], 'B': [1,1,3,1,2,3], 'C': [3,1,2,1,3,1],
+      'D': [2,1,1,3,1,3], 'E': [2,3,1,1,1,3], 'F': [2,1,3,1,1,3], 'G': [1,1,2,1,2,4],
+      'H': [1,1,2,4,2,1], 'I': [1,4,2,1,2,1], 'J': [1,1,3,2,2,2], 'K': [1,2,3,1,2,2],
+      'L': [1,2,3,2,2,1], 'M': [2,2,3,2,1,1], 'N': [2,2,1,1,3,2], 'O': [2,2,1,2,3,1],
+      'P': [2,1,3,2,1,2], 'Q': [2,2,3,1,1,2], 'R': [3,1,2,1,2,2], 'S': [3,2,2,1,1,2],
+      'T': [3,2,2,2,1,1], 'U': [2,1,2,1,2,3], 'V': [2,1,2,3,2,1], 'W': [2,3,2,1,2,1],
+      'X': [1,1,1,3,2,3], 'Y': [1,3,1,1,2,3], 'Z': [1,3,1,3,2,1]
+    };
+
+    const startB = [2,1,1,2,2,2]; // Start B pattern
+    const stop = [2,3,3,1,1,1,2]; // Stop pattern
     
-    // Generate more consistent bars based on text
+    let checksum = 104; // Start B value
+    const bars = [...startB];
+    
+    // Add character patterns
     for (let i = 0; i < cleanText.length; i++) {
-      const char = cleanText.charCodeAt(i);
-      const pattern = char % 10;
-      switch (pattern) {
-        case 0: barPattern.push(3, 1, 1, 3, 1, 1); break;
-        case 1: barPattern.push(1, 3, 1, 3, 1, 1); break;
-        case 2: barPattern.push(1, 1, 3, 3, 1, 1); break;
-        case 3: barPattern.push(3, 3, 1, 1, 1, 1); break;
-        case 4: barPattern.push(1, 1, 1, 3, 3, 1); break;
-        case 5: barPattern.push(3, 1, 1, 1, 1, 3); break;
-        case 6: barPattern.push(1, 3, 1, 1, 1, 3); break;
-        case 7: barPattern.push(1, 1, 3, 1, 1, 3); break;
-        case 8: barPattern.push(1, 1, 1, 1, 3, 3); break;
-        case 9: barPattern.push(3, 1, 1, 3, 1, 1); break;
-      }
+      const char = cleanText[i];
+      const pattern = code128B[char] || [2,1,2,2,2,2]; // Default to space if not found
+      bars.push(...pattern);
+      
+      // Calculate checksum
+      const charValue = char.charCodeAt(0) - 32; // ASCII to Code 128 value
+      checksum += charValue * (i + 1);
     }
     
-    // End pattern
-    barPattern.push(3, 1, 1, 1, 3, 1, 1);
+    // Add checksum character
+    const checksumValue = checksum % 103;
+    const checksumChar = String.fromCharCode(checksumValue + 32);
+    const checksumPattern = code128B[checksumChar] || [2,1,2,2,2,2];
+    bars.push(...checksumPattern);
     
-    return barPattern;
+    // Add stop pattern
+    bars.push(...stop);
+    
+    return bars;
   };
 
   const renderBarcode = (text: string) => {
     const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const bars = generateBarcode(cleanText);
+    const bars = generateCode128Barcode(cleanText);
     return (
-      <div className="flex items-end justify-center space-x-0" style={{ height: '60px' }}>
+      <div className="flex items-end justify-center space-x-0" style={{ height: '50px' }}>
         {bars.map((width, index) => (
           <div
             key={index}
             className={index % 2 === 0 ? "bg-black" : "bg-white"}
             style={{
-              width: `${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px`,
-              height: '60px',
-              minWidth: `${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px`
+              width: `${width * 1.2}px`,
+              height: '50px',
+              minWidth: `${width * 1.2}px`
             }}
           />
         ))}
@@ -79,10 +99,16 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   // Generate HTML barcode that matches the React component exactly
   const generateBarcodeHTML = (text: string) => {
     const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const bars = generateBarcode(cleanText);
+    const bars = generateCode128Barcode(cleanText);
     return bars.map((width, index) => 
-      `<div style="display: inline-block; background-color: ${index % 2 === 0 ? '#000' : '#fff'}; width: ${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px; height: 60px; min-width: ${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px; vertical-align: bottom;"></div>`
+      `<div style="display: inline-block; background-color: ${index % 2 === 0 ? '#000' : '#fff'}; width: ${width * 1.2}px; height: 50px; min-width: ${width * 1.2}px; vertical-align: bottom;"></div>`
     ).join('');
+  };
+
+  const getProductDisplayName = (item: any) => {
+    const name = item.title || item.name || 'Product';
+    const variant = item.variant_title || item.sku || '';
+    return variant ? `${name} - ${variant}` : name;
   };
 
   const createLabelHTML = (orderData: any, isLast: boolean = false) => {
@@ -117,60 +143,61 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
 
       return `
-        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 6px; background: #fff; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; line-height: 1.1; color: #000; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; ${pageBreak}">
+        <div style="width: 4in; height: 6in; border: 2px solid #000; padding: 8px; background: #fff; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; line-height: 1.2; color: #000; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; ${pageBreak}">
           <!-- 1. Barcode Section -->
-          <div style="text-align: center; border: 1px solid #000; padding: 3px; background: #f9fafb; margin-bottom: 3px; width: 100%; box-sizing: border-box;">
-            <div style="background: #fff; padding: 3px; border: 1px solid #d1d5db; margin-bottom: 2px;">
-              <div style="text-align: center; height: 45px; display: flex; align-items: end; justify-content: center;">
+          <div style="text-align: center; border: 2px solid #000; padding: 6px; background: #f8f9fa; margin-bottom: 6px; width: 100%; box-sizing: border-box;">
+            <div style="background: #fff; padding: 4px; border: 1px solid #ccc; margin-bottom: 4px;">
+              <div style="text-align: center; height: 50px; display: flex; align-items: end; justify-content: center;">
                 ${barcodeHTML}
               </div>
             </div>
-            <div style="font-weight: bold; font-size: 10px;">${trackingNumber}</div>
+            <div style="font-weight: bold; font-size: 12px;">${trackingNumber}</div>
           </div>
 
           <!-- 2. TO Section -->
-          <div style="margin-bottom: 3px; width: 100%; box-sizing: border-box;">
-            <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">📍 TO:</div>
-            <div style="border: 1px solid #000; padding: 3px; background: #fffbeb; width: 100%; box-sizing: border-box;">
-              <div style="font-weight: bold; font-size: 10px; word-wrap: break-word; overflow-wrap: break-word;">${customerName.toUpperCase()}</div>
-              <div style="margin-top: 1px; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address1}</div>
-              ${shippingAddress.address2 ? `<div style="font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address2}</div>` : ''}
-              <div style="font-size: 8px; word-wrap: break-word;">${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
-              <div style="font-size: 8px;">${shippingAddress.country}</div>
-              <div style="font-size: 8px;">Ph: ${shippingAddress.phone || 'N/A'}</div>
+          <div style="margin-bottom: 6px; width: 100%; box-sizing: border-box;">
+            <div style="font-weight: bold; margin-bottom: 4px; font-size: 12px; background: #fff; padding: 2px;">📍 TO:</div>
+            <div style="border: 2px solid #000; padding: 6px; background: #fffbeb; width: 100%; box-sizing: border-box; min-height: 100px;">
+              <div style="font-weight: bold; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 3px;">${customerName.toUpperCase()}</div>
+              <div style="font-size: 10px; word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 2px;">${shippingAddress.address1}</div>
+              ${shippingAddress.address2 ? `<div style="font-size: 10px; word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 2px;">${shippingAddress.address2}</div>` : ''}
+              <div style="font-size: 10px; word-wrap: break-word; margin-bottom: 2px;">${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
+              <div style="font-size: 10px; margin-bottom: 2px;">${shippingAddress.country}</div>
+              <div style="font-size: 10px;">Ph: ${shippingAddress.phone || 'N/A'}</div>
             </div>
           </div>
 
           <!-- 3. FROM Section -->
-          <div style="margin-bottom: 3px; width: 100%; box-sizing: border-box;">
-            <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">FROM:</div>
-            <div style="border: 1px solid #000; padding: 3px; background: #f9fafb; width: 100%; box-sizing: border-box; font-size: 8px;">
-              <div style="font-weight: bold;">Black Lovers</div>
+          <div style="margin-bottom: 6px; width: 100%; box-sizing: border-box;">
+            <div style="font-weight: bold; margin-bottom: 4px; font-size: 12px; background: #fff; padding: 2px;">FROM:</div>
+            <div style="border: 2px solid #000; padding: 6px; background: #f8f9fa; width: 100%; box-sizing: border-box; font-size: 10px;">
+              <div style="font-weight: bold; margin-bottom: 2px;">Black Lovers</div>
               <div>WhatsApp: 7990190234</div>
             </div>
           </div>
 
           <!-- 4. Courier Details -->
-          <div style="margin-bottom: 3px; width: 100%; box-sizing: border-box;">
-            <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">COURIER DETAILS:</div>
-            <div style="border: 1px solid #000; padding: 3px; background: #f0f9ff; width: 100%; box-sizing: border-box; font-size: 8px;">
-              <div style="margin-bottom: 1px;">Order: <strong>${orderNumber}</strong> | Weight: ${totalWeight}</div>
+          <div style="margin-bottom: 6px; width: 100%; box-sizing: border-box;">
+            <div style="font-weight: bold; margin-bottom: 4px; font-size: 12px; background: #fff; padding: 2px;">COURIER DETAILS:</div>
+            <div style="border: 2px solid #000; padding: 6px; background: #f0f9ff; width: 100%; box-sizing: border-box; font-size: 10px;">
+              <div style="margin-bottom: 2px;">Order: <strong>${orderNumber}</strong> | Weight: ${totalWeight}</div>
               <div>Items: ${totalItems} | Total: ₹${orderData.total_amount || orderData.current_total_price}</div>
             </div>
           </div>
 
-          <!-- 5. Products - Smaller Container -->
-          <div style="margin-bottom: 3px; flex: 1; display: flex; flex-direction: column; min-height: 0; max-height: 80px; width: 100%; box-sizing: border-box;">
-            <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 3px; flex: 1; overflow: hidden; font-size: 7px; word-wrap: break-word; overflow-wrap: break-word; width: 100%; box-sizing: border-box;">
-              ${orderData.line_items ? orderData.line_items.map((item: any) => 
-                `<div style="margin-bottom: 1px; word-wrap: break-word; overflow-wrap: break-word;">• ${item.title || item.name} (Qty: <strong>${item.quantity || 1}</strong>)</div>`
-              ).join('') : '<div>• Order Items</div>'}
+          <!-- 5. Products -->
+          <div style="margin-bottom: 6px; flex: 1; display: flex; flex-direction: column; min-height: 0; width: 100%; box-sizing: border-box;">
+            <div style="font-weight: bold; margin-bottom: 4px; font-size: 12px; background: #fff; padding: 2px;">PRODUCTS:</div>
+            <div style="border: 2px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 9px; word-wrap: break-word; overflow-wrap: break-word; width: 100%; box-sizing: border-box; background: #fff;">
+              ${orderData.line_items ? orderData.line_items.map((item: any) => {
+                const displayName = getProductDisplayName(item);
+                return `<div style="margin-bottom: 3px; word-wrap: break-word; overflow-wrap: break-word;">• ${displayName} (Qty: <strong>${item.quantity || 1}</strong>)</div>`;
+              }).join('') : '<div>• Order Items</div>'}
             </div>
           </div>
 
           <!-- 6. Footer -->
-          <div style="text-align: center; border-top: 2px solid #000; padding-top: 3px; font-weight: bold; font-size: 7px; margin-top: auto; width: 100%; box-sizing: border-box;">
+          <div style="text-align: center; border-top: 3px solid #000; padding-top: 4px; font-weight: bold; font-size: 8px; margin-top: auto; width: 100%; box-sizing: border-box; background: #fff;">
             <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
           </div>
         </div>
@@ -268,7 +295,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                     font-weight: bold;
                     padding: 10px;
                     background: white;
-                    line-height: 1.1;
+                    line-height: 1.2;
                   }
                   @media print {
                     body { 
@@ -435,70 +462,75 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed and orders will be automatically moved to packing stage.
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Preview shows the first label. All labels will use the same template with balanced layout.
+                Preview shows the first label. All labels will use the same template with exact layout matching.
               </p>
             </div>
           )}
           
-          <div className="print-content border-2 border-black bg-white font-sans text-sm font-bold flex flex-col" style={{ width: '4in', height: '6in', padding: '6px', boxSizing: 'border-box' }}>
+          <div className="print-content border-2 border-black bg-white font-sans text-sm font-bold flex flex-col" style={{ width: '4in', height: '6in', padding: '8px', boxSizing: 'border-box' }}>
             {/* 1. Barcode Section */}
-            <div className="text-center border border-black p-1 bg-gray-50 mb-1 w-full">
+            <div className="text-center border-2 border-black p-2 bg-gray-50 mb-2 w-full">
               <div className="bg-white p-1 border border-gray-300 mb-1">
                 {renderBarcode(trackingNumber)}
               </div>
-              <div className="font-bold text-xs">{trackingNumber}</div>
+              <div className="font-bold text-sm">{trackingNumber}</div>
             </div>
 
             {/* 2. TO Section */}
-            <div className="mb-1 w-full">
-              <div className="flex items-center mb-1">
-                <span className="mr-1 text-xs">📍</span>
-                <span className="font-bold text-xs">TO:</span>
+            <div className="mb-2 w-full">
+              <div className="flex items-center mb-1 bg-white p-1">
+                <span className="mr-1 text-sm">📍</span>
+                <span className="font-bold text-sm">TO:</span>
               </div>
-              <div className="border border-black p-1 bg-yellow-50 w-full">
-                <div className="font-bold text-xs break-words overflow-wrap-anywhere">
+              <div className="border-2 border-black p-2 bg-yellow-50 w-full min-h-[100px]">
+                <div className="font-bold text-sm break-words overflow-wrap-anywhere mb-1">
                   {customerName.toUpperCase()}
                 </div>
-                <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address1}</div>
-                {shippingAddress.address2 && <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address2}</div>}
-                <div className="text-xs break-words">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
-                <div className="text-xs">{shippingAddress.country}</div>
+                <div className="text-xs break-words overflow-wrap-anywhere mb-1">{shippingAddress.address1}</div>
+                {shippingAddress.address2 && <div className="text-xs break-words overflow-wrap-anywhere mb-1">{shippingAddress.address2}</div>}
+                <div className="text-xs break-words mb-1">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
+                <div className="text-xs mb-1">{shippingAddress.country}</div>
                 <div className="text-xs">Ph: {shippingAddress.phone || 'N/A'}</div>
               </div>
             </div>
 
             {/* 3. FROM Section */}
-            <div className="mb-1 w-full">
-              <div className="font-bold mb-1 text-xs">FROM:</div>
-              <div className="border border-black p-1 bg-gray-50 break-words overflow-wrap-anywhere text-xs w-full">
-                <div className="font-bold">Black Lovers</div>
+            <div className="mb-2 w-full">
+              <div className="font-bold mb-1 text-sm bg-white p-1">FROM:</div>
+              <div className="border-2 border-black p-2 bg-gray-50 text-xs w-full">
+                <div className="font-bold mb-1">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
             </div>
 
             {/* 4. Courier Details */}
-            <div className="mb-1 w-full">
-              <div className="font-bold mb-1 text-xs">COURIER DETAILS:</div>
-              <div className="border border-black p-1 bg-blue-50 break-words overflow-wrap-anywhere text-xs w-full">
-                <div className="mb-0.5">Order: <strong>{orderNumber}</strong> | Weight: {totalWeight}</div>
+            <div className="mb-2 w-full">
+              <div className="font-bold mb-1 text-sm bg-white p-1">COURIER DETAILS:</div>
+              <div className="border-2 border-black p-2 bg-blue-50 text-xs w-full">
+                <div className="mb-1">Order: <strong>{orderNumber}</strong> | Weight: {totalWeight}</div>
                 <div>Items: {totalItems} | Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
               </div>
             </div>
 
-            {/* 5. Products - Smaller Container */}
-            <div className="mb-1 flex flex-col flex-1 min-h-0 max-h-20 w-full">
-              <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
-              <div className="border border-black p-1 flex-1 overflow-hidden text-xs break-words overflow-wrap-anywhere w-full">
-                {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
-                  <div key={index} className="mb-0.5 break-words overflow-wrap-anywhere text-xs">• {item.title || item.name} (Qty: <strong>{item.quantity || 1}</strong>)</div>
-                )) : (
+            {/* 5. Products */}
+            <div className="mb-2 flex flex-col flex-1 min-h-0 w-full">
+              <div className="font-bold mb-1 text-sm bg-white p-1">PRODUCTS:</div>
+              <div className="border-2 border-black p-2 flex-1 overflow-hidden text-xs break-words overflow-wrap-anywhere w-full bg-white">
+                {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => {
+                  const displayName = getProductDisplayName(item);
+                  return (
+                    <div key={index} className="mb-1 break-words overflow-wrap-anywhere text-xs">
+                      • {displayName} (Qty: <strong>{item.quantity || 1}</strong>)
+                    </div>
+                  );
+                }) : (
                   <div className="text-xs">• Order Items</div>
                 )}
               </div>
             </div>
 
             {/* 6. Footer */}
-            <div className="text-center border-t-2 border-black pt-1 font-bold text-xs mt-auto w-full">
+            <div className="text-center border-t-2 border-black pt-1 font-bold text-xs mt-auto w-full bg-white">
               <div>PARCEL OPENING VIDEO is MUST For raising complaints</div>
             </div>
           </div>
