@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings, Phone } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -26,11 +27,11 @@ const Packing = () => {
 
   // Helper function to get product display name with variation
   const getProductDisplayName = (item: any) => {
-    console.log('Processing item for display:', item); // Debug log
+    console.log('Processing item for display in packing:', item);
     const name = item.title || 'Product';
     const variant = item.sku || '';
     const displayName = variant ? `${name} - ${variant}` : name;
-    console.log(`Display name: ${displayName}`); // Debug log
+    console.log(`Display name in packing: ${displayName}`);
     return displayName;
   };
 
@@ -174,9 +175,15 @@ const Packing = () => {
                           {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
                         </p>
                         {selectedOrder.customer?.phone ? (
-                          <p className="text-sm text-green-600 font-medium">📱 {selectedOrder.customer.phone}</p>
+                          <div className="flex items-center space-x-1 text-sm">
+                            <Phone className="h-3 w-3 text-green-600" />
+                            <span className="text-green-600 font-medium">{selectedOrder.customer.phone}</span>
+                          </div>
                         ) : (
-                          <p className="text-sm text-red-500">📱 No phone number</p>
+                          <div className="flex items-center space-x-1 text-sm">
+                            <Phone className="h-3 w-3 text-red-500" />
+                            <span className="text-red-500">No phone number</span>
+                          </div>
                         )}
                       </div>
                       
@@ -266,14 +273,19 @@ const Packing = () => {
                         <div className="flex items-center space-x-3">
                           <div>
                             <h3 className="font-medium text-gray-900">{order.order_number}</h3>
-                            <p className="text-sm text-gray-500">
-                              {order.customer?.first_name} {order.customer?.last_name}
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span>
+                                {order.customer?.first_name} {order.customer?.last_name}
+                              </span>
                               {order.customer?.phone && (
-                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
+                                <div className="flex items-center space-x-1">
+                                  <Phone className="h-3 w-3 text-green-600" />
+                                  <span className="text-green-600">{order.customer.phone}</span>
+                                </div>
                               )}
-                              <span className="mx-2">•</span>
-                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
-                            </p>
+                              <span>•</span>
+                              <span>{isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}</span>
+                            </div>
                           </div>
                         </div>
                       </div>

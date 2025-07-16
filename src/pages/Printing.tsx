@@ -34,6 +34,16 @@ const Printing = () => {
     });
   }, [rawShopifyOrders]);
 
+  // Helper function to get product display name with variation
+  const getProductDisplayName = (item: any) => {
+    console.log('Processing item for display in printing:', item);
+    const name = item.title || item.name || 'Product';
+    const variant = item.variant_title || item.sku || '';
+    const displayName = variant ? `${name} - ${variant}` : name;
+    console.log(`Display name in printing: ${displayName}`);
+    return displayName;
+  };
+
   // Fetch synced Shopify order IDs but allow orders in printing stage to show
   useEffect(() => {
     const fetchSyncedOrders = async () => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import { Eye, Printer, CheckSquare, Square } from 'lucide-react';
+import { Eye, Printer, CheckSquare, Square, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,9 +32,12 @@ const PrintQueue = ({
   const effectiveSelectedIds = selectedOrderIds.size > 0 ? selectedOrderIds : localSelectedIds;
 
   const getProductDisplayName = (item: any) => {
+    console.log('Processing item for display in PrintQueue:', item);
     const name = item.title || item.name || 'Product';
     const variant = item.variant_title || item.sku || '';
-    return variant ? `${name} - ${variant}` : name;
+    const displayName = variant ? `${name} - ${variant}` : name;
+    console.log(`Display name in PrintQueue: ${displayName}`);
+    return displayName;
   };
 
   const handleOrderSelect = useCallback((orderId: string, checked: boolean) => {
@@ -97,6 +100,8 @@ const PrintQueue = ({
               </TableHead>
               <TableHead>Order</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Address</TableHead>
               <TableHead>Products</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
@@ -110,6 +115,11 @@ const PrintQueue = ({
               const customerName = order.customer_name || 
                 `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 
                 'Guest Customer';
+              
+              const customerPhone = order.customer?.phone || order.shipping_address?.phone || 'N/A';
+              
+              const shippingAddress = order.shipping_address || {};
+              const addressDisplay = `${shippingAddress.city || ''}, ${shippingAddress.province || ''}`.replace(/^,|,$/, '') || 'N/A';
               
               const totalItems = order.line_items ? 
                 order.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
@@ -131,6 +141,17 @@ const PrintQueue = ({
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">{customerName}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-1 text-sm">
+                      <Phone className="h-3 w-3 text-gray-400" />
+                      <span className={customerPhone === 'N/A' ? 'text-red-500' : 'text-green-600'}>
+                        {customerPhone}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-600">{addressDisplay}</div>
                   </TableCell>
                   <TableCell>
                     <div className="max-w-xs">

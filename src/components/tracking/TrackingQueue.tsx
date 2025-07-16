@@ -24,9 +24,12 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
   const updateTracking = useUpdateTracking();
 
   const getProductDisplayName = (item: any) => {
+    console.log('Processing item for display in tracking:', item);
     const name = item.title || 'Product';
     const variant = item.sku || '';
-    return variant ? `${name} - ${variant}` : name;
+    const displayName = variant ? `${name} - ${variant}` : name;
+    console.log(`Display name in tracking: ${displayName}`);
+    return displayName;
   };
 
   const handleViewOrder = (order: Order) => {
@@ -132,10 +135,10 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                     </CardTitle>
                     <CardDescription className="flex items-center space-x-4 mt-1">
                       <span>Customer: {customerName}</span>
-                      {order.customer?.phone && (
+                      {order.customer?.phone ? (
                         <div className="flex items-center space-x-1">
-                          <Phone className="h-3 w-3 text-blue-600" />
-                          <span className="text-blue-600">{order.customer.phone}</span>
+                          <Phone className="h-3 w-3 text-green-600" />
+                          <span className="text-green-600">{order.customer.phone}</span>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -144,6 +147,11 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1">
+                          <Phone className="h-3 w-3 text-red-500" />
+                          <span className="text-red-500">No phone</span>
                         </div>
                       )}
                     </CardDescription>
@@ -169,20 +177,24 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
 
                   {/* Product Details with Variations */}
                   <div>
-                    <h4 className="font-medium text-gray-700 mb-2">Products:</h4>
+                    <h4 className="font-medium text-gray-700 mb-2">Products with Variations:</h4>
                     <div className="space-y-2">
                       {order.order_items?.map((item, index) => {
                         const displayName = getProductDisplayName(item);
                         return (
-                          <div key={index} className="bg-green-50 border border-green-200 p-2 rounded">
-                            <div className="flex justify-between items-center">
-                              <div>
+                          <div key={index} className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
                                 <div className="font-medium text-gray-900">{displayName}</div>
-                                <div className="text-sm text-gray-600">
-                                  SKU: {item.sku || 'N/A'} | Qty: {item.quantity}
+                                <div className="text-sm text-gray-600 mt-1 space-y-1">
+                                  <p><span className="font-medium">SKU:</span> {item.sku || 'N/A'}</p>
+                                  <p><span className="font-medium">Quantity:</span> {item.quantity}</p>
+                                  {item.price && (
+                                    <p><span className="font-medium">Price:</span> ₹{item.price}</p>
+                                  )}
                                 </div>
                               </div>
-                              <Badge className="bg-green-100 text-green-800">
+                              <Badge className="bg-green-100 text-green-800 ml-2">
                                 Packed ✓
                               </Badge>
                             </div>
