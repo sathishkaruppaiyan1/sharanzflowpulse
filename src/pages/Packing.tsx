@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -27,9 +26,12 @@ const Packing = () => {
 
   // Helper function to get product display name with variation
   const getProductDisplayName = (item: any) => {
+    console.log('Processing item for display:', item); // Debug log
     const name = item.title || 'Product';
     const variant = item.sku || '';
-    return variant ? `${name} - ${variant}` : name;
+    const displayName = variant ? `${name} - ${variant}` : name;
+    console.log(`Display name: ${displayName}`); // Debug log
+    return displayName;
   };
 
   if (isLoading) {
@@ -203,21 +205,29 @@ const Packing = () => {
                     </div>
                     
                     <div className="border-t pt-3">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items with Variations:</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedOrder.order_items?.map((item: any) => {
                           const displayName = getProductDisplayName(item);
                           return (
-                            <div key={item.id} className={`p-2 rounded text-xs ${
+                            <div key={item.id} className={`p-3 rounded-lg text-sm ${
                               item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
                             }`}>
-                              <div className="flex justify-between">
-                                <span className="font-medium">{displayName}</span>
-                                <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <span className="font-medium text-gray-900 block">{displayName}</span>
+                                  <div className="text-xs text-gray-600 mt-1 space-y-1">
+                                    <p><span className="font-medium">SKU:</span> {item.sku || 'N/A'}</p>
+                                    <p><span className="font-medium">Quantity:</span> {item.quantity}</p>
+                                    {item.price && (
+                                      <p><span className="font-medium">Price:</span> ₹{item.price}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
                                   {item.packed ? "Packed" : "Pending"}
                                 </Badge>
                               </div>
-                              <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
                             </div>
                           );
                         })}
