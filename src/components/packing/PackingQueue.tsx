@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,17 +73,12 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
   const debugCustomerData = (order: Order) => {
     console.log('Packing - Customer data for order', order.order_number, ':', order.customer);
     console.log('Packing - Phone number:', order.customer?.phone);
-    console.log('Packing - Shipping address phone:', order.shipping_address);
+    console.log('Packing - Shipping address:', order.shipping_address);
   };
 
   // Helper function to get phone number from order
   const getPhoneNumber = (order: Order) => {
-    // Check shipping address phone first (most reliable)
-    if (order.shipping_address?.phone) {
-      return order.shipping_address.phone;
-    }
-    
-    // Check customer phone as fallback
+    // Only check customer phone since shipping_address doesn't have phone field
     if (order.customer?.phone) {
       return order.customer.phone;
     }
