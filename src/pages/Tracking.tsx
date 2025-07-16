@@ -32,6 +32,13 @@ const Tracking = () => {
     return order.customer?.phone || null;
   };
 
+  // Helper function to get product display name with variation
+  const getProductDisplayName = (item: any) => {
+    const name = item.title || 'Product';
+    const variant = item.sku || '';
+    return variant ? `${name} - ${variant}` : name;
+  };
+
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
     
@@ -413,6 +420,27 @@ const Tracking = () => {
                       <div>
                         <p className="text-sm text-gray-500">Total Amount</p>
                         <p className="font-semibold">₹{currentOrder.total_amount}</p>
+                      </div>
+                    </div>
+
+                    {/* Product Details with Variations */}
+                    <div className="border-t pt-3">
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {currentOrder.order_items?.map((item: any) => {
+                          const displayName = getProductDisplayName(item);
+                          return (
+                            <div key={item.id} className="p-2 rounded text-xs bg-gray-50 border border-gray-200">
+                              <div className="flex justify-between">
+                                <span className="font-medium">{displayName}</span>
+                                <Badge variant="default" className="text-xs">
+                                  Packed
+                                </Badge>
+                              </div>
+                              <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 

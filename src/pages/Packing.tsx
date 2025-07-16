@@ -25,6 +25,13 @@ const Packing = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  // Helper function to get product display name with variation
+  const getProductDisplayName = (item: any) => {
+    const name = item.title || 'Product';
+    const variant = item.sku || '';
+    return variant ? `${name} - ${variant}` : name;
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -198,19 +205,22 @@ const Packing = () => {
                     <div className="border-t pt-3">
                       <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {selectedOrder.order_items?.map((item: any) => (
-                          <div key={item.id} className={`p-2 rounded text-xs ${
-                            item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
-                          }`}>
-                            <div className="flex justify-between">
-                              <span className="font-medium">{item.title}</span>
-                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
-                                {item.packed ? "Packed" : "Pending"}
-                              </Badge>
+                        {selectedOrder.order_items?.map((item: any) => {
+                          const displayName = getProductDisplayName(item);
+                          return (
+                            <div key={item.id} className={`p-2 rounded text-xs ${
+                              item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
+                            }`}>
+                              <div className="flex justify-between">
+                                <span className="font-medium">{displayName}</span>
+                                <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
+                                  {item.packed ? "Packed" : "Pending"}
+                                </Badge>
+                              </div>
+                              <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
                             </div>
-                            <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
