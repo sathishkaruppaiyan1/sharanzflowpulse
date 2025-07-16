@@ -1,81 +1,40 @@
-
-import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, RefreshCw, Phone, User, MapPin, Calendar, DollarSign } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
-import PackingStats from '@/components/packing/PackingStats';
 import PackingScanner from '@/components/packing/PackingScanner';
+import PackingStats from '@/components/packing/PackingStats';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import StageChangeControls from '@/components/common/StageChangeControls';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from '@/hooks/use-toast';
 
 const Packing = () => {
-  const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { data: packingOrders = [], isLoading, refetch } = useOrdersByStage(['packing']);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [stageChangeDialogOpen, setStageChangeDialogOpen] = useState(false);
-  const [selectedOrderForStageChange, setSelectedOrderForStageChange] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleItemPacked = (orderId: string, itemId: string) => {
-    console.log('Item packed:', { orderId, itemId });
-    // Force a refresh of the data
+  const handleRefresh = () => {
+    refetch();
     setRefreshKey(prev => prev + 1);
   };
 
-  // Enhanced helper function to get phone number from order with debugging
+  // Helper function to get phone number from order - simplified approach
   const getPhoneNumber = (order: any) => {
-    console.log('=== Phone Number Debug for Order', order.order_number, '===');
-    console.log('Full order object:', order);
-    console.log('Customer object:', order.customer);
-    console.log('Shipping address object:', order.shipping_address);
-    
-    // Check customer phone
-    const customerPhone = order.customer?.phone;
-    console.log('Customer phone:', customerPhone);
-    
-    // Check shipping address phone  
-    const shippingPhone = order.shipping_address?.phone;
-    console.log('Shipping address phone:', shippingPhone);
-    
-    // Try multiple phone field variations
-    const altCustomerPhone = order.customer_phone;
-    const altShippingPhone = order.shipping_phone;
-    console.log('Alternative customer phone field:', altCustomerPhone);
-    console.log('Alternative shipping phone field:', altShippingPhone);
-    
-    // Return the first available phone number
-    const finalPhone = customerPhone || shippingPhone || altCustomerPhone || altShippingPhone || null;
-    console.log('Final phone number selected:', finalPhone);
-    console.log('=== End Phone Debug ===');
-    
-    return finalPhone;
-  };
-
-  // Debug function to log all order data
-  React.useEffect(() => {
-    if (packingOrders.length > 0) {
-      console.log('=== PACKING ORDERS DEBUG ===');
-      packingOrders.forEach((order, index) => {
-        console.log(`Order ${index + 1}:`, order.order_number);
-        console.log('  Customer:', order.customer);
-        console.log('  Shipping Address:', order.shipping_address);
-        console.log('  Raw order object keys:', Object.keys(order));
-        if (order.customer) {
-          console.log('  Customer keys:', Object.keys(order.customer));
-        }
-        if (order.shipping_address) {
-          console.log('  Shipping address keys:', Object.keys(order.shipping_address));
-        }
-        const phone = getPhoneNumber(order);
-        console.log('  Extracted phone:', phone);
-        console.log('---');
-      });
-      console.log('=== END DEBUG ===');
+    // Check shipping address phone first (most reliable)
+    if (order.shipping_address?.phone) {
+      return order.shipping_address.phone;
     }
-  }, [packingOrders]);
+    
+    // Check customer phone as fallback
+    if (order.customer?.phone) {
+      return order.customer.phone;
+    }
+    
+    return null;
+  };
 
   if (isLoading) {
     return (
@@ -85,7 +44,7 @@ const Packing = () => {
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <Package className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading packing orders...</p>
+              <p className="text-gray-500">Loading orders...</p>
             </div>
           </div>
         </div>
@@ -93,7 +52,7 @@ const Packing = () => {
     );
   }
 
-  if (error) {
+  if (!packingOrders) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Packing Stage" showSearch={false} />
@@ -102,11 +61,11 @@ const Packing = () => {
             <CardHeader>
               <CardTitle className="text-red-600">Error Loading Orders</CardTitle>
               <CardDescription>
-                Unable to load packing orders. Please try refreshing the page.
+                Unable to load orders. Please check your connection.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600">{error.message}</p>
+              <p className="text-sm text-gray-600">An unexpected error occurred while loading orders.</p>
             </CardContent>
           </Card>
         </div>
@@ -119,267 +78,218 @@ const Packing = () => {
       <Header title="Packing Stage" showSearch={false} />
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-white">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">Ready for Packing</h3>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {packingOrders.filter(order => 
-                      order.order_items?.every((item: any) => item.packed)
-                    ).length}
-                  </div>
-                  <p className="text-xs text-gray-500">Packed orders</p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">In Progress</h3>
-                  <div className="text-2xl font-bold text-green-600">
-                    {packingOrders.filter(order => 
-                      order.order_items?.some((item: any) => item.packed) &&
-                      !order.order_items?.every((item: any) => item.packed)
-                    ).length}
-                  </div>
-                  <p className="text-xs text-gray-500">Partially packed</p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">Ready for Packing</h3>
-                  <div className="text-2xl font-bold text-purple-600">
-                    {packingOrders.filter(order => 
-                      !order.order_items?.some((item: any) => item.packed)
-                    ).length}
-                  </div>
-                  <p className="text-xs text-gray-500">Printed orders</p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">Items Today</h3>
-                  <div className="text-2xl font-bold text-orange-600">
-                    {packingOrders.reduce((total, order) => {
-                      return total + (order.order_items?.filter((item: any) => item.packed).length || 0);
-                    }, 0)}
-                  </div>
-                  <p className="text-xs text-gray-500">Items packed</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="max-w-7xl mx-auto">
+          {/* Stats Section */}
+          <PackingStats orders={packingOrders} />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+            {/* Scanner Section */}
+            <div className="lg:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Package className="h-5 w-5" />
+                    <span>Barcode Scanner</span>
+                  </CardTitle>
+                  <CardDescription>Scan barcodes to mark items as packed</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PackingScanner
+                    orders={packingOrders}
+                    onOrderUpdate={handleRefresh}
+                    key={refreshKey}
+                  />
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Main Scanner Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Scanner Card */}
-            <Card className="bg-white">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-2">
-                  <Scan className="h-5 w-5 text-blue-600" />
-                  <CardTitle className="text-lg">Packing Assignment Scanner</CardTitle>
+            {/* Orders and Details Section */}
+            <div className="lg:col-span-2">
+              <Tabs defaultValue="orders" className="w-full">
+                <div className="flex items-center justify-between mb-4">
+                  <TabsList>
+                    <TabsTrigger value="orders">Orders Ready for Packing</TabsTrigger>
+                    <TabsTrigger value="details" disabled={!selectedOrder}>
+                      Order Information
+                    </TabsTrigger>
+                  </TabsList>
+                  <Button
+                    onClick={handleRefresh}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center space-x-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Refresh</span>
+                  </Button>
                 </div>
-                <CardDescription>
-                  Scan order ID first, then scan product SKU barcode
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PackingScanner 
-                  orders={packingOrders} 
-                  onItemPacked={handleItemPacked}
-                  onOrderSelected={setSelectedOrder}
-                />
-              </CardContent>
-            </Card>
 
-            {/* Order Information Card */}
-            <Card className="bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Order Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {selectedOrder ? (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{selectedOrder.order_number}</h3>
-                        <p className="text-sm text-gray-500">
-                          {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
-                        </p>
-                        {(() => {
-                          const phoneNumber = getPhoneNumber(selectedOrder);
-                          return phoneNumber ? (
-                            <p className="text-sm text-green-600 font-medium">📱 {phoneNumber}</p>
-                          ) : (
-                            <p className="text-sm text-red-500">📱 No phone number available</p>
-                          );
-                        })()}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Total Items:</span>
-                          <p className="font-medium">{selectedOrder.order_items?.length || 0}</p>
+                <TabsContent value="orders" className="mt-0">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Orders ({packingOrders.length})</CardTitle>
+                      <CardDescription>
+                        Select an order to view details and start packing
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {packingOrders.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          No orders ready for packing
                         </div>
-                        <div>
-                          <span className="text-gray-500">Packed:</span>
-                          <p className="font-medium text-green-600">
-                            {selectedOrder.order_items?.filter((item: any) => item.packed).length || 0}
-                          </p>
+                      ) : (
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {packingOrders.map((order) => {
+                            const phoneNumber = getPhoneNumber(order);
+                            const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
+                            const totalItems = order.order_items?.length || 0;
+                            const isComplete = packedItems === totalItems && totalItems > 0;
+
+                            return (
+                              <div
+                                key={order.id}
+                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                  selectedOrder?.id === order.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => setSelectedOrder(order)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="font-medium text-gray-900">{order.order_number}</h3>
+                                    <p className="text-sm text-gray-500">
+                                      {order.customer?.first_name} {order.customer?.last_name}
+                                      {phoneNumber ? (
+                                        <span className="ml-2 text-green-600 font-medium">📱 {phoneNumber}</span>
+                                      ) : (
+                                        <span className="ml-2 text-red-500">📱 No phone</span>
+                                      )}
+                                      <span className="mx-2">•</span>
+                                      {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant={isComplete ? "default" : "secondary"}>
+                                      {isComplete ? 'Ready' : 'Packing'}
+                                    </Badge>
+                                    <Button size="sm" variant="outline">
+                                      Select
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div>
-                          <span className="text-gray-500">Remaining:</span>
-                          <p className="font-medium text-orange-600">
-                            {selectedOrder.order_items?.filter((item: any) => !item.packed).length || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Total Amount:</span>
-                          <p className="font-medium">₹{selectedOrder.total_amount || 0}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="border-t pt-3">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {selectedOrder.order_items?.map((item: any) => (
-                          <div key={item.id} className={`p-2 rounded text-xs ${
-                            item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
-                          }`}>
-                            <div className="flex justify-between">
-                              <span className="font-medium">{item.title}</span>
-                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
-                                {item.packed ? "Packed" : "Pending"}
-                              </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="details" className="mt-0">
+                  {selectedOrder ? (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Order Details - {selectedOrder.order_number}</CardTitle>
+                        <CardDescription>Complete order information and packing status</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Order Overview */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Customer Information */}
+                          <div className="space-y-3">
+                            <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                              <User className="h-5 w-5 mr-2" />
+                              Customer Information
+                            </h3>
+                            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                              <p className="text-sm">
+                                <span className="font-medium">Name:</span> {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Email:</span> {selectedOrder.customer?.email || 'Not provided'}
+                              </p>
+                              {(() => {
+                                const phoneNumber = getPhoneNumber(selectedOrder);
+                                return phoneNumber ? (
+                                  <p className="text-sm text-green-600 font-medium">📱 {phoneNumber}</p>
+                                ) : (
+                                  <p className="text-sm text-red-500">📱 No phone number available</p>
+                                );
+                              })()}
                             </div>
-                            <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-64 text-center">
-                    <CheckSquare className="h-12 w-12 text-gray-300 mb-4" />
-                    <p className="text-gray-500 mb-2">No order selected</p>
-                    <p className="text-sm text-gray-400">Scan an order ID to view details</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Orders Ready for Packing */}
-          <Card className="bg-white">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
-              <CardDescription>
-                {packingOrders.length} orders waiting for packing completion
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {packingOrders.map((order) => {
-                  const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
-                  const totalItems = order.order_items?.length || 0;
-                  const isComplete = packedItems === totalItems;
-                  const phoneNumber = getPhoneNumber(order);
-                  
-                  return (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{order.order_number}</h3>
-                            <p className="text-sm text-gray-500">
-                              {order.customer?.first_name} {order.customer?.last_name}
-                              {phoneNumber ? (
-                                <span className="ml-2 text-green-600 font-medium">📱 {phoneNumber}</span>
-                              ) : (
-                                <span className="ml-2 text-red-500">📱 No phone</span>
-                              )}
-                              <span className="mx-2">•</span>
-                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
-                            </p>
+                          {/* Order Information */}
+                          <div className="space-y-3">
+                            <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                              <Package className="h-5 w-5 mr-2" />
+                              Order Information
+                            </h3>
+                            <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                              <p className="text-sm">
+                                <span className="font-medium">Order #:</span> {selectedOrder.order_number}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Total:</span> ₹{selectedOrder.total_amount}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Date:</span> {new Date(selectedOrder.created_at).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Stage:</span> 
+                                <Badge className="ml-2" variant="secondary">{selectedOrder.stage}</Badge>
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        {isComplete ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Ready for Dispatch
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                            In Progress
-                          </Badge>
+
+                        {/* Shipping Address */}
+                        {selectedOrder.shipping_address && (
+                          <div className="space-y-3">
+                            <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                              <MapPin className="h-5 w-5 mr-2" />
+                              Shipping Address
+                            </h3>
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                              <p className="text-sm">{selectedOrder.shipping_address.address_line_1}</p>
+                              {selectedOrder.shipping_address.address_line_2 && (
+                                <p className="text-sm">{selectedOrder.shipping_address.address_line_2}</p>
+                              )}
+                              <p className="text-sm">
+                                {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.postal_code}
+                              </p>
+                              <p className="text-sm">{selectedOrder.shipping_address.country}</p>
+                            </div>
+                          </div>
                         )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrderForStageChange(order.id);
-                            setStageChangeDialogOpen(true);
-                          }}
-                        >
-                          <Settings className="h-3 w-3 mr-1" />
-                          Manage
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          Select
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {packingOrders.length === 0 && (
-                  <div className="text-center py-8">
-                    <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No orders ready for packing</p>
-                    <p className="text-sm text-gray-400 mt-1">Orders from printing stage will appear here</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
+                        {/* Order Items */}
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-medium text-gray-900">Order Items</h3>
+                          <PackingQueue
+                            orders={[selectedOrder]}
+                            selectedOrderId={selectedOrder.id}
+                            onOrderUpdate={handleRefresh}
+                            showOrderHeader={false}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <CardContent className="py-8">
+                        <div className="text-center text-gray-500">
+                          Select an order from the list to view details
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <Dialog open={stageChangeDialogOpen} onOpenChange={setStageChangeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Order Stage</DialogTitle>
-          </DialogHeader>
-          {selectedOrderForStageChange && (
-            <StageChangeControls 
-              order={packingOrders.find(o => o.id === selectedOrderForStageChange)!} 
-              currentStage="packing"
-              onStageChange={() => {
-                setRefreshKey(prev => prev + 1);
-                setStageChangeDialogOpen(false);
-                setSelectedOrderForStageChange(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
