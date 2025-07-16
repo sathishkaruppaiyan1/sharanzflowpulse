@@ -40,6 +40,11 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
     updateOrderStage.mutate({ orderId: order.id, stage: 'tracking' });
   };
 
+  const handleItemPacked = (orderId: string, itemId: string) => {
+    console.log('Item packed:', { orderId, itemId });
+    // The PackingScanner will handle the actual update
+  };
+
   const getPackingProgress = (order: Order): { packed: number; total: number; percentage: number } => {
     if (!order.order_items || order.order_items.length === 0) {
       return { packed: 0, total: 0, percentage: 0 };
@@ -219,7 +224,9 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
       {/* Packing Scanner Dialog */}
       {selectedOrder && (
         <PackingScanner
-          order={selectedOrder}
+          orders={orders}
+          onItemPacked={handleItemPacked}
+          onOrderSelected={(order) => setSelectedOrder(order)}
           open={showScanner}
           onClose={() => {
             setShowScanner(false);
