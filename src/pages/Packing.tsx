@@ -25,6 +25,19 @@ const Packing = () => {
     setRefreshKey(prev => prev + 1);
   };
 
+  // Helper function to get phone number from order
+  const getPhoneNumber = (order: any) => {
+    // First try customer phone
+    if (order.customer?.phone) {
+      return order.customer.phone;
+    }
+    // Then try shipping address phone
+    if (order.shipping_address?.phone) {
+      return order.shipping_address.phone;
+    }
+    return null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -164,11 +177,14 @@ const Packing = () => {
                         <p className="text-sm text-gray-500">
                           {selectedOrder.customer?.first_name} {selectedOrder.customer?.last_name}
                         </p>
-                        {selectedOrder.customer?.phone ? (
-                          <p className="text-sm text-green-600 font-medium">📱 {selectedOrder.customer.phone}</p>
-                        ) : (
-                          <p className="text-sm text-red-500">📱 No phone number</p>
-                        )}
+                        {(() => {
+                          const phoneNumber = getPhoneNumber(selectedOrder);
+                          return phoneNumber ? (
+                            <p className="text-sm text-green-600 font-medium">📱 {phoneNumber}</p>
+                          ) : (
+                            <p className="text-sm text-red-500">📱 No phone number</p>
+                          );
+                        })()}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -239,6 +255,7 @@ const Packing = () => {
                   const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
                   const totalItems = order.order_items?.length || 0;
                   const isComplete = packedItems === totalItems;
+                  const phoneNumber = getPhoneNumber(order);
                   
                   return (
                     <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -248,8 +265,8 @@ const Packing = () => {
                             <h3 className="font-medium text-gray-900">{order.order_number}</h3>
                             <p className="text-sm text-gray-500">
                               {order.customer?.first_name} {order.customer?.last_name}
-                              {order.customer?.phone && (
-                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
+                              {phoneNumber && (
+                                <span className="ml-2 text-green-600">📱 {phoneNumber}</span>
                               )}
                               <span className="mx-2">•</span>
                               {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
@@ -261,7 +278,7 @@ const Packing = () => {
                       <div className="flex items-center space-x-3">
                         {isComplete ? (
                           <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Ready for Packing
+                            Ready for Dispatch
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
@@ -279,7 +296,11 @@ const Packing = () => {
                           <Settings className="h-3 w-3 mr-1" />
                           Manage
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedOrder(order)}
+                        >
                           Select
                         </Button>
                       </div>
