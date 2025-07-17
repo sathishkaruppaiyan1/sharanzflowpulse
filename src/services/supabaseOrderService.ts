@@ -51,6 +51,16 @@ export const supabaseOrderService = {
     }
 
     console.log(`Fetched ${data?.length || 0} orders for stage ${stage}`);
+    
+    // Debug phone numbers for each order
+    data?.forEach(order => {
+      console.log(`Order ${order.order_number} phone debug:`, {
+        customerPhone: order.customer?.phone,
+        hasCustomer: !!order.customer,
+        customerId: order.customer_id
+      });
+    });
+    
     return data as Order[] || [];
   },
 
@@ -150,7 +160,18 @@ export const supabaseOrderService = {
     console.log('Creating order in Supabase from Shopify order:', shopifyOrder.id);
     
     try {
-      // First, create or get customer
+      // Determine the best phone number from Shopify data
+      const phoneNumber = shopifyOrder.shipping_address?.phone || 
+                         shopifyOrder.customer?.phone || 
+                         null;
+      
+      console.log('Phone number priority for order:', shopifyOrder.id, {
+        shippingPhone: shopifyOrder.shipping_address?.phone,
+        customerPhone: shopifyOrder.customer?.phone,
+        finalPhone: phoneNumber
+      });
+
+      // First, create or get customer with proper phone number handling
       let customerId = null;
       if (shopifyOrder.customer) {
         const { data: existingCustomer } = await supabase
@@ -160,6 +181,13 @@ export const supabaseOrderService = {
           .single();
 
         if (existingCustomer) {
+          // Update existing customer with phone number if we have a better one
+          if (phoneNumber) {
+            await supabase
+              .from('customers')
+              .update({ phone: phoneNumber })
+              .eq('id', existingCustomer.id);
+          }
           customerId = existingCustomer.id;
         } else {
           const { data: newCustomer, error: customerError } = await supabase
@@ -169,7 +197,7 @@ export const supabaseOrderService = {
               email: shopifyOrder.customer.email,
               first_name: shopifyOrder.customer.first_name,
               last_name: shopifyOrder.customer.last_name,
-              phone: shopifyOrder.customer.phone
+              phone: phoneNumber // Use the prioritized phone number
             })
             .select('id')
             .single();
@@ -238,6 +266,7 @@ export const supabaseOrderService = {
       }
 
       console.log('Successfully created order in Supabase:', newOrder.id);
+      console.log('Customer phone number stored:', phoneNumber);
       return newOrder.id;
       
     } catch (error) {

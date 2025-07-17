@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,11 +70,16 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
 
   const packingStageOrders = orders.filter(order => order.stage === 'packing');
 
-  // Debug function to log customer data
+  // Enhanced debug function to log customer data
   const debugCustomerData = (order: Order) => {
-    console.log('Packing - Customer data for order', order.order_number, ':', order.customer);
-    console.log('Packing - Phone number from getPhoneNumber:', getPhoneNumber(order));
-    console.log('Packing - Shipping address:', order.shipping_address);
+    console.log('=== Packing Queue Phone Debug ===');
+    console.log('Order:', order.order_number);
+    console.log('Customer object:', order.customer);
+    console.log('Customer ID:', order.customer_id);
+    console.log('Customer phone from object:', order.customer?.phone);
+    console.log('getPhoneNumber result:', getPhoneNumber(order));
+    console.log('Has customer:', !!order.customer);
+    console.log('=== End Debug ===');
   };
 
   return (
@@ -86,7 +90,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
         const isReady = isOrderReadyForShipping(order);
         const phoneNumber = getPhoneNumber(order);
         
-        // Debug log for each order
+        // Enhanced debug log for each order
         debugCustomerData(order);
         
         return (
@@ -100,12 +104,18 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                     {phoneNumber ? (
                       <div className="flex items-center space-x-1 mt-1">
                         <Phone className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">{phoneNumber}</span>
+                        <span className="text-green-600 font-medium">{phoneNumber}</span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1 mt-1">
                         <AlertTriangle className="h-3 w-3 text-red-500" />
-                        <span className="text-red-500">No phone number</span>
+                        <span className="text-red-500 font-medium">No phone number</span>
+                      </div>
+                    )}
+                    {/* Additional debug info for development */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        Debug: Customer ID: {order.customer_id}, Has Customer: {order.customer ? 'Yes' : 'No'}
                       </div>
                     )}
                   </div>
