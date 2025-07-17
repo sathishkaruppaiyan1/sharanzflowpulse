@@ -1,88 +1,57 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseOrderService } from '@/services/supabaseOrderService';
-import type { Order, OrderStage, CarrierType } from '@/types/database';
+import { supabase } from '@/integrations/supabase/client';
+import { Order } from '@/types/database';
 import { toast } from 'sonner';
 
-export const useOrders = () => {
+export const useOrdersByStage = (stages: string | string[]) => {
+  const stageArray = Array.isArray(stages) ? stages : [stages];
+  
   return useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', 'by-stage', stageArray],
     queryFn: async () => {
-      console.log('=== Fetching all orders ===');
-      try {
-        const orders = await supabaseOrderService.fetchOrders();
-        console.log('Successfully fetched orders:', orders.length);
-        
-        orders.forEach(order => {
-          console.log(`Order ${order.order_number}: stage=${order.stage}, items=${order.order_items?.length || 0}`);
-          if (order.order_items) {
-            order.order_items.forEach(item => {
-              console.log(`  - ${item.title}: qty=${item.quantity}, packed=${item.packed}`);
-            });
-          }
-        });
-        
-        return orders;
-      } catch (error) {
-        console.error('Error in useOrders:', error);
-        throw error;
-      }
-    },
-    refetchInterval: 30000,
-  });
-};
+      console.log('Fetching orders for stages:', stageArray);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          customer:customers(*),
+          shipping_address:addresses!orders_shipping_address_id_fkey(*),
+          order_items(*)
+        `)
+        .in('stage', stageArray)
+        .order('created_at', { ascending: false });
 
-export const useOrdersByStage = (stage: OrderStage | OrderStage[]) => {
-  return useQuery({
-    queryKey: ['orders', 'stage', stage],
-    queryFn: async () => {
-      const stages = Array.isArray(stage) ? stage : [stage];
-      console.log(`=== Fetching orders for stages: ${stages.join(', ')} ===`);
-      try {
-        let allOrders: Order[] = [];
-        
-        for (const s of stages) {
-          const orders = await supabaseOrderService.fetchOrdersByStage(s);
-          allOrders = [...allOrders, ...orders];
-          console.log(`Successfully fetched ${orders.length} orders for stage ${s}`);
-        }
-        
-        // Remove duplicates if any
-        const uniqueOrders = allOrders.filter((order, index, self) => 
-          index === self.findIndex(o => o.id === order.id)
-        );
-        
-        console.log(`Total unique orders fetched: ${uniqueOrders.length}`);
-        
-        uniqueOrders.forEach(order => {
-          console.log(`\n--- Order ${order.order_number} Debug ---`);
-          console.log('Stage:', order.stage);
-          console.log('Order items count:', order.order_items?.length || 0);
-          console.log('Customer phone:', order.customer?.phone);
-          
-          if (order.order_items && order.order_items.length > 0) {
-            let totalQty = 0;
-            let packedQty = 0;
-            order.order_items.forEach(item => {
-              const qty = Number(item.quantity) || 0;
-              totalQty += qty;
-              if (item.packed) {
-                packedQty += qty;
-              }
-              console.log(`  Item: ${item.title}, qty: ${qty}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
-            });
-            console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
-          } else {
-            console.log('  WARNING: No order items found!');
-          }
-        });
-        
-        return uniqueOrders;
-      } catch (error) {
-        console.error(`Error fetching orders for stages ${stages.join(', ')}:`, error);
+      if (error) {
+        console.error('Error fetching orders by stage:', error);
         throw error;
       }
+
+      console.log(`Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
+      console.log('Successfully fetched', data?.length || 0, 'orders for stage', stageArray.join(', '));
+
+      // Debug log for each order
+      data?.forEach(order => {
+        console.log(`\n--- Order ${order.order_number} Debug ---`);
+        console.log('Stage:', order.stage);
+        console.log('Order items count:', order.order_items?.length || 0);
+        console.log('Customer phone:', order.customer?.phone);
+        console.log('Shipping address phone:', order.shipping_address?.phone);
+        
+        order.order_items?.forEach(item => {
+          console.log(`  Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
+        });
+        
+        const totalQty = order.order_items?.length || 0;
+        const packedQty = order.order_items?.filter(item => item.packed).length || 0;
+        console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
+      });
+
+      console.log('Total unique orders fetched:', data?.length || 0);
+      
+      return (data as Order[]) || [];
     },
-    refetchInterval: 30000,
   });
 };
 
@@ -90,58 +59,35 @@ export const useUpdateOrderStage = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ orderId, stage }: { orderId: string; stage: OrderStage }) => {
-      console.log(`=== Updating order stage ===`);
-      console.log('Order ID:', orderId);
-      console.log('New stage:', stage);
+    mutationFn: async ({ orderId, stage }: { orderId: string; stage: string }) => {
+      console.log(`Updating order ${orderId} to stage ${stage}`);
       
-      try {
-        const result = await supabaseOrderService.updateOrderStage(orderId, stage);
-        console.log('Order stage update successful:', result);
-        return result;
-      } catch (error) {
-        console.error('Error in updateOrderStage mutation:', error);
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ 
+          stage: stage as any,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating order stage:', error);
         throw error;
       }
+
+      console.log(`Successfully updated order ${orderId} to stage ${stage}`);
+      return data;
     },
     onSuccess: (data) => {
-      console.log('Order stage mutation success:', data.order_number, '->', data.stage);
+      // Invalidate all order queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'stage'] });
       toast.success(`Order ${data.order_number} moved to ${data.stage} stage`);
     },
     onError: (error) => {
-      console.error('Order stage mutation error:', error);
+      console.error('Error updating order stage:', error);
       toast.error('Failed to update order stage');
-    },
-  });
-};
-
-export const useUpdateOrderItemPacked = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ itemId, packed }: { itemId: string; packed: boolean }) => {
-      console.log(`=== Updating order item packed status ===`);
-      console.log('Item ID:', itemId);
-      console.log('Packed:', packed);
-      
-      try {
-        await supabaseOrderService.updateOrderItemPacked(itemId, packed);
-        console.log('Order item packed status update successful');
-      } catch (error) {
-        console.error('Error in updateOrderItemPacked mutation:', error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      console.log('Order item packed status mutation success');
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'stage'] });
-    },
-    onError: (error) => {
-      console.error('Order item packed status mutation error:', error);
-      toast.error('Failed to update item packed status');
     },
   });
 };
@@ -150,42 +96,49 @@ export const useUpdateTracking = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ orderId, trackingNumber, carrier }: { 
+    mutationFn: async ({ 
+      orderId, 
+      trackingNumber, 
+      carrier 
+    }: { 
       orderId: string; 
       trackingNumber: string; 
-      carrier: CarrierType;
-    }) => supabaseOrderService.updateTracking(orderId, trackingNumber, carrier),
+      carrier: string; 
+    }) => {
+      console.log(`Adding tracking to order ${orderId}: ${trackingNumber} via ${carrier}`);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ 
+          tracking_number: trackingNumber,
+          carrier: carrier as any,
+          stage: 'completed',
+          shipped_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select(`
+          *,
+          customer:customers(*),
+          shipping_address:addresses!orders_shipping_address_id_fkey(*)
+        `)
+        .single();
+
+      if (error) {
+        console.error('Error updating tracking:', error);
+        throw error;
+      }
+
+      console.log(`Successfully added tracking to order ${orderId}`);
+      return data;
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`🚚 Order ${data.order_number} has been shipped! Order moved to shipped stage and customer notified.`);
+      toast.success(`Tracking added for order ${data.order_number}`);
     },
     onError: (error) => {
       console.error('Error updating tracking:', error);
-      toast.error('Failed to update tracking information');
-    },
-  });
-};
-
-export const useSearchOrders = (query: string) => {
-  return useQuery({
-    queryKey: ['orders', 'search', query],
-    queryFn: () => supabaseOrderService.searchOrders(query),
-    enabled: query.length > 0,
-  });
-};
-
-export const useCreateSampleOrders = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: supabaseOrderService.createSampleOrders,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success('Sample orders created successfully!');
-    },
-    onError: (error) => {
-      console.error('Error creating sample orders:', error);
-      toast.error('Failed to create sample orders');
+      toast.error('Failed to add tracking information');
     },
   });
 };

@@ -14,6 +14,7 @@ import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/watiService';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
+import { getPhoneNumber } from '@/lib/utils';
 
 const Tracking = () => {
   const { data: trackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
@@ -26,11 +27,6 @@ const Tracking = () => {
   const [isOrderLocked, setIsOrderLocked] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
-
-  // Helper function to get phone number from customer
-  const getPhoneNumber = (order: Order) => {
-    return order.customer?.phone || null;
-  };
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;

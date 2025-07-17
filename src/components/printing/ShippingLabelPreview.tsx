@@ -6,6 +6,7 @@ import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
+import { generateTrackingBarcode, generateBarcodeHTML, getPhoneNumber } from '@/lib/utils';
 
 interface ShippingLabelPreviewProps {
   open: boolean;
@@ -24,65 +25,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   if (!order && !orders?.length) return null;
 
-  const generateBarcode = (text: string) => {
-    // Clean the text to make it more scannable
-    const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const barPattern = [];
-    
-    // Start pattern
-    barPattern.push(3, 1, 1, 1, 3, 1);
-    
-    // Generate more consistent bars based on text
-    for (let i = 0; i < cleanText.length; i++) {
-      const char = cleanText.charCodeAt(i);
-      const pattern = char % 10;
-      switch (pattern) {
-        case 0: barPattern.push(3, 1, 1, 3, 1, 1); break;
-        case 1: barPattern.push(1, 3, 1, 3, 1, 1); break;
-        case 2: barPattern.push(1, 1, 3, 3, 1, 1); break;
-        case 3: barPattern.push(3, 3, 1, 1, 1, 1); break;
-        case 4: barPattern.push(1, 1, 1, 3, 3, 1); break;
-        case 5: barPattern.push(3, 1, 1, 1, 1, 3); break;
-        case 6: barPattern.push(1, 3, 1, 1, 1, 3); break;
-        case 7: barPattern.push(1, 1, 3, 1, 1, 3); break;
-        case 8: barPattern.push(1, 1, 1, 1, 3, 3); break;
-        case 9: barPattern.push(3, 1, 1, 3, 1, 1); break;
-      }
-    }
-    
-    // End pattern
-    barPattern.push(3, 1, 1, 1, 3, 1, 1);
-    
-    return barPattern;
-  };
-
   const renderBarcode = (text: string) => {
-    const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const bars = generateBarcode(cleanText);
+    const trackingNumber = generateTrackingBarcode(text);
+    const barcodeHTML = generateBarcodeHTML(trackingNumber);
+    
     return (
-      <div className="flex items-end justify-center space-x-0" style={{ height: '60px' }}>
-        {bars.map((width, index) => (
-          <div
-            key={index}
-            className={index % 2 === 0 ? "bg-black" : "bg-white"}
-            style={{
-              width: `${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px`,
-              height: '60px',
-              minWidth: `${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px`
-            }}
-          />
-        ))}
-      </div>
+      <div 
+        className="flex items-end justify-center" 
+        style={{ height: '60px' }}
+        dangerouslySetInnerHTML={{ __html: barcodeHTML }}
+      />
     );
-  };
-
-  // Generate HTML barcode that matches the React component exactly
-  const generateBarcodeHTML = (text: string) => {
-    const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const bars = generateBarcode(cleanText);
-    return bars.map((width, index) => 
-      `<div style="display: inline-block; background-color: ${index % 2 === 0 ? '#000' : '#fff'}; width: ${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px; height: 60px; min-width: ${width === 1 ? 1.5 : width === 3 ? 4.5 : 3}px; vertical-align: bottom;"></div>`
-    ).join('');
   };
 
   const createLabelHTML = (orderData: any, isLast: boolean = false) => {
@@ -90,7 +43,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       console.log('Creating label HTML for order:', orderData);
       
       const orderNumber = orderData.order_number || orderData.name || `#${orderData.id}`;
-      const trackingNumber = orderNumber.toString().replace('#', '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const trackingNumber = generateTrackingBarcode(orderNumber);
       
       const customerName = orderData.customer_name || 
         `${orderData.customer?.first_name || ''} ${orderData.customer?.last_name || ''}`.trim() || 
@@ -98,19 +51,24 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       const shippingAddress = orderData.shipping_address || {
         address1: 'Address not available',
+        address_line_1: 'Address not available',
         city: 'City',
         province: 'State',
+        state: 'State',
         zip: '000000',
-        country: 'India',
-        phone: 'N/A'
+        postal_code: '000000',
+        country: 'India'
       };
+
+      // Get phone number using our helper function
+      const phoneNumber = getPhoneNumber(orderData) || 'N/A';
 
       const totalItems = orderData.line_items ? 
         orderData.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
 
       const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
 
-      // Generate exact same barcode as in preview
+      // Generate improved barcode HTML
       const barcodeHTML = generateBarcodeHTML(trackingNumber);
 
       // Only add page break if it's not the last item in bulk print, or if it's a single print
@@ -133,11 +91,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             <div style="font-weight: bold; margin-bottom: 2px; font-size: 9px;">📍 TO:</div>
             <div style="border: 1px solid #000; padding: 3px; background: #fffbeb; width: 100%; box-sizing: border-box;">
               <div style="font-weight: bold; font-size: 10px; word-wrap: break-word; overflow-wrap: break-word;">${customerName.toUpperCase()}</div>
-              <div style="margin-top: 1px; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address1}</div>
-              ${shippingAddress.address2 ? `<div style="font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address2}</div>` : ''}
-              <div style="font-size: 8px; word-wrap: break-word;">${shippingAddress.city}, ${shippingAddress.province} ${shippingAddress.zip}</div>
+              <div style="margin-top: 1px; font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address1 || shippingAddress.address_line_1}</div>
+              ${(shippingAddress.address2 || shippingAddress.address_line_2) ? `<div style="font-size: 8px; word-wrap: break-word; overflow-wrap: break-word;">${shippingAddress.address2 || shippingAddress.address_line_2}</div>` : ''}
+              <div style="font-size: 8px; word-wrap: break-word;">${shippingAddress.city}, ${shippingAddress.province || shippingAddress.state} ${shippingAddress.zip || shippingAddress.postal_code}</div>
               <div style="font-size: 8px;">${shippingAddress.country}</div>
-              <div style="font-size: 8px;">Ph: ${shippingAddress.phone || 'N/A'}</div>
+              <div style="font-size: 8px;">Ph: ${phoneNumber}</div>
             </div>
           </div>
 
@@ -386,7 +344,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   const displayOrder = isBulkPrint ? ordersToProcess[0] : order;
   const orderNumber = displayOrder.order_number || displayOrder.name || `#${displayOrder.id}`;
-  const trackingNumber = orderNumber.toString().replace('#', '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const trackingNumber = generateTrackingBarcode(orderNumber);
   
   const customerName = displayOrder.customer_name || 
     `${displayOrder.customer?.first_name || ''} ${displayOrder.customer?.last_name || ''}`.trim() || 
@@ -394,12 +352,16 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   const shippingAddress = displayOrder.shipping_address || {
     address1: 'Address not available',
+    address_line_1: 'Address not available',
     city: 'City',
     province: 'State',
+    state: 'State',
     zip: '000000',
-    country: 'India',
-    phone: 'N/A'
+    postal_code: '000000',
+    country: 'India'
   };
+
+  const phoneNumber = getPhoneNumber(displayOrder) || 'N/A';
 
   const totalItems = displayOrder.line_items ? 
     displayOrder.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
@@ -435,7 +397,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed and orders will be automatically moved to packing stage.
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Preview shows the first label. All labels will use the same template with balanced layout.
+                Preview shows the first label. All labels will use the same template with improved barcode generation.
               </p>
             </div>
           )}
@@ -459,11 +421,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <div className="font-bold text-xs break-words overflow-wrap-anywhere">
                   {customerName.toUpperCase()}
                 </div>
-                <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address1}</div>
-                {shippingAddress.address2 && <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address2}</div>}
-                <div className="text-xs break-words">{shippingAddress.city}, {shippingAddress.province} {shippingAddress.zip}</div>
+                <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address1 || shippingAddress.address_line_1}</div>
+                {(shippingAddress.address2 || shippingAddress.address_line_2) && <div className="text-xs break-words overflow-wrap-anywhere">{shippingAddress.address2 || shippingAddress.address_line_2}</div>}
+                <div className="text-xs break-words">{shippingAddress.city}, {shippingAddress.province || shippingAddress.state} {shippingAddress.zip || shippingAddress.postal_code}</div>
                 <div className="text-xs">{shippingAddress.country}</div>
-                <div className="text-xs">Ph: {shippingAddress.phone || 'N/A'}</div>
+                <div className="text-xs">Ph: {phoneNumber}</div>
               </div>
             </div>
 

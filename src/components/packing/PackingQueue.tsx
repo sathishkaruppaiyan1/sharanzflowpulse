@@ -12,13 +12,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
+import { getPhoneNumber } from '@/lib/utils';
 
 interface PackingQueueProps {
   orders: Order[];
   onItemPacked?: (orderId: string, itemId: string) => void;
+  selectedOrderId?: string;
+  onOrderUpdate?: () => void;
+  showOrderHeader?: boolean;
 }
 
-const PackingQueue = ({ orders }: PackingQueueProps) => {
+const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader = true }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
   const queryClient = useQueryClient();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
@@ -38,6 +42,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
+      onOrderUpdate?.();
     },
     onError: (error) => {
       console.error('Error updating item status:', error);
@@ -69,8 +74,8 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
   // Debug function to log customer data
   const debugCustomerData = (order: Order) => {
     console.log('Packing - Customer data for order', order.order_number, ':', order.customer);
-    console.log('Packing - Phone number:', order.customer?.phone);
-    console.log('Packing - Shipping address phone:', order.shipping_address);
+    console.log('Packing - Phone number from getPhoneNumber:', getPhoneNumber(order));
+    console.log('Packing - Shipping address:', order.shipping_address);
   };
 
   return (
@@ -79,6 +84,7 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
         const packedItems = order.order_items.filter(item => item.packed).length;
         const totalItems = order.order_items.length;
         const isReady = isOrderReadyForShipping(order);
+        const phoneNumber = getPhoneNumber(order);
         
         // Debug log for each order
         debugCustomerData(order);
@@ -91,10 +97,10 @@ const PackingQueue = ({ orders }: PackingQueueProps) => {
                   <CardTitle className="text-lg">{order.order_number}</CardTitle>
                   <div className="text-sm text-gray-600">
                     <p>{order.customer?.first_name} {order.customer?.last_name}</p>
-                    {order.customer?.phone ? (
+                    {phoneNumber ? (
                       <div className="flex items-center space-x-1 mt-1">
                         <Phone className="h-3 w-3 text-green-600" />
-                        <span className="text-green-600">{order.customer.phone}</span>
+                        <span className="text-green-600">{phoneNumber}</span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1 mt-1">
