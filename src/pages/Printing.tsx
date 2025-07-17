@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -281,7 +282,7 @@ const Printing = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
             <p className="text-gray-600 text-sm">
-              Generate shipping labels with smart filtering • Auto-refresh every 30s
+              Generate shipping labels with smart filtering • Manual refresh
             </p>
           </div>
           <div className="flex items-center space-x-3">

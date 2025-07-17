@@ -118,13 +118,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- Products Section -->
+          <!-- Products Section with Variations -->
           <div style="flex: 1; padding: 8px; display: flex; flex-direction: column;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">PRODUCTS:</div>
             <div style="border: 1px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 10px;">
-              ${orderData.line_items ? orderData.line_items.map((item: any) => 
-                `<div style="margin-bottom: 2px;">• ${item.title || item.name} (Qty: ${item.quantity || 1})</div>`
-              ).join('') : '<div>• Order Items</div>'}
+              ${orderData.line_items ? orderData.line_items.map((item: any) => {
+                const variation = item.variant_title || item.sku || '';
+                return `<div style="margin-bottom: 3px;">
+                  • ${item.title || item.name} (Qty: ${item.quantity || 1})
+                  ${variation ? `<br>&nbsp;&nbsp;${variation}` : ''}
+                </div>`;
+              }).join('') : '<div>• Order Items</div>'}
             </div>
           </div>
 
@@ -451,12 +455,19 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
-            {/* Products Section */}
+            {/* Products Section with Variations */}
             <div className="flex-1 p-2 flex flex-col">
               <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
               <div className="border border-black p-1 flex-1 overflow-hidden text-xs">
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
-                  <div key={index} className="mb-0.5">• {item.title || item.name} (Qty: {item.quantity || 1})</div>
+                  <div key={index} className="mb-1">
+                    <div>• {item.title || item.name} (Qty: {item.quantity || 1})</div>
+                    {(item.variant_title || item.sku) && (
+                      <div className="ml-2 text-gray-600 text-[10px]">
+                        {item.variant_title || item.sku}
+                      </div>
+                    )}
+                  </div>
                 )) : (
                   <div>• Order Items</div>
                 )}
