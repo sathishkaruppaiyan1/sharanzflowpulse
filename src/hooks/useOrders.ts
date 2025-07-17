@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Order } from '@/types/database';
+import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
 
 export const useOrdersByStage = (stages: string | string[]) => {
@@ -20,7 +20,7 @@ export const useOrdersByStage = (stages: string | string[]) => {
           shipping_address:addresses!orders_shipping_address_id_fkey(*),
           order_items(*)
         `)
-        .in('stage', stageArray)
+        .in('stage', stageArray as OrderStage[])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -37,7 +37,7 @@ export const useOrdersByStage = (stages: string | string[]) => {
         console.log('Stage:', order.stage);
         console.log('Order items count:', order.order_items?.length || 0);
         console.log('Customer phone:', order.customer?.phone);
-        console.log('Shipping address phone:', order.shipping_address?.phone);
+        console.log('Shipping address exists:', !!order.shipping_address);
         
         order.order_items?.forEach(item => {
           console.log(`  Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
@@ -55,6 +55,34 @@ export const useOrdersByStage = (stages: string | string[]) => {
   });
 };
 
+// Add the missing useOrders export that other components depend on
+export const useOrders = () => {
+  return useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      console.log('Fetching all orders');
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          customer:customers(*),
+          shipping_address:addresses!orders_shipping_address_id_fkey(*),
+          order_items(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching all orders:', error);
+        throw error;
+      }
+
+      console.log(`Fetched ${data?.length || 0} total orders`);
+      return (data as Order[]) || [];
+    },
+  });
+};
+
 export const useUpdateOrderStage = () => {
   const queryClient = useQueryClient();
   
@@ -65,7 +93,7 @@ export const useUpdateOrderStage = () => {
       const { data, error } = await supabase
         .from('orders')
         .update({ 
-          stage: stage as any,
+          stage: stage as OrderStage,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
@@ -112,7 +140,7 @@ export const useUpdateTracking = () => {
         .update({ 
           tracking_number: trackingNumber,
           carrier: carrier as any,
-          stage: 'completed',
+          stage: 'shipped' as OrderStage,
           shipped_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })

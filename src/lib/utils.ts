@@ -8,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 
 // Helper function to get phone number from order
 export const getPhoneNumber = (order: any) => {
-  // First try shipping address phone, then customer phone
-  return order.shipping_address?.phone || order.customer?.phone || null;
+  // Only try customer phone since shipping address doesn't have phone in our schema
+  return order.customer?.phone || null;
 };
 
 // Enhanced barcode generation for better scanning
