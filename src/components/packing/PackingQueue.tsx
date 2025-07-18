@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
+import { getVariationDisplay } from '@/utils/productVariationUtils';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -41,7 +42,8 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`${data.title} marked as ${data.packed ? 'packed' : 'unpacked'}`);
+      const variationInfo = getVariationDisplay(data);
+      toast.success(`${variationInfo.fullDisplay} marked as ${data.packed ? 'packed' : 'unpacked'}`);
       onOrderUpdate?.();
     },
     onError: (error) => {
@@ -67,53 +69,6 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
 
   const isOrderReadyForShipping = (order: Order) => {
     return order.order_items.every(item => item.packed);
-  };
-
-  // Enhanced function to extract product variation from multiple sources
-  const formatProductWithVariation = (item: any) => {
-    console.log('=== Formatting Product Variation ===');
-    console.log('Item data:', item);
-    console.log('Title:', item.title);
-    console.log('SKU:', item.sku);
-    console.log('Shopify Variant ID:', item.shopify_variant_id);
-    
-    const baseTitle = item.title || 'Product';
-    
-    // Method 1: Try to extract from SKU
-    if (item.sku && typeof item.sku === 'string' && item.sku.includes('/')) {
-      const parts = item.sku.split('/');
-      if (parts.length > 1) {
-        const variation = parts.slice(1).join('/');
-        console.log('Variation from SKU:', variation);
-        return `${baseTitle} - ${variation}`;
-      }
-    }
-    
-    // Method 2: Try to extract from title if it contains variations
-    if (item.title && typeof item.title === 'string') {
-      // Look for patterns like "Product Name - Color/Size" or "Product (Color, Size)"
-      const titleVariationMatch = item.title.match(/^(.+?)\s*[-–—]\s*(.+)$/);
-      if (titleVariationMatch && titleVariationMatch[2]) {
-        console.log('Variation from title:', titleVariationMatch[2]);
-        return `${titleVariationMatch[1].trim()} - ${titleVariationMatch[2].trim()}`;
-      }
-      
-      // Look for patterns in parentheses
-      const parenthesisMatch = item.title.match(/^(.+?)\s*\((.+)\)$/);
-      if (parenthesisMatch && parenthesisMatch[2]) {
-        console.log('Variation from parentheses:', parenthesisMatch[2]);
-        return `${parenthesisMatch[1].trim()} - ${parenthesisMatch[2].trim()}`;
-      }
-    }
-    
-    // Method 3: If we have shopify_variant_id but no variation data, show ID
-    if (item.shopify_variant_id && item.shopify_variant_id !== item.product?.shopify_product_id) {
-      console.log('Using variant ID as fallback');
-      return `${baseTitle} - Variant #${item.shopify_variant_id}`;
-    }
-    
-    console.log('No variation found, returning base title');
-    return baseTitle;
   };
 
   const packingStageOrders = orders.filter(order => order.stage === 'packing');
@@ -232,11 +187,11 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-gray-700 flex items-center">
                   <Shirt className="h-4 w-4 mr-2 text-blue-600" />
-                  Items to Pack (with Variations)
+                  Items to Pack with Variations
                 </h4>
                 <div className="space-y-2">
                   {order.order_items.map((item) => {
-                    const formattedProduct = formatProductWithVariation(item);
+                    const variationInfo = getVariationDisplay(item);
                     return (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                         <div className="flex items-center space-x-3">
@@ -248,11 +203,26 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                             disabled={updateItemPacked.isPending}
                           />
                           <div className="flex-1">
-                            <p className="font-medium text-sm text-blue-900">{formattedProduct}</p>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium text-sm text-blue-900">
+                                {variationInfo.productName}
+                              </p>
+                              {variationInfo.hasVariation && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-xs text-gray-400">•</span>
+                                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                    {variationInfo.variation}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
                             <div className="text-xs text-gray-500 mt-1 space-y-1">
                               <p>SKU: {item.sku || 'No SKU'}</p>
                               {item.shopify_variant_id && (
                                 <p>Variant ID: {item.shopify_variant_id}</p>
+                              )}
+                              {!variationInfo.hasVariation && item.shopify_variant_id && (
+                                <p className="text-amber-600 font-medium">⚠️ Variation data needed</p>
                               )}
                             </div>
                           </div>

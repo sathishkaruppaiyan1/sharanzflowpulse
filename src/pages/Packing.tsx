@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StageChangeControls from '@/components/common/StageChangeControls';
+import { getVariationDisplay } from '@/utils/productVariationUtils';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
@@ -23,53 +24,6 @@ const Packing = () => {
     console.log('Item packed:', { orderId, itemId });
     // Force a refresh of the data
     setRefreshKey(prev => prev + 1);
-  };
-
-  // Enhanced function to extract product variation from multiple sources
-  const formatProductWithVariation = (item: any) => {
-    console.log('=== Packing Page - Formatting Product Variation ===');
-    console.log('Item data:', item);
-    console.log('Title:', item.title);
-    console.log('SKU:', item.sku);
-    console.log('Shopify Variant ID:', item.shopify_variant_id);
-    
-    const baseTitle = item.title || 'Product';
-    
-    // Method 1: Try to extract from SKU
-    if (item.sku && typeof item.sku === 'string' && item.sku.includes('/')) {
-      const parts = item.sku.split('/');
-      if (parts.length > 1) {
-        const variation = parts.slice(1).join('/');
-        console.log('Variation from SKU:', variation);
-        return `${baseTitle} - ${variation}`;
-      }
-    }
-    
-    // Method 2: Try to extract from title if it contains variations
-    if (item.title && typeof item.title === 'string') {
-      // Look for patterns like "Product Name - Color/Size" or "Product (Color, Size)"
-      const titleVariationMatch = item.title.match(/^(.+?)\s*[-–—]\s*(.+)$/);
-      if (titleVariationMatch && titleVariationMatch[2]) {
-        console.log('Variation from title:', titleVariationMatch[2]);
-        return `${titleVariationMatch[1].trim()} - ${titleVariationMatch[2].trim()}`;
-      }
-      
-      // Look for patterns in parentheses
-      const parenthesisMatch = item.title.match(/^(.+?)\s*\((.+)\)$/);
-      if (parenthesisMatch && parenthesisMatch[2]) {
-        console.log('Variation from parentheses:', parenthesisMatch[2]);
-        return `${parenthesisMatch[1].trim()} - ${parenthesisMatch[2].trim()}`;
-      }
-    }
-    
-    // Method 3: If we have shopify_variant_id but no variation data, show ID
-    if (item.shopify_variant_id && item.shopify_variant_id !== item.product?.shopify_product_id) {
-      console.log('Using variant ID as fallback');
-      return `${baseTitle} - Variant #${item.shopify_variant_id}`;
-    }
-    
-    console.log('No variation found in packing page, returning base title');
-    return baseTitle;
   };
 
   if (isLoading) {
@@ -202,7 +156,7 @@ const Packing = () => {
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg flex items-center">
                   <Shirt className="h-5 w-5 mr-2 text-blue-600" />
-                  Order Information with Variations
+                  Order Details with Product Variations
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -248,23 +202,35 @@ const Packing = () => {
                     <div className="border-t pt-3">
                       <h4 className="font-medium text-sm text-gray-700 mb-2 flex items-center">
                         <Shirt className="h-4 w-4 mr-2 text-blue-600" />
-                        Items with Detailed Variations:
+                        Product Variations:
                       </h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedOrder.order_items?.map((item: any) => {
-                          const formattedProduct = formatProductWithVariation(item);
+                          const variationInfo = getVariationDisplay(item);
                           return (
                             <div key={item.id} className={`p-3 rounded border text-xs ${
                               item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
                             }`}>
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <span className="font-medium text-sm text-blue-900">{formattedProduct}</span>
-                                  <div className="text-gray-500 mt-1 space-y-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <span className="font-medium text-sm text-blue-900">
+                                      {variationInfo.productName}
+                                    </span>
+                                    {variationInfo.hasVariation && (
+                                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                        {variationInfo.variation}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-gray-500 space-y-1">
                                     <p>Qty: {item.quantity}</p>
                                     <p>SKU: {item.sku || 'No SKU'}</p>
                                     {item.shopify_variant_id && (
                                       <p>Variant ID: {item.shopify_variant_id}</p>
+                                    )}
+                                    {!variationInfo.hasVariation && item.shopify_variant_id && (
+                                      <p className="text-amber-600 font-medium">⚠️ Variation data needed</p>
                                     )}
                                   </div>
                                 </div>
@@ -294,7 +260,7 @@ const Packing = () => {
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center">
                 <Shirt className="h-5 w-5 mr-2 text-blue-600" />
-                Orders Ready for Packing (with Variations)
+                Orders Ready for Packing
               </CardTitle>
               <CardDescription>
                 {packingOrders.length} orders waiting for packing completion
@@ -323,17 +289,31 @@ const Packing = () => {
                             </p>
                             
                             {/* Show first few items with variations */}
-                            <div className="mt-1 text-xs text-blue-700">
-                              <span className="font-medium">Items: </span>
-                              {order.order_items?.slice(0, 2).map((item: any, index: number) => (
-                                <span key={item.id}>
-                                  {formatProductWithVariation(item)}
-                                  {index < Math.min(order.order_items?.length || 0, 2) - 1 && ', '}
-                                </span>
-                              ))}
-                              {(order.order_items?.length || 0) > 2 && (
-                                <span> + {(order.order_items?.length || 0) - 2} more</span>
-                              )}
+                            <div className="mt-1 text-xs">
+                              <span className="font-medium text-gray-600">Items: </span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {order.order_items?.slice(0, 3).map((item: any, index: number) => {
+                                  const variationInfo = getVariationDisplay(item);
+                                  return (
+                                    <div key={item.id} className="flex items-center space-x-1">
+                                      <span className="text-blue-700 font-medium">
+                                        {variationInfo.productName}
+                                      </span>
+                                      {variationInfo.hasVariation && (
+                                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                          {variationInfo.variation}
+                                        </Badge>
+                                      )}
+                                      {index < Math.min(order.order_items?.length || 0, 3) - 1 && (
+                                        <span className="text-gray-400">,</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {(order.order_items?.length || 0) > 3 && (
+                                  <span className="text-gray-500"> + {(order.order_items?.length || 0) - 3} more</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
