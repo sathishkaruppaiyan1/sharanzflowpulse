@@ -25,7 +25,7 @@ export const extractProductVariation = (item: any): string => {
   }
   
   // Method 3: Extract from SKU if it contains variation info
-  if (item.sku && typeof item.sku === 'string') {
+  if (item.sku && typeof item.sku === 'string' && item.sku.trim()) {
     // Look for patterns like "PRODUCT-COLOR-SIZE" or "PRODUCT/COLOR/SIZE"
     const skuParts = item.sku.split(/[-/_]/);
     if (skuParts.length >= 3) {
@@ -41,12 +41,26 @@ export const extractProductVariation = (item: any): string => {
     return `${baseTitle} - ${item.variant_title}`;
   }
   
-  // Method 5: Create a placeholder variation for items that should have variations
-  if (item.shopify_variant_id && item.shopify_variant_id !== item.product?.shopify_product_id) {
-    // For products that clearly have variants but we don't have the variation data
-    // We'll show a placeholder that indicates missing variation data
-    console.log('Creating placeholder for missing variation data');
-    return `${baseTitle} - Variation Required`;
+  // Method 5: Try to extract variation from title patterns like "ProductName Color Size"
+  const titleWords = baseTitle.trim().split(/\s+/);
+  if (titleWords.length >= 3) {
+    // Common patterns: "ProductName Color Size" or "Product Name Color Size"
+    const lastTwoWords = titleWords.slice(-2);
+    const possibleColorSize = lastTwoWords.join('/');
+    
+    // Check if the last words might be color/size (simple heuristic)
+    const colorSizePattern = /^[a-zA-Z]+\/[a-zA-Z0-9]+$/;
+    if (colorSizePattern.test(possibleColorSize)) {
+      const productName = titleWords.slice(0, -2).join(' ');
+      console.log('Extracted variation from title pattern:', possibleColorSize);
+      return `${productName} - ${possibleColorSize}`;
+    }
+  }
+  
+  // Method 6: If we have shopify_variant_id, show it as a last resort
+  if (item.shopify_variant_id) {
+    console.log('Using shopify_variant_id as variation:', item.shopify_variant_id);
+    return `${baseTitle} - Variant #${item.shopify_variant_id}`;
   }
   
   console.log('No variation found, returning base title');
