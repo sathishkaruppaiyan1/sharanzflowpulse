@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings } from 'lucide-react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Shirt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -196,14 +197,28 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                         />
                         <div className="flex-1">
                           <p className="font-medium text-sm">{item.title}</p>
-                          {item.sku && (
-                            <div className="flex items-center space-x-1 mt-1">
-                              <Hash className="h-3 w-3 text-blue-600" />
-                              <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
-                                {item.sku}
-                              </span>
-                            </div>
-                          )}
+                          
+                          {/* Enhanced Variation Display */}
+                          <div className="mt-1 space-y-1">
+                            {item.sku && (
+                              <div className="flex items-center space-x-1">
+                                <Hash className="h-3 w-3 text-blue-600" />
+                                <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
+                                  {item.sku}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Check if this item has variation information */}
+                            {(item.sku && item.sku.includes('/')) && (
+                              <div className="flex items-center space-x-1">
+                                <Shirt className="h-3 w-3 text-purple-600" />
+                                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded border font-medium">
+                                  Variation: {item.sku.split('/').slice(1).join(' / ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">

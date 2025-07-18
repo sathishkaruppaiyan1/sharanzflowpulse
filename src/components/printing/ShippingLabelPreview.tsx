@@ -77,7 +77,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       return `
         <div style="width: 4in; height: 6in; border: 2px solid #000; background: #fff; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #000; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; ${pageBreak}">
           
-          <!-- Barcode Section (matching your template) -->
+          <!-- Barcode Section -->
           <div style="border-bottom: 2px solid #000; padding: 10px; text-align: center; background: #fff;">
             <div style="background: #fff; border: 1px solid #000; padding: 8px; margin-bottom: 5px;">
               ${barcodeSVG}
@@ -85,10 +85,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             <div style="font-weight: bold; font-size: 14px; margin-top: 5px;">${trackingNumber}</div>
           </div>
 
-          <!-- TO Section (matching your template) -->
+          <!-- TO Section -->
           <div style="border-bottom: 1px solid #000; padding: 8px;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">🔴 TO:</div>
-            <div style="border: 1px solid #000; padding: 8px; background: #fffbeb;">
+            <div style="border: 1px solid #000; padding: 8px; background: #fff;">
               <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;">${customerName.toUpperCase()}</div>
               <div style="font-size: 10px; margin-bottom: 1px;">${shippingAddress.address1 || shippingAddress.address_line_1}</div>
               ${(shippingAddress.address2 || shippingAddress.address_line_2) ? `<div style="font-size: 10px; margin-bottom: 1px;">${shippingAddress.address2 || shippingAddress.address_line_2}</div>` : ''}
@@ -98,18 +98,18 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
-          <!-- FROM and COURIER DETAILS Section (side by side like your template) -->
+          <!-- FROM and COURIER DETAILS Section -->
           <div style="border-bottom: 1px solid #000; padding: 8px; display: flex;">
             <div style="flex: 1; margin-right: 5px;">
               <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">FROM:</div>
-              <div style="border: 1px solid #000; padding: 6px; background: #f9fafb; font-size: 10px; height: 60px;">
+              <div style="border: 1px solid #000; padding: 6px; background: #fff; font-size: 10px; height: 60px;">
                 <div style="font-weight: bold;">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
             </div>
             <div style="flex: 1; margin-left: 5px;">
               <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">COURIER DETAILS:</div>
-              <div style="border: 1px solid #000; padding: 6px; background: #f0f9ff; font-size: 10px; height: 60px;">
+              <div style="border: 1px solid #000; padding: 6px; background: #fff; font-size: 10px; height: 60px;">
                 <div style="margin-bottom: 2px;">Order: <strong>${orderNumber}</strong></div>
                 <div style="margin-bottom: 2px;">Weight: ${totalWeight}</div>
                 <div style="margin-bottom: 2px;">Items: ${totalItems}</div>
@@ -121,7 +121,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <!-- Products Section with Variations -->
           <div style="flex: 1; padding: 8px; display: flex; flex-direction: column;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 10px;">
+            <div style="border: 1px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 10px; background: #fff;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => {
                 const variation = item.variant_title || item.sku || '';
                 return `<div style="margin-bottom: 3px;">
@@ -133,7 +133,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
 
           <!-- Footer -->
-          <div style="text-align: center; border-top: 2px solid #000; padding: 6px; font-weight: bold; font-size: 10px; background: #f9fafb;">
+          <div style="text-align: center; border-top: 2px solid #000; padding: 6px; font-weight: bold; font-size: 10px; background: #fff;">
             PARCEL OPENING VIDEO is MUST For raising complaints
           </div>
         </div>
@@ -423,7 +423,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <span className="mr-1 text-red-600">🔴</span>
                 <span className="font-bold text-xs">TO:</span>
               </div>
-              <div className="border border-black p-2 bg-yellow-50">
+              <div className="border border-black p-2 bg-white">
                 <div className="font-bold text-xs break-words mb-0.5">
                   {customerName.toUpperCase()}
                 </div>
@@ -439,14 +439,14 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             <div className="border-b border-black p-2 flex">
               <div className="flex-1 mr-1">
                 <div className="font-bold mb-1 text-xs">FROM:</div>
-                <div className="border border-black p-1 bg-gray-50 text-xs h-16">
+                <div className="border border-black p-1 bg-white text-xs h-16">
                   <div className="font-bold">Black Lovers</div>
                   <div>WhatsApp: 7990190234</div>
                 </div>
               </div>
               <div className="flex-1 ml-1">
                 <div className="font-bold mb-1 text-xs">COURIER DETAILS:</div>
-                <div className="border border-black p-1 bg-blue-50 text-xs h-16">
+                <div className="border border-black p-1 bg-white text-xs h-16">
                   <div className="mb-0.5">Order: <strong>{orderNumber}</strong></div>
                   <div className="mb-0.5">Weight: {totalWeight}</div>
                   <div className="mb-0.5">Items: {totalItems}</div>
@@ -458,7 +458,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             {/* Products Section with Variations */}
             <div className="flex-1 p-2 flex flex-col">
               <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
-              <div className="border border-black p-1 flex-1 overflow-hidden text-xs">
+              <div className="border border-black p-1 flex-1 overflow-hidden text-xs bg-white">
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
                   <div key={index} className="mb-1">
                     <div>• {item.title || item.name} (Qty: {item.quantity || 1})</div>
@@ -475,7 +475,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
 
             {/* Footer */}
-            <div className="text-center border-t-2 border-black p-1 font-bold text-xs bg-gray-50">
+            <div className="text-center border-t-2 border-black p-1 font-bold text-xs bg-white">
               PARCEL OPENING VIDEO is MUST For raising complaints
             </div>
           </div>

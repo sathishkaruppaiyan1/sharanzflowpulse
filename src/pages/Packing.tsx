@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings, Shirt, Hash } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -73,7 +73,7 @@ const Packing = () => {
             <Card className="bg-white">
               <CardContent className="p-4">
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-gray-600">Ready for Packing</h3>
+                  <h3 className="text-sm font-medium text-gray-600">Ready for Dispatch</h3>
                   <div className="text-2xl font-bold text-blue-600">
                     {packingOrders.filter(order => 
                       order.order_items?.every((item: any) => item.packed)
@@ -196,19 +196,44 @@ const Packing = () => {
                     </div>
                     
                     <div className="border-t pt-3">
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items:</h4>
+                      <h4 className="font-medium text-sm text-gray-700 mb-2">Items with Variations:</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedOrder.order_items?.map((item: any) => (
-                          <div key={item.id} className={`p-2 rounded text-xs ${
+                          <div key={item.id} className={`p-3 rounded text-xs ${
                             item.packed ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
                           }`}>
-                            <div className="flex justify-between">
-                              <span className="font-medium">{item.title}</span>
-                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <span className="font-medium text-sm">{item.title}</span>
+                                
+                                {/* Enhanced variation display */}
+                                <div className="mt-1 space-y-1">
+                                  {item.sku && (
+                                    <div className="flex items-center space-x-1">
+                                      <Hash className="h-3 w-3 text-blue-600" />
+                                      <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">
+                                        {item.sku}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Show variation if SKU contains variation info */}
+                                  {item.sku && item.sku.includes('/') && (
+                                    <div className="flex items-center space-x-1">
+                                      <Shirt className="h-3 w-3 text-purple-600" />
+                                      <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">
+                                        {item.sku.split('/').slice(1).join(' / ')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  <p className="text-gray-500 text-xs">Qty: {item.quantity}</p>
+                                </div>
+                              </div>
+                              <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
                                 {item.packed ? "Packed" : "Pending"}
                               </Badge>
                             </div>
-                            <p className="text-gray-500 mt-1">SKU: {item.sku || 'N/A'} • Qty: {item.quantity}</p>
                           </div>
                         ))}
                       </div>
@@ -261,7 +286,7 @@ const Packing = () => {
                       <div className="flex items-center space-x-3">
                         {isComplete ? (
                           <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Ready for Packing
+                            Ready for Dispatch
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
@@ -279,7 +304,11 @@ const Packing = () => {
                           <Settings className="h-3 w-3 mr-1" />
                           Manage
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedOrder(order)}
+                        >
                           Select
                         </Button>
                       </div>
