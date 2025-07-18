@@ -69,6 +69,19 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
     return order.order_items.every(item => item.packed);
   };
 
+  // Helper function to format product with variation
+  const formatProductWithVariation = (item: any) => {
+    const baseTitle = item.title || 'Product';
+    
+    // Extract variation from SKU if available
+    if (item.sku && item.sku.includes('/')) {
+      const variation = item.sku.split('/').slice(1).join('/');
+      return `${baseTitle} - ${variation}`;
+    }
+    
+    return baseTitle;
+  };
+
   const packingStageOrders = orders.filter(order => order.stage === 'packing');
 
   // Enhanced debug function to log customer data
@@ -196,29 +209,8 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                           disabled={updateItemPacked.isPending}
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-sm">{item.title}</p>
-                          
-                          {/* Enhanced Variation Display */}
-                          <div className="mt-1 space-y-1">
-                            {item.sku && (
-                              <div className="flex items-center space-x-1">
-                                <Hash className="h-3 w-3 text-blue-600" />
-                                <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border">
-                                  {item.sku}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {/* Check if this item has variation information */}
-                            {(item.sku && item.sku.includes('/')) && (
-                              <div className="flex items-center space-x-1">
-                                <Shirt className="h-3 w-3 text-purple-600" />
-                                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded border font-medium">
-                                  Variation: {item.sku.split('/').slice(1).join(' / ')}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          {/* Simple Product Name with Variation */}
+                          <p className="font-medium text-sm">{formatProductWithVariation(item)}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">

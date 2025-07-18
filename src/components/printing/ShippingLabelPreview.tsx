@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,6 +37,24 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         dangerouslySetInnerHTML={{ __html: barcodeSVG }}
       />
     );
+  };
+
+  // Helper function to format product with variation for shipping label
+  const formatProductWithVariation = (item: any) => {
+    const baseTitle = item.title || item.name || 'Product';
+    
+    // Extract variation from SKU if available
+    if (item.sku && item.sku.includes('/')) {
+      const variation = item.sku.split('/').slice(1).join('/');
+      return `${baseTitle} - ${variation}`;
+    }
+    
+    // Fallback to variant_title if available
+    if (item.variant_title) {
+      return `${baseTitle} - ${item.variant_title}`;
+    }
+    
+    return baseTitle;
   };
 
   const createLabelHTML = (orderData: any, isLast: boolean = false) => {
@@ -123,10 +142,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">PRODUCTS:</div>
             <div style="border: 1px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 10px; background: #fff;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => {
-                const variation = item.variant_title || item.sku || '';
+                const productWithVariation = formatProductWithVariation(item);
                 return `<div style="margin-bottom: 3px;">
-                  • ${item.title || item.name} (Qty: ${item.quantity || 1})
-                  ${variation ? `<br>&nbsp;&nbsp;${variation}` : ''}
+                  • ${productWithVariation} (Qty: ${item.quantity || 1})
                 </div>`;
               }).join('') : '<div>• Order Items</div>'}
             </div>
@@ -461,12 +479,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               <div className="border border-black p-1 flex-1 overflow-hidden text-xs bg-white">
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
                   <div key={index} className="mb-1">
-                    <div>• {item.title || item.name} (Qty: {item.quantity || 1})</div>
-                    {(item.variant_title || item.sku) && (
-                      <div className="ml-2 text-gray-600 text-[10px]">
-                        {item.variant_title || item.sku}
-                      </div>
-                    )}
+                    <div>• {formatProductWithVariation(item)} (Qty: {item.quantity || 1})</div>
                   </div>
                 )) : (
                   <div>• Order Items</div>

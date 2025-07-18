@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings, Shirt, Hash } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
@@ -23,6 +23,19 @@ const Packing = () => {
     console.log('Item packed:', { orderId, itemId });
     // Force a refresh of the data
     setRefreshKey(prev => prev + 1);
+  };
+
+  // Helper function to format product with variation
+  const formatProductWithVariation = (item: any) => {
+    const baseTitle = item.title || 'Product';
+    
+    // Extract variation from SKU if available
+    if (item.sku && item.sku.includes('/')) {
+      const variation = item.sku.split('/').slice(1).join('/');
+      return `${baseTitle} - ${variation}`;
+    }
+    
+    return baseTitle;
   };
 
   if (isLoading) {
@@ -204,31 +217,9 @@ const Packing = () => {
                           }`}>
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <span className="font-medium text-sm">{item.title}</span>
-                                
-                                {/* Enhanced variation display */}
-                                <div className="mt-1 space-y-1">
-                                  {item.sku && (
-                                    <div className="flex items-center space-x-1">
-                                      <Hash className="h-3 w-3 text-blue-600" />
-                                      <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">
-                                        {item.sku}
-                                      </span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* Show variation if SKU contains variation info */}
-                                  {item.sku && item.sku.includes('/') && (
-                                    <div className="flex items-center space-x-1">
-                                      <Shirt className="h-3 w-3 text-purple-600" />
-                                      <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">
-                                        {item.sku.split('/').slice(1).join(' / ')}
-                                      </span>
-                                    </div>
-                                  )}
-                                  
-                                  <p className="text-gray-500 text-xs">Qty: {item.quantity}</p>
-                                </div>
+                                {/* Simple Product Name with Variation */}
+                                <span className="font-medium text-sm">{formatProductWithVariation(item)}</span>
+                                <p className="text-gray-500 text-xs mt-1">Qty: {item.quantity}</p>
                               </div>
                               <Badge variant={item.packed ? "default" : "secondary"} className="text-xs ml-2">
                                 {item.packed ? "Packed" : "Pending"}
