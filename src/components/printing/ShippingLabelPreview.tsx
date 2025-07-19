@@ -3,6 +3,7 @@ import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
@@ -97,17 +98,20 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         <div style="width: 4in; height: 6in; border: 2px solid #000; background: #fff; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #000; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; ${pageBreak}">
           
           <!-- Barcode Section -->
-          <div style="border-bottom: 2px solid #000; padding: 10px; text-align: center; background: #fff;">
+          <div style="padding: 10px; text-align: center; background: #fff;">
             <div style="background: #fff; border: 1px solid #000; padding: 8px; margin-bottom: 5px;">
               ${barcodeSVG}
             </div>
             <div style="font-weight: bold; font-size: 14px; margin-top: 5px;">${trackingNumber}</div>
           </div>
 
+          <!-- Separator Line -->
+          <div style="border-bottom: 2px solid #000; margin: 0;"></div>
+
           <!-- TO Section -->
-          <div style="border-bottom: 1px solid #000; padding: 8px;">
+          <div style="padding: 8px;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">🔴 TO:</div>
-            <div style="border: 1px solid #000; padding: 8px; background: #fff;">
+            <div style="padding: 8px 0; background: #fff;">
               <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;">${customerName.toUpperCase()}</div>
               <div style="font-size: 10px; margin-bottom: 1px;">${shippingAddress.address1 || shippingAddress.address_line_1}</div>
               ${(shippingAddress.address2 || shippingAddress.address_line_2) ? `<div style="font-size: 10px; margin-bottom: 1px;">${shippingAddress.address2 || shippingAddress.address_line_2}</div>` : ''}
@@ -117,18 +121,25 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
+          <!-- Separator Line -->
+          <div style="border-bottom: 1px solid #000; margin: 0;"></div>
+
           <!-- FROM and COURIER DETAILS Section -->
-          <div style="border-bottom: 1px solid #000; padding: 8px; display: flex;">
+          <div style="padding: 8px; display: flex;">
             <div style="flex: 1; margin-right: 5px;">
               <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">FROM:</div>
-              <div style="border: 1px solid #000; padding: 6px; background: #fff; font-size: 10px; height: 60px;">
+              <div style="padding: 6px 0; background: #fff; font-size: 10px; height: 60px;">
                 <div style="font-weight: bold;">Black Lovers</div>
                 <div>WhatsApp: 7990190234</div>
               </div>
             </div>
+            
+            <!-- Vertical separator between FROM and COURIER DETAILS -->
+            <div style="width: 1px; background: #000; margin: 0 5px;"></div>
+            
             <div style="flex: 1; margin-left: 5px;">
               <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">COURIER DETAILS:</div>
-              <div style="border: 1px solid #000; padding: 6px; background: #fff; font-size: 10px; height: 60px;">
+              <div style="padding: 6px 0; background: #fff; font-size: 10px; height: 60px;">
                 <div style="margin-bottom: 2px;">Order: <strong>${orderNumber}</strong></div>
                 <div style="margin-bottom: 2px;">Weight: ${totalWeight}</div>
                 <div style="margin-bottom: 2px;">Items: ${totalItems}</div>
@@ -137,10 +148,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
 
+          <!-- Separator Line -->
+          <div style="border-bottom: 1px solid #000; margin: 0;"></div>
+
           <!-- Products Section with Variations -->
           <div style="flex: 1; padding: 8px; display: flex; flex-direction: column;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">PRODUCTS:</div>
-            <div style="border: 1px solid #000; padding: 6px; flex: 1; overflow: hidden; font-size: 10px; background: #fff;">
+            <div style="padding: 6px 0; flex: 1; overflow: hidden; font-size: 10px; background: #fff;">
               ${orderData.line_items ? orderData.line_items.map((item: any) => {
                 const productWithVariation = formatProductWithVariation(item);
                 return `<div style="margin-bottom: 3px;">
@@ -428,20 +442,23 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <div className="print-content border-2 border-black bg-white font-sans text-sm font-bold flex flex-col" style={{ width: '4in', height: '6in', boxSizing: 'border-box' }}>
             
             {/* Barcode Section */}
-            <div className="border-b-2 border-black p-2 text-center bg-white">
+            <div className="p-2 text-center bg-white">
               <div className="bg-white border border-black p-2 mb-1">
                 {renderBarcode(trackingNumber)}
               </div>
               <div className="font-bold text-sm mt-1">{trackingNumber}</div>
             </div>
 
+            {/* Separator */}
+            <Separator className="bg-black h-0.5" />
+
             {/* TO Section */}
-            <div className="border-b border-black p-2">
+            <div className="p-2">
               <div className="flex items-center mb-1">
                 <span className="mr-1 text-red-600">🔴</span>
                 <span className="font-bold text-xs">TO:</span>
               </div>
-              <div className="border border-black p-2 bg-white">
+              <div className="py-2 bg-white">
                 <div className="font-bold text-xs break-words mb-0.5">
                   {customerName.toUpperCase()}
                 </div>
@@ -453,18 +470,25 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
+            {/* Separator */}
+            <Separator className="bg-black h-px" />
+
             {/* FROM and COURIER DETAILS Section */}
-            <div className="border-b border-black p-2 flex">
+            <div className="p-2 flex">
               <div className="flex-1 mr-1">
                 <div className="font-bold mb-1 text-xs">FROM:</div>
-                <div className="border border-black p-1 bg-white text-xs h-16">
+                <div className="py-1 bg-white text-xs h-16">
                   <div className="font-bold">Black Lovers</div>
                   <div>WhatsApp: 7990190234</div>
                 </div>
               </div>
+              
+              {/* Vertical Separator */}
+              <Separator orientation="vertical" className="bg-black w-px mx-1" />
+              
               <div className="flex-1 ml-1">
                 <div className="font-bold mb-1 text-xs">COURIER DETAILS:</div>
-                <div className="border border-black p-1 bg-white text-xs h-16">
+                <div className="py-1 bg-white text-xs h-16">
                   <div className="mb-0.5">Order: <strong>{orderNumber}</strong></div>
                   <div className="mb-0.5">Weight: {totalWeight}</div>
                   <div className="mb-0.5">Items: {totalItems}</div>
@@ -473,10 +497,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </div>
             </div>
 
+            {/* Separator */}
+            <Separator className="bg-black h-px" />
+
             {/* Products Section with Variations */}
             <div className="flex-1 p-2 flex flex-col">
               <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
-              <div className="border border-black p-1 flex-1 overflow-hidden text-xs bg-white">
+              <div className="py-1 flex-1 overflow-hidden text-xs bg-white">
                 {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
                   <div key={index} className="mb-1">
                     <div>• {formatProductWithVariation(item)} (Qty: {item.quantity || 1})</div>
