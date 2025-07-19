@@ -1,5 +1,5 @@
-// Function to format phone number for WATI
-export const formatPhoneForWati = (phoneNumber: string): string => {
+// Function to format phone number for Interakt BSP
+export const formatPhoneForInterakt = (phoneNumber: string): string => {
   // Remove all non-digits
   const digits = phoneNumber.replace(/[^\d]/g, '');
   

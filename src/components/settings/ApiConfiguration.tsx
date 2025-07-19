@@ -35,7 +35,7 @@ const ApiConfiguration = () => {
   }
 
   const isShopifyConnected = apiConfigs.shopify?.enabled && apiConfigs.shopify?.shop_url && apiConfigs.shopify?.access_token;
-  const isWatiConnected = apiConfigs.wati?.enabled && apiConfigs.wati?.api_key;
+  const isInteraktConnected = apiConfigs.interakt?.enabled && apiConfigs.interakt?.api_key;
   const isTrackingMoreConnected = apiConfigs.trackingmore?.enabled && apiConfigs.trackingmore?.api_key;
 
   return (
@@ -138,68 +138,68 @@ const ApiConfiguration = () => {
         </CardContent>
       </Card>
 
-      {/* WATI Integration */}
+      {/* Interakt BSP Integration */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <MessageSquare className="h-6 w-6" />
               <div>
-                <CardTitle className="text-xl">WATI Integration</CardTitle>
+                <CardTitle className="text-xl">Interakt BSP Integration</CardTitle>
                 <CardDescription>
-                  Configure WATI for sending WhatsApp notifications to customers
+                  Configure Interakt BSP for sending WhatsApp notifications to customers
                 </CardDescription>
               </div>
             </div>
             <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-              isWatiConnected 
+              isInteraktConnected 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {isWatiConnected ? '✓ Connected' : '✗ Not Connected'}
+              {isInteraktConnected ? '✓ Connected' : '✗ Not Connected'}
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="wati-api-key">API Key</Label>
+            <Label htmlFor="interakt-api-key">API Key</Label>
             <Input
-              id="wati-api-key"
+              id="interakt-api-key"
               type="password"
-              placeholder="Enter WATI API key"
-              value={apiConfigs.wati?.api_key || ''}
+              placeholder="Enter Interakt BSP API key"
+              value={apiConfigs.interakt?.api_key || ''}
               onChange={(e) =>
                 setApiConfigs(prev => ({
                   ...prev,
-                  wati: { ...prev.wati, api_key: e.target.value, enabled: true }
+                  interakt: { ...prev.interakt, api_key: e.target.value, enabled: true }
                 }))
               }
             />
           </div>
 
           <div>
-            <Label htmlFor="wati-base-url">Base URL</Label>
+            <Label htmlFor="interakt-base-url">Base URL</Label>
             <Input
-              id="wati-base-url"
-              placeholder="https://live-server-6371.wati.io"
-              value={apiConfigs.wati?.base_url || 'https://live-server-6371.wati.io'}
+              id="interakt-base-url"
+              placeholder="https://api.interakt.ai"
+              value={apiConfigs.interakt?.base_url || 'https://api.interakt.ai'}
               onChange={(e) =>
                 setApiConfigs(prev => ({
                   ...prev,
-                  wati: { ...prev.wati, base_url: e.target.value }
+                  interakt: { ...prev.interakt, base_url: e.target.value }
                 }))
               }
             />
             <p className="text-xs text-gray-500 mt-1">
-              Find your base URL in your WATI dashboard
+              Find your base URL in your Interakt BSP dashboard
             </p>
           </div>
 
           <div className="flex space-x-3 pt-4">
             <Button
               variant="outline"
-              onClick={() => handleTestConnection('WATI')}
-              disabled={!isWatiConnected}
+              onClick={() => handleTestConnection('Interakt BSP')}
+              disabled={!isInteraktConnected}
             >
               Test Connection
             </Button>
@@ -208,7 +208,7 @@ const ApiConfiguration = () => {
               disabled={saving}
               className="min-w-[160px]"
             >
-              {saving ? 'Saving...' : 'Save WATI Configuration'}
+              {saving ? 'Saving...' : 'Save Interakt BSP Configuration'}
             </Button>
           </div>
         </CardContent>

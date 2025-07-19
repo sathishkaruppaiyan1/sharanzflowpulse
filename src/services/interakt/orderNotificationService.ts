@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, CarrierType } from '@/types/database';
-import { sendWhatsAppMessage, type WatiMessageTemplate } from './watiApiClient';
+import { sendWhatsAppMessage, type InteraktMessageTemplate } from './interaktApiClient';
 import { generateTrackingLink, getCourierDisplayName } from './carrierUtils';
 
 // Send order shipped notification with tracking ID and link
@@ -19,7 +19,7 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
       return false;
     }
 
-    // Get WATI configuration
+    // Get Interakt BSP configuration
     const { data: configData, error: configError } = await supabase
       .from('system_settings')
       .select('value')
@@ -37,29 +37,29 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
     }
 
     const apiConfigs = configData.value as any;
-    const watiConfig = apiConfigs.wati;
+    const interaktConfig = apiConfigs.interakt;
 
-    if (!watiConfig) {
-      console.error('WATI configuration not found in API configs');
+    if (!interaktConfig) {
+      console.error('Interakt BSP configuration not found in API configs');
       return false;
     }
 
-    if (!watiConfig.enabled) {
-      console.error('WATI is disabled in configuration');
+    if (!interaktConfig.enabled) {
+      console.error('Interakt BSP is disabled in configuration');
       return false;
     }
 
-    if (!watiConfig.api_key) {
-      console.error('WATI API key not configured');
+    if (!interaktConfig.api_key) {
+      console.error('Interakt BSP API key not configured');
       return false;
     }
 
-    if (!watiConfig.base_url) {
-      console.error('WATI base URL not configured');
+    if (!interaktConfig.base_url) {
+      console.error('Interakt BSP base URL not configured');
       return false;
     }
 
-    console.log('WATI configuration validation passed');
+    console.log('Interakt BSP configuration validation passed');
 
     // Generate tracking link and courier name
     const trackingLink = generateTrackingLink(trackingNumber, carrier);
@@ -72,7 +72,7 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
     });
 
     // Prepare message template
-    const template: WatiMessageTemplate = {
+    const template: InteraktMessageTemplate = {
       templateName: 'order_shipped_template',
       parameters: [
         {
@@ -99,8 +99,8 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
     const success = await sendWhatsAppMessage(
       order.customer.phone,
       template,
-      watiConfig.api_key,
-      watiConfig.base_url
+      interaktConfig.api_key,
+      interaktConfig.base_url
     );
 
     if (success) {

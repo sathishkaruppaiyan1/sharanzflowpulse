@@ -22,8 +22,8 @@ const ConnectionStatus = () => {
       enabled: apiConfigs.shopify?.enabled && apiConfigs.shopify?.shop_url && apiConfigs.shopify?.access_token,
     },
     {
-      name: 'WATI',
-      enabled: apiConfigs.wati?.enabled && apiConfigs.wati?.api_key,
+      name: 'Interakt BSP',
+      enabled: apiConfigs.interakt?.enabled && apiConfigs.interakt?.api_key,
     },
     {
       name: 'TrackingMore',

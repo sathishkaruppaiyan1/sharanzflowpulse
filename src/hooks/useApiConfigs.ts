@@ -10,7 +10,7 @@ export interface ApiConfigs {
     access_token: string;
     webhook_secret: string;
   };
-  wati: {
+  interakt: {
     enabled: boolean;
     api_key: string;
     base_url: string;
@@ -29,10 +29,10 @@ const defaultConfigs: ApiConfigs = {
     access_token: '',
     webhook_secret: ''
   },
-  wati: {
+  interakt: {
     enabled: false,
     api_key: '',
-    base_url: 'https://live-server-6371.wati.io'
+    base_url: 'https://api.interakt.ai'
   },
   trackingmore: {
     enabled: false,
@@ -67,7 +67,7 @@ export const useApiConfigs = () => {
         const configData = data.value as unknown as Partial<ApiConfigs>;
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
-          wati: { ...defaultConfigs.wati, ...configData.wati },
+          interakt: { ...defaultConfigs.interakt, ...configData.interakt },
           trackingmore: { ...defaultConfigs.trackingmore, ...configData.trackingmore }
         };
         setApiConfigs(mergedConfigs);
