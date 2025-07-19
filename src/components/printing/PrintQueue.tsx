@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import ShippingLabelPreview from './ShippingLabelPreview';
 
 interface PrintQueueProps {
@@ -14,6 +15,7 @@ interface PrintQueueProps {
   onSelectedCountChange?: (count: number, selectedIds: Set<string>) => void;
   selectedOrderIds?: Set<string>;
   onSelectAll?: () => void;
+  itemsPerPage?: number;
 }
 
 const PrintQueue = ({ 
@@ -21,17 +23,30 @@ const PrintQueue = ({
   isShopifyOrders = false, 
   onSelectedCountChange,
   selectedOrderIds = new Set(),
-  onSelectAll
+  onSelectAll,
+  itemsPerPage = 10
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
   const [previewOrder, setPreviewOrder] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Update local state when external selectedOrderIds changes
   useEffect(() => {
     setSelectedOrders(selectedOrderIds);
   }, [selectedOrderIds]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(orders.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedOrders = orders.slice(startIndex, endIndex);
+
+  // Reset to first page when orders change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [orders.length]);
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -71,10 +86,16 @@ const PrintQueue = ({
 
   const isPrinting = (orderId: string) => printingOrders.has(orderId);
 
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   return (
     <>
       <div className="space-y-2">
-        {orders.map((order) => (
+        {paginatedOrders.map((order) => (
           <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
             <div className="grid grid-cols-12 gap-3 items-start">
               {/* Checkbox and Order Info */}
@@ -172,6 +193,44 @@ const PrintQueue = ({
               <div className="text-gray-500">No orders found matching your criteria</div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
 

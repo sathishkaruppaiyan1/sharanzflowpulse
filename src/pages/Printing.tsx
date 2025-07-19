@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -445,6 +444,7 @@ const Printing = () => {
                 onSelectedCountChange={handleSelectedCountChange}
                 selectedOrderIds={selectedOrderIds}
                 onSelectAll={handleSelectAll}
+                itemsPerPage={10}
               />
             </CardContent>
           </Card>
