@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import OrderDetails from '@/components/orders/OrderDetails';
+import OrderDetailsBasic from '@/components/orders/OrderDetailsBasic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -570,7 +570,7 @@ const Orders = () => {
         </div>
       </main>
 
-      <OrderDetails
+      <OrderDetailsBasic
         open={showOrderDetails}
         onClose={() => setShowOrderDetails(false)}
         order={selectedOrder}

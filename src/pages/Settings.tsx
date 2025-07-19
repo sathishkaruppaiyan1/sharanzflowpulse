@@ -116,40 +116,26 @@ const Settings = () => {
                       <AlertTriangle className="h-8 w-8 text-red-600" />
                     </div>
                     <CardTitle className="text-2xl font-bold text-gray-900">
-                      Error Logs
+                      System Logs
                     </CardTitle>
                     <CardDescription className="text-lg text-gray-600">
-                      View system errors and debugging information
+                      View system events and application logs
                     </CardDescription>
                   </CardHeader>
                   
                   <CardContent className="space-y-4">
                     <div className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
                       <div className="text-sm text-gray-700 space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-red-600">[ERROR]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 10:30:25</span>
+                        <div className="text-center text-gray-500 py-8">
+                          <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p>No system logs available</p>
+                          <p className="text-xs mt-1">Logs will appear here when events occur</p>
                         </div>
-                        <p className="text-sm">Failed to process order #12345</p>
-                        <hr className="border-gray-200" />
-                        
-                        <div className="flex justify-between">
-                          <span className="text-red-600">[ERROR]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 09:15:10</span>
-                        </div>
-                        <p className="text-sm">Database connection timeout</p>
-                        <hr className="border-gray-200" />
-                        
-                        <div className="flex justify-between">
-                          <span className="text-yellow-600">[WARNING]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 08:45:33</span>
-                        </div>
-                        <p className="text-sm">Low inventory for product SKU-001</p>
                       </div>
                     </div>
                     
-                    <Button variant="outline" className="w-full">
-                      Download Error Logs
+                    <Button variant="outline" className="w-full" disabled>
+                      Download System Logs
                     </Button>
                   </CardContent>
                 </Card>
@@ -160,40 +146,26 @@ const Settings = () => {
                       <FileText className="h-8 w-8 text-green-600" />
                     </div>
                     <CardTitle className="text-2xl font-bold text-gray-900">
-                      Change Logs
+                      Activity Logs
                     </CardTitle>
                     <CardDescription className="text-lg text-gray-600">
-                      Track system changes and updates
+                      Track user activities and system changes
                     </CardDescription>
                   </CardHeader>
                   
                   <CardContent className="space-y-4">
                     <div className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
                       <div className="text-sm text-gray-700 space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-green-600">[UPDATE]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 11:20:15</span>
+                        <div className="text-center text-gray-500 py-8">
+                          <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p>No activity logs available</p>
+                          <p className="text-xs mt-1">User activities will be tracked here</p>
                         </div>
-                        <p className="text-sm">System configuration updated by admin</p>
-                        <hr className="border-gray-200" />
-                        
-                        <div className="flex justify-between">
-                          <span className="text-blue-600">[CREATE]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 10:45:22</span>
-                        </div>
-                        <p className="text-sm">New user account created: user@example.com</p>
-                        <hr className="border-gray-200" />
-                        
-                        <div className="flex justify-between">
-                          <span className="text-purple-600">[CONFIG]</span>
-                          <span className="text-xs text-gray-500">2024-01-15 09:30:45</span>
-                        </div>
-                        <p className="text-sm">API configuration modified</p>
                       </div>
                     </div>
                     
-                    <Button variant="outline" className="w-full">
-                      Download Change Logs
+                    <Button variant="outline" className="w-full" disabled>
+                      Download Activity Logs
                     </Button>
                   </CardContent>
                 </Card>

@@ -7,11 +7,13 @@ import Header from '@/components/layout/Header';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrders } from '@/hooks/useOrders';
+import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { data: orders = [] } = useOrders();
+  const { orders: shopifyOrders = [] } = useShopifyOrders();
   const [realtimeData, setRealtimeData] = useState({
     newOrders: 0,
     readyToPrint: 0,
@@ -21,11 +23,21 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // Calculate real-time statistics from orders
+    // Calculate real-time statistics from both Shopify orders and internal orders
     const calculateStats = () => {
+      // Count new orders from Shopify (unfulfilled orders)
+      const newOrdersCount = shopifyOrders.filter(order => 
+        (order.fulfillment_status || '') === 'unfulfilled'
+      ).length;
+
+      // Count ready to print from internal orders (pending stage)
+      const readyToPrintCount = orders.filter(order => 
+        order.stage === 'pending'
+      ).length;
+
       const stats = {
-        newOrders: orders.filter(order => order.stage === 'pending').length,
-        readyToPrint: orders.filter(order => order.stage === 'printing').length,
+        newOrders: newOrdersCount,
+        readyToPrint: readyToPrintCount,
         readyToPack: orders.filter(order => order.stage === 'packing').length,
         readyToShip: orders.filter(order => order.stage === 'tracking').length,
         inTransit: orders.filter(order => order.stage === 'shipped').length
@@ -55,7 +67,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orders]);
+  }, [orders, shopifyOrders]);
 
   const stageData = [
     {
