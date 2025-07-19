@@ -14,7 +14,8 @@ interface PrintQueueProps {
   isShopifyOrders?: boolean;
   onSelectedCountChange?: (count: number, selectedIds: Set<string>) => void;
   selectedOrderIds?: Set<string>;
-  onSelectAll?: () => void;
+  onSelectAll?: (currentPageOrders?: any[]) => void;
+  onUnselectAll?: () => void;
   itemsPerPage?: number;
 }
 
@@ -24,6 +25,7 @@ const PrintQueue = ({
   onSelectedCountChange,
   selectedOrderIds = new Set(),
   onSelectAll,
+  onUnselectAll,
   itemsPerPage = 10
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
@@ -90,6 +92,14 @@ const PrintQueue = ({
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const handleSelectCurrentPage = () => {
+    onSelectAll?.(paginatedOrders);
+  };
+
+  const handleUnselectCurrentPage = () => {
+    onUnselectAll?.();
   };
 
   return (

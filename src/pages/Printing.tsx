@@ -192,10 +192,18 @@ const Printing = () => {
     setSelectedOrderIds(selectedIds);
   };
 
-  const handleSelectAll = () => {
-    const allIds = new Set(filteredOrders.map(order => order.id));
+  const handleSelectAll = (currentPageOrders?: any[]) => {
+    // If currentPageOrders is provided (from PrintQueue), select only current page
+    // Otherwise, select all filtered orders (for backward compatibility)
+    const ordersToSelect = currentPageOrders || filteredOrders;
+    const allIds = new Set(ordersToSelect.map(order => order.id));
     setSelectedOrderIds(allIds);
     setSelectedCount(allIds.size);
+  };
+
+  const handleUnselectAll = () => {
+    setSelectedOrderIds(new Set());
+    setSelectedCount(0);
   };
 
   const handleBulkPrint = () => {
@@ -427,14 +435,24 @@ const Printing = () => {
                     {filteredOrders.length} orders match your filter criteria
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900"
-                  onClick={handleSelectAll}
-                >
-                  Select All
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900"
+                    onClick={() => handleSelectAll()}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900"
+                    onClick={handleUnselectAll}
+                  >
+                    Unselect All
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -444,6 +462,7 @@ const Printing = () => {
                 onSelectedCountChange={handleSelectedCountChange}
                 selectedOrderIds={selectedOrderIds}
                 onSelectAll={handleSelectAll}
+                onUnselectAll={handleUnselectAll}
                 itemsPerPage={10}
               />
             </CardContent>
