@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUpdateTracking, useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, CarrierType } from '@/types/database';
-import { detectCourierPartner, generateTrackingLink } from '@/services/watiService';
+import { detectCourierPartner, generateTrackingLink } from '@/services/interaktService';
 import { useState } from 'react';
 import StageChangeControls from '@/components/common/StageChangeControls';
 
