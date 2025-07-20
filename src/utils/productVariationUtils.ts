@@ -1,3 +1,4 @@
+
 // Utility functions for extracting and formatting product variations
 export const extractProductVariation = (item: any): string => {
   console.log('=== Extracting Product Variation ===');
@@ -91,10 +92,32 @@ export const extractProductVariation = (item: any): string => {
     }
   }
   
-  // Method 6: If we have shopify_variant_id, show it as a last resort only if no other variation found
-  if (item.shopify_variant_id && !item.sku) {
-    console.log('Using shopify_variant_id as variation (last resort):', item.shopify_variant_id);
-    return `${baseTitle} - Variant #${item.shopify_variant_id}`;
+  // Method 6: Check for Shopify variant data in various formats
+  if (item.shopify_variant_id) {
+    // If we have additional Shopify variant data that might contain the actual variation values
+    if (item.variant_option1 || item.variant_option2 || item.variant_option3) {
+      const options = [item.variant_option1, item.variant_option2, item.variant_option3]
+        .filter(option => option && option !== 'Default Title' && option.trim())
+        .join('/');
+      
+      if (options) {
+        console.log('Using Shopify variant options:', options);
+        return `${baseTitle} - ${options}`;
+      }
+    }
+    
+    // If we have variant attributes in a different format
+    if (item.attributes && Array.isArray(item.attributes)) {
+      const variationAttrs = item.attributes
+        .filter(attr => attr.name && attr.value && attr.name !== 'Title')
+        .map(attr => attr.value)
+        .join('/');
+      
+      if (variationAttrs) {
+        console.log('Using variation attributes:', variationAttrs);
+        return `${baseTitle} - ${variationAttrs}`;
+      }
+    }
   }
   
   console.log('No variation found, returning base title');
@@ -131,9 +154,15 @@ export const getVariationDisplay = (item: any): {
 
 // Helper function to ensure consistent variation display across stages
 export const normalizeItemForDisplay = (item: any): any => {
-  const variationInfo = getVariationDisplay(item);
+  console.log('=== Normalizing item for display ===');
+  console.log('Original item:', item);
   
-  return {
+  // First, try to get variation info from the item
+  const variationInfo = getVariationDisplay(item);
+  console.log('Variation info extracted:', variationInfo);
+  
+  // Create normalized item with enhanced variation data
+  const normalizedItem = {
     ...item,
     // Ensure title shows the full variation info
     title: variationInfo.fullDisplay,
@@ -144,4 +173,7 @@ export const normalizeItemForDisplay = (item: any): any => {
     computed_variation: variationInfo.variation,
     has_variation: variationInfo.hasVariation
   };
+  
+  console.log('Normalized item:', normalizedItem);
+  return normalizedItem;
 };

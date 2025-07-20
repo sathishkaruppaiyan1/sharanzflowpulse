@@ -191,14 +191,17 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                 </h4>
                 <div className="space-y-2">
                   {order.order_items.map((item) => {
+                    // Normalize item to ensure proper variation display
                     const normalizedItem = normalizeItemForDisplay(item);
                     const variationInfo = getVariationDisplay(normalizedItem);
                     
-                    console.log(`Packing item ${item.id}:`, {
-                      original: item,
-                      normalized: normalizedItem,
-                      variation: variationInfo
-                    });
+                    console.log(`=== Packing Queue Item Processing ===`);
+                    console.log(`Item ID: ${item.id}`);
+                    console.log('Original item:', item);
+                    console.log('Normalized item:', normalizedItem);
+                    console.log('Variation info:', variationInfo);
+                    console.log('Has variation:', variationInfo.hasVariation);
+                    console.log('Variation value:', variationInfo.variation);
                     
                     return (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
@@ -215,7 +218,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                               <p className="font-medium text-sm text-blue-900">
                                 {variationInfo.productName}
                               </p>
-                              {variationInfo.hasVariation && (
+                              {variationInfo.hasVariation && variationInfo.variation && (
                                 <div className="flex items-center space-x-1">
                                   <span className="text-xs text-gray-400">•</span>
                                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
@@ -229,7 +232,8 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                               {item.shopify_variant_id && (
                                 <p>Variant ID: {item.shopify_variant_id}</p>
                               )}
-                              {!variationInfo.hasVariation && item.shopify_variant_id && (
+                              {/* Show warning only if we have variant ID but no readable variation */}
+                              {item.shopify_variant_id && !variationInfo.hasVariation && (
                                 <p className="text-amber-600 font-medium">⚠️ Variation data needed</p>
                               )}
                             </div>

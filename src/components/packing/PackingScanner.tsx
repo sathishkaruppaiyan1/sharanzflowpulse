@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback } from 'react';
 import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
+import { normalizeItemForDisplay, getVariationDisplay } from '@/utils/productVariationUtils';
 
 interface PackingScannerProps {
   orders: any[];
@@ -324,11 +324,23 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                 {selectedOrder.order_items.map((item: any) => {
                   const scanned = scannedItems[item.id] || 0;
                   const isComplete = scanned >= item.quantity;
+                  
+                  // Normalize item for proper variation display
+                  const normalizedItem = normalizeItemForDisplay(item);
+                  const variationInfo = getVariationDisplay(normalizedItem);
+                  
                   return (
                     <div key={item.id} className={`p-2 rounded-lg border ${isComplete ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                       <div className="flex justify-between items-center">
                         <div className="flex-1">
-                          <p className="text-sm font-medium">{item.title}</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm font-medium">{variationInfo.productName}</p>
+                            {variationInfo.hasVariation && variationInfo.variation && (
+                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                {variationInfo.variation}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
                         </div>
                         <div className="text-right">
@@ -346,7 +358,6 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           )}
         </div>
       )}
-
     </div>
   );
 };
