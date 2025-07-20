@@ -80,7 +80,7 @@ const Printing = () => {
     setTodayPrintedCount(todayPrinted.length);
   }, [packingOrders]);
 
-  // Process and filter orders including orders moved back to printing stage
+  // Process and filter orders with proper deduplication
   const getBaseFilteredOrders = useCallback(() => {
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
@@ -89,63 +89,88 @@ const Printing = () => {
     const supabaseOrdersInPrinting = packingOrders.filter(order => order.stage === 'printing');
     console.log('Supabase orders in printing stage:', supabaseOrdersInPrinting.length);
     
-    // Convert Supabase orders to Shopify-like format for consistency
-    const supabaseOrdersFormatted = supabaseOrdersInPrinting.map(order => ({
-      id: order.shopify_order_id?.toString() || order.id,
-      order_number: order.order_number,
-      created_at: order.created_at,
-      fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
-      current_total_price: order.total_amount?.toString() || '0',
-      currency: order.currency || 'INR',
-      // Add missing required properties
-      customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
-      total_amount: order.total_amount?.toString() || '0',
-      financial_status: 'paid', // Assume paid for orders in system
-      total_weight: 0, // Default weight
-      customer: order.customer ? {
-        first_name: order.customer.first_name,
-        last_name: order.customer.last_name,
-        phone: order.customer.phone,
-        email: order.customer.email,
-        id: order.customer.id
-      } : null,
-      shipping_address: order.shipping_address ? {
-        address1: order.shipping_address.address_line_1,
-        address2: order.shipping_address.address_line_2,
-        city: order.shipping_address.city,
-        province: order.shipping_address.state,
-        zip: order.shipping_address.postal_code,
-        country: order.shipping_address.country,
-        phone: order.customer?.phone
-      } : null,
-      line_items: order.order_items?.map(item => ({
-        title: item.title,
-        name: item.title,
-        variant_title: item.sku,
-        quantity: item.quantity,
-        price: item.price,
-        product_id: item.product_id,
-        variant_id: item.shopify_variant_id,
-        sku: item.sku
-      })) || []
-    }));
-
-    let readyToPrintOrders = shopifyOrders.filter(order => {
-      // Exclude orders that are already fulfilled
-      const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
-      
-      // Exclude orders that have already been synced to Supabase (but not in printing stage)
-      const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
-      
-      console.log(`Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
-      
-      return isUnfulfilled && isNotSynced;
+    // Create a map to track orders by Shopify order ID to prevent duplicates
+    const orderMap = new Map();
+    
+    // First, add Supabase orders in printing stage (they have priority for complete data)
+    supabaseOrdersInPrinting.forEach(order => {
+      const shopifyOrderId = order.shopify_order_id?.toString();
+      if (shopifyOrderId) {
+        // Convert Supabase order to Shopify-like format for consistency
+        const formattedOrder = {
+          id: shopifyOrderId,
+          order_number: order.order_number,
+          created_at: order.created_at,
+          fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
+          current_total_price: order.total_amount?.toString() || '0',
+          currency: order.currency || 'INR',
+          customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
+          total_amount: order.total_amount?.toString() || '0',
+          financial_status: 'paid', // Assume paid for orders in system
+          total_weight: 0, // Default weight
+          customer: order.customer ? {
+            first_name: order.customer.first_name,
+            last_name: order.customer.last_name,
+            phone: order.customer.phone,
+            email: order.customer.email,
+            id: order.customer.id
+          } : null,
+          shipping_address: order.shipping_address ? {
+            address1: order.shipping_address.address_line_1,
+            address2: order.shipping_address.address_line_2,
+            city: order.shipping_address.city,
+            province: order.shipping_address.state,
+            zip: order.shipping_address.postal_code,
+            country: order.shipping_address.country,
+            phone: order.customer?.phone
+          } : null,
+          line_items: order.order_items?.map(item => ({
+            title: item.title,
+            name: item.title,
+            variant_title: item.sku,
+            quantity: item.quantity,
+            price: item.price,
+            product_id: item.product_id,
+            variant_id: item.shopify_variant_id,
+            sku: item.sku
+          })) || [],
+          // Mark as Supabase order to identify source
+          _isSupabaseOrder: true
+        };
+        orderMap.set(shopifyOrderId, formattedOrder);
+        console.log(`Added Supabase order ${order.order_number} (Shopify ID: ${shopifyOrderId}) to map`);
+      }
     });
 
-    // Combine Shopify orders with Supabase orders that are in printing stage
-    readyToPrintOrders = [...readyToPrintOrders, ...supabaseOrdersFormatted];
+    // Then, add Shopify orders that are not already in the map and meet criteria
+    shopifyOrders.forEach(order => {
+      const orderId = order.id.toString();
+      
+      // Skip if already in map (from Supabase)
+      if (orderMap.has(orderId)) {
+        console.log(`Skipping Shopify order ${order.id} - already exists from Supabase`);
+        return;
+      }
+      
+      // Check if order should be included
+      const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
+      const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
+      
+      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
+      
+      if (isUnfulfilled && isNotSynced) {
+        orderMap.set(orderId, {
+          ...order,
+          _isSupabaseOrder: false
+        });
+        console.log(`Added Shopify order ${order.id} to map`);
+      }
+    });
 
-    console.log('Orders ready for printing after filtering:', readyToPrintOrders.length);
+    // Convert map to array
+    let readyToPrintOrders = Array.from(orderMap.values());
+    
+    console.log('Total unique orders ready for printing:', readyToPrintOrders.length);
 
     // Apply search filter
     if (searchQuery.trim()) {
