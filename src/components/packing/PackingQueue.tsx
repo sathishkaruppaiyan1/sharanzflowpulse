@@ -33,7 +33,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
         .from('order_items')
         .update({ packed })
         .eq('id', itemId)
-        .select('*')
+        .select('*, product:products(*)')
         .single();
 
       if (error) throw error;
@@ -41,8 +41,12 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      
+      // Use the enhanced variation display logic with Supabase data
       const normalizedItem = normalizeItemForDisplay(data);
       const variationInfo = getVariationDisplay(normalizedItem);
+      
+      console.log('Packing success - showing variation:', variationInfo.fullDisplay);
       toast.success(`${variationInfo.fullDisplay} marked as ${data.packed ? 'packed' : 'unpacked'}`);
       onOrderUpdate?.();
     },
@@ -93,8 +97,17 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
         const isReady = isOrderReadyForShipping(order);
         const phoneNumber = getPhoneNumber(order);
         
-        // Enhanced debug log for each order
-        debugCustomerData(order);
+        // Enhanced debug log for each order with variation data
+        console.log('=== Packing Queue Order with Variations ===');
+        console.log('Order:', order.order_number);
+        console.log('Items with variation data:', order.order_items.map(item => ({
+          id: item.id,
+          title: item.title,
+          sku: item.sku,
+          variant_title: item.variant_title,
+          variant_options: item.variant_options,
+          shopify_variant_id: item.shopify_variant_id
+        })));
         
         return (
           <Card key={order.id} className="hover:shadow-md transition-shadow">
@@ -187,19 +200,21 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
               <div className="space-y-2">
                 <h4 className="font-medium text-sm text-gray-700 flex items-center">
                   <Shirt className="h-4 w-4 mr-2 text-blue-600" />
-                  Items to Pack with Variations
+                  Items to Pack with Variations (from Supabase)
                 </h4>
                 <div className="space-y-2">
                   {order.order_items.map((item) => {
-                    // Normalize item to ensure proper variation display
+                    // Enhanced normalization with Supabase data
                     const normalizedItem = normalizeItemForDisplay(item);
                     const variationInfo = getVariationDisplay(normalizedItem);
                     
-                    console.log(`=== Packing Queue Item Processing ===`);
+                    console.log(`=== Packing Queue Item with Supabase Data ===`);
                     console.log(`Item ID: ${item.id}`);
-                    console.log('Original item:', item);
+                    console.log('Original item from Supabase:', item);
+                    console.log('Supabase variant_title:', item.variant_title);
+                    console.log('Supabase variant_options:', item.variant_options);
                     console.log('Normalized item:', normalizedItem);
-                    console.log('Variation info:', variationInfo);
+                    console.log('Final variation info:', variationInfo);
                     console.log('Has variation:', variationInfo.hasVariation);
                     console.log('Variation value:', variationInfo.variation);
                     
@@ -229,12 +244,17 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                             </div>
                             <div className="text-xs text-gray-500 mt-1 space-y-1">
                               <p>SKU: {item.sku || 'No SKU'}</p>
+                              {item.variant_title && (
+                                <p>Variant: {item.variant_title}</p>
+                              )}
                               {item.shopify_variant_id && (
                                 <p>Variant ID: {item.shopify_variant_id}</p>
                               )}
-                              {/* Show warning only if we have variant ID but no readable variation */}
-                              {item.shopify_variant_id && !variationInfo.hasVariation && (
-                                <p className="text-amber-600 font-medium">⚠️ Variation data needed</p>
+                              {/* Show success message if we have proper variation data */}
+                              {variationInfo.hasVariation ? (
+                                <p className="text-green-600 font-medium">✅ Variation loaded from Supabase</p>
+                              ) : (
+                                <p className="text-amber-600 font-medium">⚠️ Using fallback variation detection</p>
                               )}
                             </div>
                           </div>

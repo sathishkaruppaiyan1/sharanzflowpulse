@@ -4,7 +4,7 @@ import type { Order, OrderStage, CarrierType } from '@/types/database';
 
 export const supabaseOrderService = {
   async fetchOrders(): Promise<Order[]> {
-    console.log('Fetching all orders with order items...');
+    console.log('Fetching all orders with order items and variation details...');
     
     const { data, error } = await supabase
       .from('orders')
@@ -29,7 +29,7 @@ export const supabaseOrderService = {
   },
 
   async fetchOrdersByStage(stage: OrderStage): Promise<Order[]> {
-    console.log(`Fetching orders for stage: ${stage}`);
+    console.log(`Fetching orders for stage: ${stage} with variation details`);
     
     const { data, error } = await supabase
       .from('orders')
@@ -52,12 +52,20 @@ export const supabaseOrderService = {
 
     console.log(`Fetched ${data?.length || 0} orders for stage ${stage}`);
     
-    // Debug phone numbers for each order
+    // Debug phone numbers and variation data for each order
     data?.forEach(order => {
-      console.log(`Order ${order.order_number} phone debug:`, {
+      console.log(`Order ${order.order_number} debug:`, {
         customerPhone: order.customer?.phone,
         hasCustomer: !!order.customer,
-        customerId: order.customer_id
+        customerId: order.customer_id,
+        itemsWithVariations: order.order_items?.map(item => ({
+          id: item.id,
+          title: item.title,
+          sku: item.sku,
+          variant_title: item.variant_title,
+          variant_options: item.variant_options,
+          shopify_variant_id: item.shopify_variant_id
+        }))
       });
     });
     
@@ -246,7 +254,7 @@ export const supabaseOrderService = {
 
       if (orderError) throw orderError;
 
-      // Create order items
+      // Create order items with enhanced variation details
       if (shopifyOrder.line_items) {
         const orderItems = shopifyOrder.line_items.map((item: any) => ({
           order_id: newOrder.id,
@@ -255,7 +263,9 @@ export const supabaseOrderService = {
           sku: item.sku,
           quantity: item.quantity,
           price: parseFloat(item.price || '0'),
-          total: parseFloat(item.price || '0') * item.quantity
+          total: parseFloat(item.price || '0') * item.quantity,
+          variant_title: item.variant_title || null,
+          variant_options: item.properties || item.variant_options || {}
         }));
 
         const { error: itemsError } = await supabase
@@ -265,7 +275,7 @@ export const supabaseOrderService = {
         if (itemsError) throw itemsError;
       }
 
-      console.log('Successfully created order in Supabase:', newOrder.id);
+      console.log('Successfully created order in Supabase with variation details:', newOrder.id);
       console.log('Customer phone number stored:', phoneNumber);
       return newOrder.id;
       

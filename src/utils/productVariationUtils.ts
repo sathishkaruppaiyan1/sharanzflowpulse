@@ -1,12 +1,44 @@
 
-// Utility functions for extracting and formatting product variations
+// Utility functions for extracting and formatting product variations from Supabase data
 export const extractProductVariation = (item: any): string => {
-  console.log('=== Extracting Product Variation ===');
+  console.log('=== Extracting Product Variation from Supabase ===');
   console.log('Item:', item);
   
   const baseTitle = item.title || 'Product';
   
-  // Method 1: Check if title already contains variation info in parentheses
+  // Method 1: Use variant_title from Supabase if available
+  if (item.variant_title && item.variant_title !== 'Default Title' && item.variant_title.trim()) {
+    console.log('Using Supabase variant_title:', item.variant_title);
+    return `${baseTitle} - ${item.variant_title}`;
+  }
+  
+  // Method 2: Extract from variant_options JSONB field
+  if (item.variant_options && typeof item.variant_options === 'object') {
+    const options = [];
+    
+    // Handle various possible structures in variant_options
+    if (Array.isArray(item.variant_options)) {
+      // If it's an array of option objects
+      const validOptions = item.variant_options
+        .filter(opt => opt && opt.value && opt.value !== 'Default Title')
+        .map(opt => opt.value);
+      options.push(...validOptions);
+    } else if (typeof item.variant_options === 'object') {
+      // If it's an object with key-value pairs
+      Object.entries(item.variant_options).forEach(([key, value]) => {
+        if (value && value !== 'Default Title' && typeof value === 'string') {
+          options.push(value);
+        }
+      });
+    }
+    
+    if (options.length > 0) {
+      console.log('Using Supabase variant_options:', options.join('/'));
+      return `${baseTitle} - ${options.join('/')}`;
+    }
+  }
+  
+  // Method 3: Check if title already contains variation info in parentheses
   const parenthesisMatch = baseTitle.match(/^(.+?)\s*\((.+)\)$/);
   if (parenthesisMatch && parenthesisMatch[2]) {
     const productName = parenthesisMatch[1].trim();
@@ -15,7 +47,7 @@ export const extractProductVariation = (item: any): string => {
     return `${productName} - ${variation}`;
   }
   
-  // Method 2: Check if title contains variation after dash
+  // Method 4: Check if title contains variation after dash
   const dashMatch = baseTitle.match(/^(.+?)\s*[-–—]\s*(.+)$/);
   if (dashMatch && dashMatch[2]) {
     const productName = dashMatch[1].trim();
@@ -24,15 +56,8 @@ export const extractProductVariation = (item: any): string => {
     return `${productName} - ${variation}`;
   }
   
-  // Method 3: If we have variant_title from Shopify data, use it (priority over SKU)
-  if (item.variant_title && item.variant_title !== 'Default Title' && item.variant_title.trim()) {
-    console.log('Using variant_title:', item.variant_title);
-    return `${baseTitle} - ${item.variant_title}`;
-  }
-  
-  // Method 4: Extract from SKU if it contains variation info (improved logic)
+  // Method 5: Extract from SKU if it contains variation info (improved logic)
   if (item.sku && typeof item.sku === 'string' && item.sku.trim()) {
-    // Look for patterns like "PRODUCT-COLOR-SIZE" or "PRODUCT/COLOR/SIZE" or "COLOR SIZE" format
     const sku = item.sku.trim();
     
     // Pattern 1: SKU with separators like "hakoba-wine-xl" or "hakoba/wine/xl"
@@ -76,7 +101,7 @@ export const extractProductVariation = (item: any): string => {
     }
   }
   
-  // Method 5: Try to extract variation from title patterns like "ProductName Color Size"
+  // Method 6: Try to extract variation from title patterns like "ProductName Color Size"
   const titleWords = baseTitle.trim().split(/\s+/);
   if (titleWords.length >= 3) {
     // Common patterns: "ProductName Color Size" or "Product Name Color Size"
@@ -92,9 +117,9 @@ export const extractProductVariation = (item: any): string => {
     }
   }
   
-  // Method 6: Check for Shopify variant data in various formats
+  // Method 7: Check for additional Shopify variant data
   if (item.shopify_variant_id) {
-    // If we have additional Shopify variant data that might contain the actual variation values
+    // If we have additional variant data that might contain the actual variation values
     if (item.variant_option1 || item.variant_option2 || item.variant_option3) {
       const options = [item.variant_option1, item.variant_option2, item.variant_option3]
         .filter(option => option && option !== 'Default Title' && option.trim())
@@ -106,16 +131,21 @@ export const extractProductVariation = (item: any): string => {
       }
     }
     
-    // If we have variant attributes in a different format
-    if (item.attributes && Array.isArray(item.attributes)) {
-      const variationAttrs = item.attributes
-        .filter(attr => attr.name && attr.value && attr.name !== 'Title')
-        .map(attr => attr.value)
-        .join('/');
+    // If we have product variations from the products table
+    if (item.product && item.product.variations && typeof item.product.variations === 'object') {
+      const productVariations = item.product.variations;
+      const variationValues = [];
       
-      if (variationAttrs) {
-        console.log('Using variation attributes:', variationAttrs);
-        return `${baseTitle} - ${variationAttrs}`;
+      // Extract variation values from product variations
+      Object.entries(productVariations).forEach(([key, value]) => {
+        if (value && typeof value === 'string' && value !== 'Default Title') {
+          variationValues.push(value);
+        }
+      });
+      
+      if (variationValues.length > 0) {
+        console.log('Using product variations:', variationValues.join('/'));
+        return `${baseTitle} - ${variationValues.join('/')}`;
       }
     }
   }
@@ -154,14 +184,14 @@ export const getVariationDisplay = (item: any): {
 
 // Helper function to ensure consistent variation display across stages
 export const normalizeItemForDisplay = (item: any): any => {
-  console.log('=== Normalizing item for display ===');
+  console.log('=== Normalizing item for display with Supabase data ===');
   console.log('Original item:', item);
   
   // First, try to get variation info from the item
   const variationInfo = getVariationDisplay(item);
   console.log('Variation info extracted:', variationInfo);
   
-  // Create normalized item with enhanced variation data
+  // Create normalized item with enhanced variation data from Supabase
   const normalizedItem = {
     ...item,
     // Ensure title shows the full variation info
@@ -171,9 +201,12 @@ export const normalizeItemForDisplay = (item: any): any => {
     original_sku: item.sku,
     // Add computed variation info
     computed_variation: variationInfo.variation,
-    has_variation: variationInfo.hasVariation
+    has_variation: variationInfo.hasVariation,
+    // Include Supabase variation data
+    supabase_variant_title: item.variant_title,
+    supabase_variant_options: item.variant_options
   };
   
-  console.log('Normalized item:', normalizedItem);
+  console.log('Normalized item with Supabase data:', normalizedItem);
   return normalizedItem;
 };

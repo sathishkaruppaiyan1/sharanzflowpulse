@@ -107,6 +107,8 @@ export type Database = {
           sku: string | null
           title: string
           total: number | null
+          variant_options: Json | null
+          variant_title: string | null
         }
         Insert: {
           created_at?: string
@@ -120,6 +122,8 @@ export type Database = {
           sku?: string | null
           title: string
           total?: number | null
+          variant_options?: Json | null
+          variant_title?: string | null
         }
         Update: {
           created_at?: string
@@ -133,6 +137,8 @@ export type Database = {
           sku?: string | null
           title?: string
           total?: number | null
+          variant_options?: Json | null
+          variant_title?: string | null
         }
         Relationships: [
           {
@@ -231,6 +237,8 @@ export type Database = {
           shopify_product_id: number | null
           sku: string | null
           title: string
+          variant_options: Json | null
+          variations: Json | null
           weight: number | null
         }
         Insert: {
@@ -240,6 +248,8 @@ export type Database = {
           shopify_product_id?: number | null
           sku?: string | null
           title: string
+          variant_options?: Json | null
+          variations?: Json | null
           weight?: number | null
         }
         Update: {
@@ -249,6 +259,8 @@ export type Database = {
           shopify_product_id?: number | null
           sku?: string | null
           title?: string
+          variant_options?: Json | null
+          variations?: Json | null
           weight?: number | null
         }
         Relationships: []

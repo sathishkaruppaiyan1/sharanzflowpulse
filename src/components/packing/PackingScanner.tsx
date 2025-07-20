@@ -41,7 +41,21 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     return order.order_items.find((item: any) => {
       const skuMatch = item.sku && item.sku.toLowerCase() === sku.toLowerCase();
       const nameMatch = item.title && item.title.toLowerCase().includes(sku.toLowerCase());
-      return skuMatch || nameMatch;
+      
+      // Enhanced matching with variation data from Supabase
+      const variationInfo = getVariationDisplay(item);
+      const variationMatch = variationInfo.variation && variationInfo.variation.toLowerCase().includes(sku.toLowerCase());
+      
+      console.log(`Scanner matching for SKU "${sku}":`, {
+        itemTitle: item.title,
+        itemSku: item.sku,
+        itemVariant: item.variant_title,
+        skuMatch,
+        nameMatch,
+        variationMatch
+      });
+      
+      return skuMatch || nameMatch || variationMatch;
     });
   }, []);
 
@@ -144,9 +158,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const currentScans = scannedItems[item.id] || 0;
       
       if (currentScans >= item.quantity) {
+        // Use enhanced variation display for completed items
+        const normalizedItem = normalizeItemForDisplay(item);
+        const variationInfo = getVariationDisplay(normalizedItem);
+        
         toast({
           title: "Item Complete",
-          description: `${item.title} has been scanned ${item.quantity} times already.`,
+          description: `${variationInfo.fullDisplay} has been scanned ${item.quantity} times already.`,
           variant: "default"
         });
         setSkuInput('');
@@ -164,9 +182,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       // Check if this item is now complete
       const isItemComplete = newScannedItems[item.id] >= item.quantity;
       
+      // Use enhanced variation display for scan confirmation
+      const normalizedItem = normalizeItemForDisplay(item);
+      const variationInfo = getVariationDisplay(normalizedItem);
+      
       toast({
         title: "Item Scanned",
-        description: `${item.title} scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
+        description: `${variationInfo.fullDisplay} scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
       });
 
       // If item is complete, mark it as packed
@@ -205,7 +227,6 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       setIsProcessing(false);
     }
   };
-
 
   const resetScanner = () => {
     setStep('order');
@@ -316,18 +337,26 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             </Button>
           </div>
 
-          {/* Item Status Display */}
+          {/* Enhanced Item Status Display with Supabase variation data */}
           {selectedOrder && selectedOrder.order_items && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">Items to Pack:</h4>
+              <h4 className="text-sm font-medium text-gray-700">Items to Pack (with Supabase Variations):</h4>
               <div className="grid gap-2">
                 {selectedOrder.order_items.map((item: any) => {
                   const scanned = scannedItems[item.id] || 0;
                   const isComplete = scanned >= item.quantity;
                   
-                  // Normalize item for proper variation display
+                  // Enhanced normalization with Supabase variation data
                   const normalizedItem = normalizeItemForDisplay(item);
                   const variationInfo = getVariationDisplay(normalizedItem);
+                  
+                  console.log(`Scanner display for item ${item.id}:`, {
+                    originalItem: item,
+                    supabaseVariantTitle: item.variant_title,
+                    supabaseVariantOptions: item.variant_options,
+                    normalizedItem,
+                    variationInfo
+                  });
                   
                   return (
                     <div key={item.id} className={`p-2 rounded-lg border ${isComplete ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
@@ -341,7 +370,15 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <p>SKU: {item.sku || 'N/A'}</p>
+                            {item.variant_title && (
+                              <p>Supabase Variant: {item.variant_title}</p>
+                            )}
+                            {variationInfo.hasVariation && (
+                              <p className="text-green-600">✅ Variation from Supabase</p>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right">
                           <Badge variant={isComplete ? "default" : "secondary"}>
