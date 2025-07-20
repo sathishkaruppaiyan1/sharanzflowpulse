@@ -1,4 +1,3 @@
-
 // Utility functions for extracting and formatting product variations
 export const extractProductVariation = (item: any): string => {
   console.log('=== Extracting Product Variation ===');
@@ -24,21 +23,56 @@ export const extractProductVariation = (item: any): string => {
     return `${productName} - ${variation}`;
   }
   
-  // Method 3: Extract from SKU if it contains variation info
-  if (item.sku && typeof item.sku === 'string' && item.sku.trim()) {
-    // Look for patterns like "PRODUCT-COLOR-SIZE" or "PRODUCT/COLOR/SIZE"
-    const skuParts = item.sku.split(/[-/_]/);
-    if (skuParts.length >= 3) {
-      const variation = skuParts.slice(-2).join('/'); // Take last 2 parts as variation
-      console.log('Extracted variation from SKU:', variation);
-      return `${baseTitle} - ${variation}`;
-    }
-  }
-  
-  // Method 4: If we have variant_title from Shopify data, use it
-  if (item.variant_title && item.variant_title !== 'Default Title') {
+  // Method 3: If we have variant_title from Shopify data, use it (priority over SKU)
+  if (item.variant_title && item.variant_title !== 'Default Title' && item.variant_title.trim()) {
     console.log('Using variant_title:', item.variant_title);
     return `${baseTitle} - ${item.variant_title}`;
+  }
+  
+  // Method 4: Extract from SKU if it contains variation info (improved logic)
+  if (item.sku && typeof item.sku === 'string' && item.sku.trim()) {
+    // Look for patterns like "PRODUCT-COLOR-SIZE" or "PRODUCT/COLOR/SIZE" or "COLOR SIZE" format
+    const sku = item.sku.trim();
+    
+    // Pattern 1: SKU with separators like "hakoba-wine-xl" or "hakoba/wine/xl"
+    const skuParts = sku.split(/[-/_\s]+/);
+    if (skuParts.length >= 2) {
+      // If SKU starts with product name, use the remaining parts as variation
+      const lowerTitle = baseTitle.toLowerCase();
+      const lowerFirstPart = skuParts[0].toLowerCase();
+      
+      if (lowerTitle.includes(lowerFirstPart) || lowerFirstPart.includes(lowerTitle.split(' ')[0].toLowerCase())) {
+        // SKU starts with product name, use remaining parts
+        const variation = skuParts.slice(1).join('/');
+        if (variation) {
+          console.log('Extracted variation from SKU (product-based):', variation);
+          return `${baseTitle} - ${variation}`;
+        }
+      } else {
+        // SKU doesn't start with product name, treat as color/size combination
+        if (skuParts.length === 2) {
+          const variation = skuParts.join('/');
+          console.log('Extracted variation from SKU (color/size):', variation);
+          return `${baseTitle} - ${variation}`;
+        }
+      }
+    }
+    
+    // Pattern 2: SKU as "wine xl" or "wine-xl" format (color size)
+    const colorSizeMatch = sku.match(/^([a-zA-Z]+)\s*[-_\s]\s*([a-zA-Z0-9]+)$/i);
+    if (colorSizeMatch) {
+      const variation = `${colorSizeMatch[1]}/${colorSizeMatch[2]}`;
+      console.log('Extracted color/size variation from SKU:', variation);
+      return `${baseTitle} - ${variation}`;
+    }
+    
+    // Pattern 3: Simple space-separated format like "wine xl"
+    const spaceSeparated = sku.split(/\s+/);
+    if (spaceSeparated.length === 2 && spaceSeparated.every(part => /^[a-zA-Z0-9]+$/i.test(part))) {
+      const variation = spaceSeparated.join('/');
+      console.log('Extracted space-separated variation from SKU:', variation);
+      return `${baseTitle} - ${variation}`;
+    }
   }
   
   // Method 5: Try to extract variation from title patterns like "ProductName Color Size"
@@ -57,9 +91,9 @@ export const extractProductVariation = (item: any): string => {
     }
   }
   
-  // Method 6: If we have shopify_variant_id, show it as a last resort
-  if (item.shopify_variant_id) {
-    console.log('Using shopify_variant_id as variation:', item.shopify_variant_id);
+  // Method 6: If we have shopify_variant_id, show it as a last resort only if no other variation found
+  if (item.shopify_variant_id && !item.sku) {
+    console.log('Using shopify_variant_id as variation (last resort):', item.shopify_variant_id);
     return `${baseTitle} - Variant #${item.shopify_variant_id}`;
   }
   
@@ -92,5 +126,22 @@ export const getVariationDisplay = (item: any): {
     variation: null,
     fullDisplay,
     hasVariation: false
+  };
+};
+
+// Helper function to ensure consistent variation display across stages
+export const normalizeItemForDisplay = (item: any): any => {
+  const variationInfo = getVariationDisplay(item);
+  
+  return {
+    ...item,
+    // Ensure title shows the full variation info
+    title: variationInfo.fullDisplay,
+    // Keep original data intact
+    original_title: item.title,
+    original_sku: item.sku,
+    // Add computed variation info
+    computed_variation: variationInfo.variation,
+    has_variation: variationInfo.hasVariation
   };
 };

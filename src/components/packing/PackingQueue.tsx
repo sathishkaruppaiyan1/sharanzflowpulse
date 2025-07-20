@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Shirt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
-import { getVariationDisplay } from '@/utils/productVariationUtils';
+import { getVariationDisplay, normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -42,7 +41,8 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      const variationInfo = getVariationDisplay(data);
+      const normalizedItem = normalizeItemForDisplay(data);
+      const variationInfo = getVariationDisplay(normalizedItem);
       toast.success(`${variationInfo.fullDisplay} marked as ${data.packed ? 'packed' : 'unpacked'}`);
       onOrderUpdate?.();
     },
@@ -191,7 +191,15 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                 </h4>
                 <div className="space-y-2">
                   {order.order_items.map((item) => {
-                    const variationInfo = getVariationDisplay(item);
+                    const normalizedItem = normalizeItemForDisplay(item);
+                    const variationInfo = getVariationDisplay(normalizedItem);
+                    
+                    console.log(`Packing item ${item.id}:`, {
+                      original: item,
+                      normalized: normalizedItem,
+                      variation: variationInfo
+                    });
+                    
                     return (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                         <div className="flex items-center space-x-3">

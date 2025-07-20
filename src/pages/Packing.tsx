@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Package, Scan, CheckSquare, Settings, Shirt } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -11,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StageChangeControls from '@/components/common/StageChangeControls';
-import { getVariationDisplay } from '@/utils/productVariationUtils';
+import { getVariationDisplay, normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
@@ -206,7 +205,10 @@ const Packing = () => {
                       </h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedOrder.order_items?.map((item: any) => {
-                          const variationInfo = getVariationDisplay(item);
+                          // Normalize item for proper variation display
+                          const normalizedItem = normalizeItemForDisplay(item);
+                          const variationInfo = getVariationDisplay(normalizedItem);
+                          
                           return (
                             <div key={item.id} className={`p-3 rounded border text-xs ${
                               item.packed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
@@ -288,12 +290,14 @@ const Packing = () => {
                               {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
                             </p>
                             
-                            {/* Show first few items with variations */}
+                            {/* Show first few items with proper variations */}
                             <div className="mt-1 text-xs">
                               <span className="font-medium text-gray-600">Items: </span>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {order.order_items?.slice(0, 3).map((item: any, index: number) => {
-                                  const variationInfo = getVariationDisplay(item);
+                                  const normalizedItem = normalizeItemForDisplay(item);
+                                  const variationInfo = getVariationDisplay(normalizedItem);
+                                  
                                   return (
                                     <div key={item.id} className="flex items-center space-x-1">
                                       <span className="text-blue-700 font-medium">
