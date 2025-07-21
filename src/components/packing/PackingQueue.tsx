@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
-import { getVariationDisplay, normalizeItemForDisplay } from '@/utils/productVariationUtils';
+import { getVariationDisplayText, normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 interface PackingQueueProps {
   orders: Order[];
@@ -44,10 +44,10 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
       
       // Use the enhanced variation display logic with Supabase data
       const normalizedItem = normalizeItemForDisplay(data);
-      const variationInfo = getVariationDisplay(normalizedItem);
+      const variationText = getVariationDisplayText(normalizedItem);
       
-      console.log('Packing success - showing variation:', variationInfo.fullDisplay);
-      toast.success(`${variationInfo.fullDisplay} marked as ${data.packed ? 'packed' : 'unpacked'}`);
+      console.log('Packing success - showing variation:', variationText);
+      toast.success(`${data.title || data.name} (${variationText}) marked as ${data.packed ? 'packed' : 'unpacked'}`);
       onOrderUpdate?.();
     },
     onError: (error) => {
@@ -206,7 +206,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                   {order.order_items.map((item) => {
                     // Enhanced normalization with Supabase data
                     const normalizedItem = normalizeItemForDisplay(item);
-                    const variationInfo = getVariationDisplay(normalizedItem);
+                    const variationText = getVariationDisplayText(normalizedItem);
                     
                     console.log(`=== Packing Queue Item with Supabase Data ===`);
                     console.log(`Item ID: ${item.id}`);
@@ -214,9 +214,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                     console.log('Supabase variant_title:', item.variant_title);
                     console.log('Supabase variant_options:', item.variant_options);
                     console.log('Normalized item:', normalizedItem);
-                    console.log('Final variation info:', variationInfo);
-                    console.log('Has variation:', variationInfo.hasVariation);
-                    console.log('Variation value:', variationInfo.variation);
+                    console.log('Final variation text:', variationText);
                     
                     return (
                       <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
@@ -231,13 +229,13 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
                               <p className="font-medium text-sm text-blue-900">
-                                {variationInfo.productName}
+                                {item.title || item.name}
                               </p>
-                              {variationInfo.hasVariation && variationInfo.variation && (
+                              {variationText && variationText !== 'No variations' && (
                                 <div className="flex items-center space-x-1">
                                   <span className="text-xs text-gray-400">•</span>
                                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                    {variationInfo.variation}
+                                    {variationText}
                                   </Badge>
                                 </div>
                               )}
@@ -251,7 +249,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                                 <p>Variant ID: {item.shopify_variant_id}</p>
                               )}
                               {/* Show success message if we have proper variation data */}
-                              {variationInfo.hasVariation ? (
+                              {variationText && variationText !== 'No variations' ? (
                                 <p className="text-green-600 font-medium">✅ Variation loaded from Supabase</p>
                               ) : (
                                 <p className="text-amber-600 font-medium">⚠️ Using fallback variation detection</p>

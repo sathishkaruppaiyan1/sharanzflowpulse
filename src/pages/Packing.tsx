@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StageChangeControls from '@/components/common/StageChangeControls';
-import { getVariationDisplay, normalizeItemForDisplay } from '@/utils/productVariationUtils';
+import { getVariationDisplayText, normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
@@ -207,7 +207,7 @@ const Packing = () => {
                         {selectedOrder.order_items?.map((item: any) => {
                           // Normalize item for proper variation display
                           const normalizedItem = normalizeItemForDisplay(item);
-                          const variationInfo = getVariationDisplay(normalizedItem);
+                          const variationText = getVariationDisplayText(normalizedItem);
                           
                           return (
                             <div key={item.id} className={`p-3 rounded border text-xs ${
@@ -217,11 +217,11 @@ const Packing = () => {
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-2 mb-1">
                                     <span className="font-medium text-sm text-blue-900">
-                                      {variationInfo.productName}
+                                      {item.title || item.name}
                                     </span>
-                                    {variationInfo.hasVariation && (
+                                    {variationText && variationText !== 'No variations' && (
                                       <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                        {variationInfo.variation}
+                                        {variationText}
                                       </Badge>
                                     )}
                                   </div>
@@ -231,7 +231,7 @@ const Packing = () => {
                                     {item.shopify_variant_id && (
                                       <p>Variant ID: {item.shopify_variant_id}</p>
                                     )}
-                                    {!variationInfo.hasVariation && item.shopify_variant_id && (
+                                    {!(variationText && variationText !== 'No variations') && item.shopify_variant_id && (
                                       <p className="text-amber-600 font-medium">⚠️ Variation data needed</p>
                                     )}
                                   </div>
@@ -296,16 +296,16 @@ const Packing = () => {
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {order.order_items?.slice(0, 3).map((item: any, index: number) => {
                                   const normalizedItem = normalizeItemForDisplay(item);
-                                  const variationInfo = getVariationDisplay(normalizedItem);
+                                  const variationText = getVariationDisplayText(normalizedItem);
                                   
                                   return (
                                     <div key={item.id} className="flex items-center space-x-1">
                                       <span className="text-blue-700 font-medium">
-                                        {variationInfo.productName}
+                                        {item.title || item.name}
                                       </span>
-                                      {variationInfo.hasVariation && (
+                                      {variationText && variationText !== 'No variations' && (
                                         <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                          {variationInfo.variation}
+                                          {variationText}
                                         </Badge>
                                       )}
                                       {index < Math.min(order.order_items?.length || 0, 3) - 1 && (

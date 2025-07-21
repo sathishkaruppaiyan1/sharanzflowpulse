@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
-import { normalizeItemForDisplay, getVariationDisplay } from '@/utils/productVariationUtils';
+import { normalizeItemForDisplay, getVariationDisplayText } from '@/utils/productVariationUtils';
 
 interface PackingScannerProps {
   orders: any[];
@@ -43,8 +43,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const nameMatch = item.title && item.title.toLowerCase().includes(sku.toLowerCase());
       
       // Enhanced matching with variation data from Supabase
-      const variationInfo = getVariationDisplay(item);
-      const variationMatch = variationInfo.variation && variationInfo.variation.toLowerCase().includes(sku.toLowerCase());
+      const variationText = getVariationDisplayText(item);
+      const variationMatch = variationText && variationText.toLowerCase().includes(sku.toLowerCase());
       
       console.log(`Scanner matching for SKU "${sku}":`, {
         itemTitle: item.title,
@@ -160,11 +160,11 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       if (currentScans >= item.quantity) {
         // Use enhanced variation display for completed items
         const normalizedItem = normalizeItemForDisplay(item);
-        const variationInfo = getVariationDisplay(normalizedItem);
+        const variationText = getVariationDisplayText(normalizedItem);
         
         toast({
           title: "Item Complete",
-          description: `${variationInfo.fullDisplay} has been scanned ${item.quantity} times already.`,
+          description: `${item.title || item.name} (${variationText}) has been scanned ${item.quantity} times already.`,
           variant: "default"
         });
         setSkuInput('');
@@ -184,11 +184,11 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       
       // Use enhanced variation display for scan confirmation
       const normalizedItem = normalizeItemForDisplay(item);
-      const variationInfo = getVariationDisplay(normalizedItem);
+      const variationText = getVariationDisplayText(normalizedItem);
       
       toast({
         title: "Item Scanned",
-        description: `${variationInfo.fullDisplay} scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
+        description: `${item.title || item.name} (${variationText}) scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
       });
 
       // If item is complete, mark it as packed
@@ -348,14 +348,14 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                   
                   // Enhanced normalization with Supabase variation data
                   const normalizedItem = normalizeItemForDisplay(item);
-                  const variationInfo = getVariationDisplay(normalizedItem);
+                  const variationText = getVariationDisplayText(normalizedItem);
                   
                   console.log(`Scanner display for item ${item.id}:`, {
                     originalItem: item,
                     supabaseVariantTitle: item.variant_title,
                     supabaseVariantOptions: item.variant_options,
                     normalizedItem,
-                    variationInfo
+                    variationText
                   });
                   
                   return (
@@ -363,10 +363,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                       <div className="flex justify-between items-center">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium">{variationInfo.productName}</p>
-                            {variationInfo.hasVariation && variationInfo.variation && (
+                            <p className="text-sm font-medium">{item.title || item.name}</p>
+                            {variationText && variationText !== 'No variations' && (
                               <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                {variationInfo.variation}
+                                {variationText}
                               </Badge>
                             )}
                           </div>
@@ -375,8 +375,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                             {item.variant_title && (
                               <p>Supabase Variant: {item.variant_title}</p>
                             )}
-                            {variationInfo.hasVariation && (
+                            {variationText && variationText !== 'No variations' ? (
                               <p className="text-green-600">✅ Variation from Supabase</p>
+                            ) : (
+                              <p className="text-amber-600">⚠️ Using fallback variation detection</p>
                             )}
                           </div>
                         </div>
