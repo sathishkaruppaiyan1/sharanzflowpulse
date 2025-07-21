@@ -21,7 +21,17 @@ serve(async (req) => {
 
     const { shopify_order_id, tracking_number, carrier } = await req.json()
 
-    console.log('Received request:', { shopify_order_id, tracking_number, carrier })
+    console.log('=== SHOPIFY FULFILLMENT UPDATE START ===')
+    console.log('Request data:', { shopify_order_id, tracking_number, carrier })
+
+    // Validate required fields
+    if (!shopify_order_id || !tracking_number || !carrier) {
+      console.error('Missing required fields:', { shopify_order_id, tracking_number, carrier })
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: shopify_order_id, tracking_number, carrier' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Get API configurations from system_settings
     const { data: configData, error: configError } = await supabase
@@ -33,7 +43,7 @@ serve(async (req) => {
     if (configError || !configData?.value) {
       console.error('Error fetching API configurations:', configError)
       return new Response(
-        JSON.stringify({ error: 'API configurations not found' }),
+        JSON.stringify({ error: 'API configurations not found', details: configError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -41,10 +51,25 @@ serve(async (req) => {
     const apiConfigs = configData.value as any
     const shopifyConfig = apiConfigs.shopify
 
-    if (!shopifyConfig?.enabled || !shopifyConfig?.shop_url || !shopifyConfig?.access_token) {
-      console.error('Shopify API not configured')
+    console.log('Shopify config check:', {
+      enabled: shopifyConfig?.enabled,
+      hasShopUrl: !!shopifyConfig?.shop_url,
+      hasAccessToken: !!shopifyConfig?.access_token,
+      shopUrl: shopifyConfig?.shop_url
+    })
+
+    if (!shopifyConfig?.enabled) {
+      console.error('Shopify API is not enabled')
       return new Response(
-        JSON.stringify({ error: 'Shopify API not configured' }),
+        JSON.stringify({ error: 'Shopify API is not enabled' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!shopifyConfig?.shop_url || !shopifyConfig?.access_token) {
+      console.error('Shopify API not properly configured')
+      return new Response(
+        JSON.stringify({ error: 'Shopify API not properly configured - missing shop_url or access_token' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -66,96 +91,123 @@ serve(async (req) => {
     // Get the shop domain from the shop_url
     const shopDomain = shopifyConfig.shop_url.replace(/^https?:\/\//, '').replace(/\/$/, '')
 
-    console.log('Shop domain:', shopDomain)
-    console.log('Order ID:', shopify_order_id)
-    console.log('Tracking number:', tracking_number)
-    console.log('Carrier:', trackingCompany)
+    console.log('Processing order:', {
+      shopDomain,
+      shopifyOrderId: shopify_order_id,
+      trackingNumber: tracking_number,
+      trackingCompany
+    })
 
-    // First, get the order details to get line items
-    const orderResponse = await fetch(
-      `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}.json`,
-      {
-        method: 'GET',
-        headers: {
-          'X-Shopify-Access-Token': shopifyConfig.access_token,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    // First, get the order details to check current status
+    const orderUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}.json`
+    console.log('Fetching order from:', orderUrl)
+
+    const orderResponse = await fetch(orderUrl, {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': shopifyConfig.access_token,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    console.log('Order fetch response status:', orderResponse.status)
 
     if (!orderResponse.ok) {
       const errorText = await orderResponse.text()
-      console.error('Error fetching Shopify order:', errorText)
+      console.error('Error fetching Shopify order:', {
+        status: orderResponse.status,
+        statusText: orderResponse.statusText,
+        error: errorText
+      })
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch Shopify order', details: errorText }),
+        JSON.stringify({ 
+          error: 'Failed to fetch Shopify order', 
+          status: orderResponse.status,
+          details: errorText 
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const orderData = await orderResponse.json()
-    console.log('Order data received:', JSON.stringify(orderData, null, 2))
+    console.log('Order current status:', {
+      id: orderData.order.id,
+      name: orderData.order.name,
+      fulfillmentStatus: orderData.order.fulfillment_status,
+      totalLineItems: orderData.order.line_items?.length || 0
+    })
 
     // Check if order is already fulfilled
     if (orderData.order.fulfillment_status === 'fulfilled') {
-      console.log('Order is already fulfilled, updating existing fulfillment')
+      console.log('Order is already fulfilled, attempting to update existing fulfillment')
       
       // Get existing fulfillments
-      const fulfillmentsResponse = await fetch(
-        `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`,
-        {
-          method: 'GET',
-          headers: {
-            'X-Shopify-Access-Token': shopifyConfig.access_token,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const fulfillmentsUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`
+      const fulfillmentsResponse = await fetch(fulfillmentsUrl, {
+        method: 'GET',
+        headers: {
+          'X-Shopify-Access-Token': shopifyConfig.access_token,
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (fulfillmentsResponse.ok) {
         const fulfillmentsData = await fulfillmentsResponse.json()
+        console.log('Existing fulfillments:', fulfillmentsData.fulfillments?.length || 0)
+        
         if (fulfillmentsData.fulfillments && fulfillmentsData.fulfillments.length > 0) {
           const fulfillmentId = fulfillmentsData.fulfillments[0].id
+          console.log('Updating existing fulfillment:', fulfillmentId)
           
-          // Update existing fulfillment with tracking
-          const updateResponse = await fetch(
-            `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments/${fulfillmentId}.json`,
-            {
-              method: 'PUT',
-              headers: {
-                'X-Shopify-Access-Token': shopifyConfig.access_token,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                fulfillment: {
-                  id: fulfillmentId,
-                  tracking_number: tracking_number,
-                  tracking_company: trackingCompany,
-                  notify_customer: true
-                }
-              }),
-            }
-          )
+          const updateUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments/${fulfillmentId}.json`
+          const updateResponse = await fetch(updateUrl, {
+            method: 'PUT',
+            headers: {
+              'X-Shopify-Access-Token': shopifyConfig.access_token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fulfillment: {
+                id: fulfillmentId,
+                tracking_number: tracking_number,
+                tracking_company: trackingCompany,
+                notify_customer: true
+              }
+            }),
+          })
+
+          console.log('Update fulfillment response status:', updateResponse.status)
 
           if (updateResponse.ok) {
             const updateResult = await updateResponse.json()
-            console.log('Fulfillment updated successfully:', updateResult)
+            console.log('Fulfillment updated successfully:', updateResult.fulfillment?.id)
             return new Response(
-              JSON.stringify({ success: true, fulfillment: updateResult }),
+              JSON.stringify({ 
+                success: true, 
+                fulfillment: updateResult,
+                action: 'updated_existing'
+              }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
           } else {
             const errorText = await updateResponse.text()
-            console.error('Error updating fulfillment:', errorText)
+            console.error('Error updating fulfillment:', {
+              status: updateResponse.status,
+              error: errorText
+            })
           }
         }
       }
     }
 
     // Create new fulfillment
+    console.log('Creating new fulfillment...')
     const lineItems = orderData.order.line_items.map((item: any) => ({
       id: item.id,
       quantity: item.quantity
     }))
+
+    console.log('Line items for fulfillment:', lineItems)
 
     const fulfillmentData = {
       fulfillment: {
@@ -168,50 +220,83 @@ serve(async (req) => {
       }
     }
 
-    console.log('Creating Shopify fulfillment with data:', JSON.stringify(fulfillmentData, null, 2))
+    console.log('Creating fulfillment with data:', JSON.stringify(fulfillmentData, null, 2))
 
-    const fulfillmentResponse = await fetch(
-      `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`,
-      {
-        method: 'POST',
-        headers: {
-          'X-Shopify-Access-Token': shopifyConfig.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(fulfillmentData),
-      }
-    )
+    const createUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`
+    const fulfillmentResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': shopifyConfig.access_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fulfillmentData),
+    })
+
+    console.log('Create fulfillment response status:', fulfillmentResponse.status)
 
     if (!fulfillmentResponse.ok) {
       const errorText = await fulfillmentResponse.text()
-      console.error('Error creating Shopify fulfillment:', errorText)
+      console.error('Error creating Shopify fulfillment:', {
+        status: fulfillmentResponse.status,
+        statusText: fulfillmentResponse.statusText,
+        error: errorText
+      })
       
-      // Try to parse the error response
+      // Try to parse the error response for more details
       try {
         const errorData = JSON.parse(errorText)
-        console.error('Parsed error:', errorData)
-      } catch (e) {
-        console.error('Could not parse error response')
+        console.error('Parsed Shopify error:', errorData)
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to create Shopify fulfillment', 
+            status: fulfillmentResponse.status,
+            shopifyError: errorData,
+            details: errorText 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (parseError) {
+        console.error('Could not parse error response:', parseError)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to create Shopify fulfillment', 
+            status: fulfillmentResponse.status,
+            details: errorText 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-      
-      return new Response(
-        JSON.stringify({ error: 'Failed to create Shopify fulfillment', details: errorText }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
     const fulfillmentResult = await fulfillmentResponse.json()
-    console.log('Shopify fulfillment created successfully:', fulfillmentResult)
+    console.log('Shopify fulfillment created successfully:', {
+      id: fulfillmentResult.fulfillment?.id,
+      status: fulfillmentResult.fulfillment?.status,
+      trackingNumber: fulfillmentResult.fulfillment?.tracking_number
+    })
+
+    console.log('=== SHOPIFY FULFILLMENT UPDATE END ===')
 
     return new Response(
-      JSON.stringify({ success: true, fulfillment: fulfillmentResult }),
+      JSON.stringify({ 
+        success: true, 
+        fulfillment: fulfillmentResult,
+        action: 'created_new'
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
+    console.error('=== SHOPIFY FULFILLMENT ERROR ===')
     console.error('Error in update-shopify-fulfillment:', error)
+    console.error('Error stack:', error.stack)
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ 
+        error: 'Internal server error', 
+        details: error.message,
+        stack: error.stack
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
