@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Shirt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,7 +48,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
       const variationText = getVariationDisplayText(normalizedItem);
       
       console.log('Packing success - showing variation:', variationText);
-      toast.success(`${data.title || data.name} (${variationText}) marked as ${data.packed ? 'packed' : 'unpacked'}`);
+      toast.success(`${data.title} (${variationText}) marked as ${data.packed ? 'packed' : 'unpacked'}`);
       onOrderUpdate?.();
     },
     onError: (error) => {
@@ -229,7 +230,7 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
                               <p className="font-medium text-sm text-blue-900">
-                                {item.title || item.name}
+                                {item.title}
                               </p>
                               {variationText && variationText !== 'No variations' && (
                                 <div className="flex items-center space-x-1">
