@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
@@ -161,20 +160,22 @@ export const supabaseOrderService = {
     try {
       console.log('Attempting to update Shopify order status...');
       if (order.shopify_order_id) {
+        console.log(`Updating Shopify order ${order.shopify_order_id} with tracking ${trackingNumber}`);
         await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrier);
         console.log('✅ Shopify order status updated successfully');
       } else {
         console.log('⚠️ No Shopify order ID found, skipping Shopify update');
       }
     } catch (shopifyError) {
-      console.error('Shopify update error:', shopifyError);
+      console.error('❌ Shopify update error:', shopifyError);
+      // Don't throw here - we want the order to be updated even if Shopify fails
     }
 
     return order;
   },
 
   async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
-    console.log(`Updating Shopify order ${shopifyOrderId} fulfillment`);
+    console.log(`Updating Shopify order ${shopifyOrderId} fulfillment with tracking ${trackingNumber} via ${carrier}`);
     
     try {
       const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
@@ -187,10 +188,21 @@ export const supabaseOrderService = {
 
       if (error) {
         console.error('Error calling update-shopify-fulfillment function:', error);
-        throw error;
+        throw new Error(`Shopify fulfillment update failed: ${error.message}`);
+      }
+
+      if (data?.error) {
+        console.error('Error from update-shopify-fulfillment function:', data.error);
+        throw new Error(`Shopify fulfillment update failed: ${data.error}`);
       }
 
       console.log('Shopify fulfillment update response:', data);
+      
+      if (data?.success) {
+        console.log('✅ Shopify fulfillment updated successfully');
+      } else {
+        console.log('⚠️ Shopify fulfillment update completed but response unclear');
+      }
     } catch (error) {
       console.error('Failed to update Shopify fulfillment:', error);
       throw error;
