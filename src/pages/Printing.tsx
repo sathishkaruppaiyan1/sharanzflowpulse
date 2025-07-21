@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
@@ -124,16 +125,30 @@ const Printing = () => {
             country: order.shipping_address.country,
             phone: order.customer?.phone
           } : null,
-          line_items: order.order_items?.map(item => ({
-            title: item.title,
-            name: item.title,
-            variant_title: item.sku,
-            quantity: item.quantity,
-            price: item.price,
-            product_id: item.product_id,
-            variant_id: item.shopify_variant_id,
-            sku: item.sku
-          })) || [],
+          // Enhanced line items with proper variation handling
+          line_items: order.order_items?.map(item => {
+            console.log('=== Processing Supabase order item for display ===');
+            console.log('Raw item:', item);
+            
+            // Normalize the item for proper variation display
+            const normalizedItem = normalizeItemForDisplay(item);
+            console.log('Normalized item:', normalizedItem);
+            
+            return {
+              title: normalizedItem.title,
+              name: normalizedItem.title,
+              variant_title: normalizedItem.computed_variation || item.variant_title,
+              quantity: item.quantity,
+              price: item.price,
+              product_id: item.product_id,
+              variant_id: item.shopify_variant_id,
+              sku: item.sku,
+              // Include original data for fallback
+              original_title: item.title,
+              original_sku: item.sku,
+              variant_options: item.variant_options || {}
+            };
+          }) || [],
           // Mark as Supabase order to identify source
           _isSupabaseOrder: true
         };
@@ -159,10 +174,22 @@ const Printing = () => {
       console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
       
       if (isUnfulfilled && isNotSynced) {
-        orderMap.set(orderId, {
+        // Normalize Shopify order items for consistent display
+        const normalizedOrder = {
           ...order,
+          line_items: order.line_items?.map((item: any) => {
+            const normalizedItem = normalizeItemForDisplay(item);
+            return {
+              ...item,
+              title: normalizedItem.title,
+              name: normalizedItem.title,
+              variant_title: normalizedItem.computed_variation || item.variant_title
+            };
+          }) || [],
           _isSupabaseOrder: false
-        });
+        };
+        
+        orderMap.set(orderId, normalizedOrder);
         console.log(`Added Shopify order ${order.id} to map`);
       }
     });

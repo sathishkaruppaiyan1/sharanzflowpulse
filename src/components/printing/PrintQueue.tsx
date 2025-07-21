@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import ShippingLabelPreview from './ShippingLabelPreview';
+import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 interface PrintQueueProps {
   orders: any[];
@@ -102,6 +103,21 @@ const PrintQueue = ({
     onUnselectAll?.();
   };
 
+  const getProductDisplayWithVariation = (item: any) => {
+    console.log('=== PrintQueue: Processing item for variation display ===');
+    console.log('Original item:', item);
+    
+    // Use our enhanced variation utilities
+    const normalizedItem = normalizeItemForDisplay(item);
+    console.log('Normalized item:', normalizedItem);
+    
+    return {
+      title: normalizedItem.title,
+      hasVariation: normalizedItem.has_variation,
+      variation: normalizedItem.computed_variation
+    };
+  };
+
   return (
     <>
       <div className="space-y-2">
@@ -127,16 +143,19 @@ const PrintQueue = ({
               <div className="col-span-3">
                 <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
                 <div className="space-y-1">
-                  {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => (
-                    <div key={index} className="text-xs text-gray-900">
-                      <div className="font-medium">{item.title || item.name}</div>
-                      {(item.variant_title || item.sku) && (
-                        <div className="text-gray-600 ml-1">
-                          {item.variant_title || item.sku}
-                        </div>
-                      )}
-                    </div>
-                  )) : (
+                  {order.line_items ? order.line_items.slice(0, 2).map((item: any, index: number) => {
+                    const productDisplay = getProductDisplayWithVariation(item);
+                    return (
+                      <div key={index} className="text-xs text-gray-900">
+                        <div className="font-medium">{productDisplay.title}</div>
+                        {productDisplay.hasVariation && productDisplay.variation && (
+                          <div className="text-gray-600 ml-1">
+                            {productDisplay.variation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }) : (
                     <div className="text-xs text-gray-900">Order Items</div>
                   )}
                   {order.line_items && order.line_items.length > 2 && (
