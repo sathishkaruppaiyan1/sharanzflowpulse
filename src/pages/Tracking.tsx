@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings } from 'lucide-react';
+import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
@@ -26,6 +26,7 @@ const Tracking = () => {
   const [detectedCarrier, setDetectedCarrier] = useState<string>('');
   const [isOrderLocked, setIsOrderLocked] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
+  const [shopifyStatus, setShopifyStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
 
   const handleOrderScan = () => {
@@ -43,6 +44,7 @@ const Tracking = () => {
       setCurrentOrder(order);
       setIsOrderLocked(true);
       setWhatsappStatus(null);
+      setShopifyStatus(null);
       toast.success(`Order ${order.order_number} loaded`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
@@ -75,6 +77,7 @@ const Tracking = () => {
     
     setDetectedCarrier(carrierDisplayName);
     setWhatsappStatus('pending');
+    setShopifyStatus('pending');
     
     try {
       await updateTrackingMutation.mutateAsync({
@@ -87,11 +90,18 @@ const Tracking = () => {
       const phoneNumber = getPhoneNumber(currentOrder);
       if (phoneNumber) {
         setWhatsappStatus('success');
-        toast.success(`Tracking added successfully for order ${currentOrder.order_number}. WhatsApp notification sent!`);
       } else {
         setWhatsappStatus('failed');
-        toast.warning(`Tracking added but WhatsApp notification failed - no phone number available`);
       }
+      
+      // Set Shopify status based on whether order has Shopify ID
+      if (currentOrder.shopify_order_id) {
+        setShopifyStatus('success');
+      } else {
+        setShopifyStatus('failed');
+      }
+      
+      toast.success(`🎉 Tracking added successfully for order ${currentOrder.order_number}!`);
       
       // Reset form after successful update
       setOrderIdInput('');
@@ -100,12 +110,16 @@ const Tracking = () => {
       setDetectedCarrier('');
       setIsOrderLocked(false);
       
-      // Reset WhatsApp status after a delay
-      setTimeout(() => setWhatsappStatus(null), 5000);
+      // Reset status indicators after a delay
+      setTimeout(() => {
+        setWhatsappStatus(null);
+        setShopifyStatus(null);
+      }, 5000);
       
     } catch (error) {
       console.error('Error updating tracking:', error);
       setWhatsappStatus('failed');
+      setShopifyStatus('failed');
       toast.error('Failed to update tracking information');
     }
   };
@@ -117,6 +131,7 @@ const Tracking = () => {
     setDetectedCarrier('');
     setIsOrderLocked(false);
     setWhatsappStatus(null);
+    setShopifyStatus(null);
   };
 
   if (isLoading) {
@@ -163,51 +178,103 @@ const Tracking = () => {
           {/* Tracking Stats */}
           <TrackingStats orders={trackingOrders} />
 
-          {/* WhatsApp Status Indicator */}
-          {whatsappStatus && (
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <MessageCircle className="h-5 w-5 text-blue-600" />
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">WhatsApp Notification</span>
-                      {whatsappStatus === 'pending' && (
-                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                          Sending...
-                        </Badge>
-                      )}
-                      {whatsappStatus === 'success' && (
-                        <div className="flex items-center space-x-1">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            Sent Successfully
-                          </Badge>
+          {/* Status Indicators */}
+          {(whatsappStatus || shopifyStatus) && (
+            <div className="space-y-3">
+              {/* WhatsApp Status */}
+              {whatsappStatus && (
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <MessageCircle className="h-5 w-5 text-blue-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">WhatsApp Notification</span>
+                          {whatsappStatus === 'pending' && (
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                              Sending...
+                            </Badge>
+                          )}
+                          {whatsappStatus === 'success' && (
+                            <div className="flex items-center space-x-1">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                Sent Successfully
+                              </Badge>
+                            </div>
+                          )}
+                          {whatsappStatus === 'failed' && (
+                            <div className="flex items-center space-x-1">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <Badge variant="secondary" className="bg-red-100 text-red-800">
+                                Failed to Send
+                              </Badge>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {whatsappStatus === 'failed' && (
-                        <div className="flex items-center space-x-1">
-                          <XCircle className="h-4 w-4 text-red-600" />
-                          <Badge variant="secondary" className="bg-red-100 text-red-800">
-                            Failed to Send
-                          </Badge>
-                        </div>
-                      )}
+                        {whatsappStatus === 'success' && (
+                          <p className="text-sm text-green-600 mt-1">
+                            Customer has been notified about the shipment via WhatsApp
+                          </p>
+                        )}
+                        {whatsappStatus === 'failed' && (
+                          <p className="text-sm text-red-600 mt-1">
+                            Could not send WhatsApp notification - check customer phone number
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {whatsappStatus === 'success' && (
-                      <p className="text-sm text-green-600 mt-1">
-                        Customer has been notified about the shipment via WhatsApp
-                      </p>
-                    )}
-                    {whatsappStatus === 'failed' && (
-                      <p className="text-sm text-red-600 mt-1">
-                        Could not send WhatsApp notification - check customer phone number
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Shopify Status */}
+              {shopifyStatus && (
+                <Card className="border-l-4 border-l-purple-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <ExternalLink className="h-5 w-5 text-purple-600" />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">Shopify Order Update</span>
+                          {shopifyStatus === 'pending' && (
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                              Updating...
+                            </Badge>
+                          )}
+                          {shopifyStatus === 'success' && (
+                            <div className="flex items-center space-x-1">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                Updated Successfully
+                              </Badge>
+                            </div>
+                          )}
+                          {shopifyStatus === 'failed' && (
+                            <div className="flex items-center space-x-1">
+                              <XCircle className="h-4 w-4 text-red-600" />
+                              <Badge variant="secondary" className="bg-red-100 text-red-800">
+                                Update Failed
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        {shopifyStatus === 'success' && (
+                          <p className="text-sm text-green-600 mt-1">
+                            Order has been marked as fulfilled in Shopify with tracking details
+                          </p>
+                        )}
+                        {shopifyStatus === 'failed' && (
+                          <p className="text-sm text-red-600 mt-1">
+                            Could not update Shopify order - order may not be from Shopify
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
 
           {/* Main Tracking Interface */}

@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
+import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 
 export const supabaseOrderService = {
   async fetchOrders(): Promise<Order[]> {
@@ -113,6 +114,8 @@ export const supabaseOrderService = {
   },
 
   async updateTracking(orderId: string, trackingNumber: string, carrier: CarrierType): Promise<Order> {
+    console.log(`Updating tracking for order ${orderId}: ${trackingNumber} via ${carrier}`);
+    
     const { data, error } = await supabase
       .from('orders')
       .update({ 
@@ -138,7 +141,60 @@ export const supabaseOrderService = {
       throw error;
     }
 
-    return data as Order;
+    const order = data as Order;
+    console.log(`Successfully updated tracking for order ${order.order_number}`);
+
+    // Send WhatsApp notification via Interakt
+    try {
+      console.log('Attempting to send WhatsApp notification...');
+      const whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrier);
+      if (whatsappSuccess) {
+        console.log('✅ WhatsApp notification sent successfully');
+      } else {
+        console.log('❌ WhatsApp notification failed');
+      }
+    } catch (whatsappError) {
+      console.error('WhatsApp notification error:', whatsappError);
+    }
+
+    // Update Shopify order status to fulfilled
+    try {
+      console.log('Attempting to update Shopify order status...');
+      if (order.shopify_order_id) {
+        await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrier);
+        console.log('✅ Shopify order status updated successfully');
+      } else {
+        console.log('⚠️ No Shopify order ID found, skipping Shopify update');
+      }
+    } catch (shopifyError) {
+      console.error('Shopify update error:', shopifyError);
+    }
+
+    return order;
+  },
+
+  async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
+    console.log(`Updating Shopify order ${shopifyOrderId} fulfillment`);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
+        body: {
+          shopify_order_id: shopifyOrderId,
+          tracking_number: trackingNumber,
+          carrier: carrier
+        }
+      });
+
+      if (error) {
+        console.error('Error calling update-shopify-fulfillment function:', error);
+        throw error;
+      }
+
+      console.log('Shopify fulfillment update response:', data);
+    } catch (error) {
+      console.error('Failed to update Shopify fulfillment:', error);
+      throw error;
+    }
   },
 
   async searchOrders(query: string): Promise<Order[]> {
