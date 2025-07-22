@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [], isolating,isolatingPacingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
+  const { data: packingOrders = [], isLoading,isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -82,7 +82,7 @@ const Printing = () => {
 
   // Process and filter orders with proper deduplication
   const getBaseFilteredOrders = useCallback(() => {
-    if (isloadingPackingOrders) {
+    if (isLoadingPackingOrders) {
       return[];
     }
     console.log('Total Shopify orders:', shopifyOrders.length);
@@ -196,11 +196,11 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders,isloadingPackingOrders]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders,isLoadingPackingOrders]);
 
   // Initialize filtered orders with default sorting only
   useEffect(() => {
-    if (isloadingPackingOrders) {
+    if (isLoadingPackingOrders) {
       retun;
       }
       
@@ -212,7 +212,7 @@ const Printing = () => {
       return dateB - dateA; // Newest first
     });
     setFilteredOrders(sorted);
-  }, [getBaseFilteredOrders,isloadingPackingOrders]);
+  }, [getBaseFilteredOrders,isLoadingPackingOrders]);
 
   const handleFilterChange = (filtered: any[]) => {
     setFilteredOrders(filtered);
@@ -274,7 +274,7 @@ const Printing = () => {
     refetch();
   };
 
-  if (isLoading || isloadingPackingOrders) {
+  if (isLoading || isLoadingPackingOrders) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Printing Stage" showSearch={false} />
