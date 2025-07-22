@@ -47,11 +47,12 @@ export const sendWhatsAppMessage = async (
       formattedPhone: formattedPhone,
       templateName: template.templateName,
       parameterCount: template.parameters.length,
+      parameters: template.parameters,
       hasApiKey: !!cleanApiKey,
       apiKeyLength: cleanApiKey.length
     });
 
-    // Interakt BSP API request body format
+    // Interakt BSP API request body format with proper parameter mapping
     const requestBody = {
       fullPhoneNumber: formattedPhone,
       callbackData: template.templateName,
@@ -60,12 +61,17 @@ export const sendWhatsAppMessage = async (
         name: template.templateName,
         languageCode: "en",
         headerValues: [],
-        bodyValues: template.parameters.map(param => param.value),
+        bodyValues: template.parameters.map(param => param.value), // Map parameter values in order
         buttonValues: {}
       }
     };
 
     console.log('Interakt BSP Request Body:', JSON.stringify(requestBody, null, 2));
+    console.log('Template Parameters Mapping:', template.parameters.map((param, index) => ({
+      position: index + 1,
+      placeholder: `{{${param.name}}}`,
+      value: param.value
+    })));
 
     const response = await fetch(`${baseUrl}/api/v1/public/message/`, {
       method: 'POST',
@@ -114,7 +120,9 @@ export const sendWhatsAppMessage = async (
     }
 
     // Consider it successful if no explicit failure
-    console.log('Interakt BSP message sent successfully');
+    console.log('✅ Interakt BSP message sent successfully');
+    console.log('📋 Template used: order_shipped_template');
+    console.log('🎯 Campaign ID: 990ca66f-9714-4a97-9dda-c4d9d9bbe148');
     return true;
     
   } catch (error) {

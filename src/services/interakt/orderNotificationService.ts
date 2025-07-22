@@ -74,37 +74,38 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
       customerName,
       courierName,
       trackingLink,
-      orderNumber: order.order_number
+      orderNumber: order.order_number,
+      templateName: 'order_shipped_template',
+      campaignId: '990ca66f-9714-4a97-9dda-c4d9d9bbe148'
     });
 
-    // Prepare message template - mapping to your template format
-    // {{1}} - customer name, {{2}} - courier name, {{3}} - order number, 
-    // {{4}} - tracking number, {{5}} - courier name again, {{6}} - tracking link
+    // Prepare message template with exact mapping for your template
+    // Template: "Dear {{1}} This is Black Lovers Your order 📦 has been shipped with {{2}} Courier..."
     const template: InteraktMessageTemplate = {
       templateName: 'order_shipped_template',
       parameters: [
         {
-          name: 'customer_name', // {{1}}
+          name: '1', // {{1}} - customer name
           value: customerName
         },
         {
-          name: 'courier_name_1', // {{2}}
+          name: '2', // {{2}} - courier name  
           value: courierName
         },
         {
-          name: 'order_number', // {{3}}
+          name: '3', // {{3}} - order number
           value: order.order_number
         },
         {
-          name: 'tracking_number', // {{4}}
+          name: '4', // {{4}} - tracking number
           value: trackingNumber
         },
         {
-          name: 'courier_name_2', // {{5}}
+          name: '5', // {{5}} - courier name again
           value: courierName
         },
         {
-          name: 'tracking_link', // {{6}}
+          name: '6', // {{6}} - tracking link
           value: trackingLink
         }
       ]
@@ -123,6 +124,7 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
       console.log(`✅ Shipped notification sent successfully for order ${order.order_number}`);
       console.log(`📱 WhatsApp sent to: ${order.customer.phone}`);
       console.log(`📦 Message: Customer ${customerName} notified about ${order.order_number} shipped via ${courierName}`);
+      console.log(`🔗 Campaign ID: 990ca66f-9714-4a97-9dda-c4d9d9bbe148`);
     } else {
       console.error(`❌ Failed to send shipped notification for order ${order.order_number}`);
     }
