@@ -107,10 +107,22 @@ const PrintQueue = ({
     <>
       <div className="space-y-2">
         {paginatedOrders.map((order) => {
-          // Get product items with variations
-          const productItems = isShopifyOrders 
-            ? (order.line_items || []).map(normalizeItemForDisplay)
-            : (order.order_items || []).map(normalizeItemForDisplay);
+          // Get product items with variations and debug logging
+          const rawItems = isShopifyOrders 
+            ? (order.line_items || [])
+            : (order.order_items || []);
+            
+          console.log(`Processing order ${order.id} items:`, rawItems);
+          
+          const productItems = rawItems.map(item => {
+            const normalized = normalizeItemForDisplay(item);
+            console.log(`Normalized item for order ${order.id}:`, {
+              original: item,
+              normalized: normalized,
+              variationText: normalized.variationText
+            });
+            return normalized;
+          });
 
           return (
             <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
@@ -137,7 +149,7 @@ const PrintQueue = ({
                     {productItems.slice(0, 2).map((item: any, index: number) => (
                       <div key={index} className="text-xs text-gray-900">
                         <div className="font-medium">{item.displayName}</div>
-                        <div className="text-gray-600 ml-1 text-xs">
+                        <div className="text-blue-600 ml-1 text-xs font-medium">
                           {item.variationText}
                         </div>
                       </div>
