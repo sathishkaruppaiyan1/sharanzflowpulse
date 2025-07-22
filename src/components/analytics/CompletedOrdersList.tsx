@@ -1,17 +1,20 @@
 
 import React from 'react';
-import { Package, Phone, Truck, Hash, Calendar, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { Package, Phone, Truck, Hash, Calendar, Download, FileSpreadsheet, FileText, MessageCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Order } from '@/types/database';
+import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
+import { useToast } from '@/hooks/use-toast';
 
 interface CompletedOrdersListProps {
   orders: Order[];
 }
 
 const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
+  const { toast } = useToast();
   const completedOrders = orders.filter(order => 
     order.stage === 'delivered' || order.stage === 'shipped'
   );
@@ -35,6 +38,56 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
         return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleSendWhatsApp = async (order: Order) => {
+    if (!order.tracking_number || !order.carrier) {
+      toast({
+        title: "Missing Information",
+        description: "Order must have tracking number and carrier to send WhatsApp message.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!order.customer?.phone) {
+      toast({
+        title: "No Phone Number",
+        description: "Customer phone number is not available for this order.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log(`Sending WhatsApp for order ${order.order_number}...`);
+      
+      const success = await sendOrderShippedNotification(
+        order, 
+        order.tracking_number, 
+        order.carrier as any
+      );
+
+      if (success) {
+        toast({
+          title: "WhatsApp Sent",
+          description: `Order details sent to ${order.customer.phone} successfully.`,
+        });
+      } else {
+        toast({
+          title: "Failed to Send",
+          description: "Failed to send WhatsApp message. Check console for details.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while sending WhatsApp message.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -150,6 +203,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
                 <TableHead>Status</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -210,6 +264,18 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
                         {new Date(order.created_at).toLocaleDateString()}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      onClick={() => handleSendWhatsApp(order)}
+                      variant="outline"
+                      size="sm"
+                      disabled={!order.tracking_number || !order.carrier || !order.customer?.phone}
+                      className="flex items-center space-x-1"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span>WhatsApp</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
