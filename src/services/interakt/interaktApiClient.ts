@@ -106,7 +106,7 @@ export const sendWhatsAppMessage = async (
         status: response.status,
         statusText: response.statusText,
         response: responseText,
-        url: `${baseUrl}/api/v1/public/message/`,
+        url: `${baseUrl}/v1/public/message/`,
         headers: {
           'Authorization': `Basic ${cleanApiKey.substring(0, 10)}...`,
           'Content-Type': 'application/json'
