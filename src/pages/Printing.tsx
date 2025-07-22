@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -14,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [], ispending: isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -83,7 +84,7 @@ const Printing = () => {
   // Process and filter orders with proper deduplication
   const getBaseFilteredOrders = useCallback(() => {
     if (isLoadingPackingOrders) {
-      return[];
+      return [];
     }
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
@@ -196,13 +197,13 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders,isLoadingPackingOrders]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders, isLoadingPackingOrders]);
 
   // Initialize filtered orders with default sorting only
   useEffect(() => {
     if (isLoadingPackingOrders) {
-      retun;
-      }
+      return;
+    }
       
     const baseOrders = getBaseFilteredOrders();
     // Apply default sorting (newest first)
@@ -212,7 +213,7 @@ const Printing = () => {
       return dateB - dateA; // Newest first
     });
     setFilteredOrders(sorted);
-  }, [getBaseFilteredOrders,isLoadingPackingOrders]);
+  }, [getBaseFilteredOrders, isLoadingPackingOrders]);
 
   const handleFilterChange = (filtered: any[]) => {
     setFilteredOrders(filtered);
