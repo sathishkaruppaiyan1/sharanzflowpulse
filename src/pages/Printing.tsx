@@ -127,7 +127,7 @@ const Printing = () => {
           line_items: order.order_items?.map(item => ({
             title: item.title,
             name: item.title,
-            variant_title: item.sku,
+            variant_title: item.variant_title,
             quantity: item.quantity,
             price: item.price,
             product_id: item.product_id,
