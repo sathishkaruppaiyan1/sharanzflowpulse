@@ -65,30 +65,46 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
     const trackingLink = generateTrackingLink(trackingNumber, carrier);
     const courierName = getCourierDisplayName(carrier);
 
+    // Get customer name
+    const customerName = order.customer?.first_name && order.customer?.last_name 
+      ? `${order.customer.first_name} ${order.customer.last_name}`
+      : order.customer?.first_name || order.customer?.last_name || 'Customer';
+
     console.log('Message details:', {
+      customerName,
       courierName,
       trackingLink,
       orderNumber: order.order_number
     });
 
-    // Prepare message template
+    // Prepare message template - mapping to your template format
+    // {{1}} - customer name, {{2}} - courier name, {{3}} - order number, 
+    // {{4}} - tracking number, {{5}} - courier name again, {{6}} - tracking link
     const template: InteraktMessageTemplate = {
       templateName: 'order_shipped_template',
       parameters: [
         {
-          name: 'courier_name',
+          name: 'customer_name', // {{1}}
+          value: customerName
+        },
+        {
+          name: 'courier_name_1', // {{2}}
           value: courierName
         },
         {
-          name: 'order_id',
+          name: 'order_number', // {{3}}
           value: order.order_number
         },
         {
-          name: 'tracking_number',
+          name: 'tracking_number', // {{4}}
           value: trackingNumber
         },
         {
-          name: 'tracking_link',
+          name: 'courier_name_2', // {{5}}
+          value: courierName
+        },
+        {
+          name: 'tracking_link', // {{6}}
           value: trackingLink
         }
       ]
@@ -105,6 +121,8 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
 
     if (success) {
       console.log(`✅ Shipped notification sent successfully for order ${order.order_number}`);
+      console.log(`📱 WhatsApp sent to: ${order.customer.phone}`);
+      console.log(`📦 Message: Customer ${customerName} notified about ${order.order_number} shipped via ${courierName}`);
     } else {
       console.error(`❌ Failed to send shipped notification for order ${order.order_number}`);
     }
