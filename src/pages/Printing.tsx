@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [], isLoading,isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
+  const { data: packingOrders = [], ispending: isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
