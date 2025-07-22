@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [] } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
+  const { data: packingOrders = [], isolating,isolatingPacingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -82,6 +82,9 @@ const Printing = () => {
 
   // Process and filter orders with proper deduplication
   const getBaseFilteredOrders = useCallback(() => {
+    if (isloadingPackingOrders) {
+      return[];
+    }
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
     
@@ -193,10 +196,14 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders,isloadingPackingOrders]);
 
   // Initialize filtered orders with default sorting only
   useEffect(() => {
+    if (isloadingPackingOrders) {
+      retun;
+      }
+      
     const baseOrders = getBaseFilteredOrders();
     // Apply default sorting (newest first)
     const sorted = [...baseOrders].sort((a, b) => {
@@ -205,7 +212,7 @@ const Printing = () => {
       return dateB - dateA; // Newest first
     });
     setFilteredOrders(sorted);
-  }, [getBaseFilteredOrders]);
+  }, [getBaseFilteredOrders,isloadingPackingOrders]);
 
   const handleFilterChange = (filtered: any[]) => {
     setFilteredOrders(filtered);
@@ -267,7 +274,7 @@ const Printing = () => {
     refetch();
   };
 
-  if (isLoading) {
+  if (isLoading || isloadingPackingOrders) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Printing Stage" showSearch={false} />
