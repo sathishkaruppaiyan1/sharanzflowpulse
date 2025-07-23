@@ -194,9 +194,9 @@ export const supabaseOrderService = {
 
       console.log('📤 Calling edge function with payload:', JSON.stringify(requestBody, null, 2));
 
-      // Use the invoke method with proper error handling
+      // Use the invoke method with proper error handling and make sure to send the body
       const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
-        body: requestBody,
+        body: JSON.stringify(requestBody),
         headers: {
           'Content-Type': 'application/json',
         }
