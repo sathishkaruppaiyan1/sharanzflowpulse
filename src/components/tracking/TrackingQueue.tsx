@@ -241,7 +241,7 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
                       <Label htmlFor={`tracking-${order.id}`}>Tracking Number</Label>
                       <Input
                         id={`tracking-${order.id}`}
-                        placeholder="Enter tracking number (4804... or 2158...)"
+                        placeholder="Enter tracking number (48... or 2158...)"
                         value={trackingData[order.id]?.trackingNumber || ''}
                         onChange={(e) => handleTrackingNumberChange(order.id, e.target.value)}
                       />
