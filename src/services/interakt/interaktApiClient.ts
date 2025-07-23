@@ -52,7 +52,7 @@ export const sendWhatsAppMessage = async (
     }
     
     console.log('📋 Interakt BSP API Request Debug:', {
-      url: `${baseUrl}/api/v1/public/message/`,
+      url: `${baseUrl}/v1/public/message/`,
       originalPhone: phoneNumber,
       formattedPhone: formattedPhone,
       templateName: template.templateName,
