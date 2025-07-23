@@ -143,10 +143,10 @@ const PrintQueue = ({
                 </div>
 
                 {/* Products with Variations */}
-                <div className="col-span-3">
+                <div className="col-span-4">
                   <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
                   <div className="space-y-1">
-                    {productItems.slice(0, 2).map((item: any, index: number) => (
+                    {productItems.map((item: any, index: number) => (
                       <div key={index} className="text-xs text-gray-900">
                         <div className="font-medium">{item.displayName}</div>
                         <div className="text-blue-600 ml-1 text-xs font-medium">
@@ -154,9 +154,6 @@ const PrintQueue = ({
                         </div>
                       </div>
                     ))}
-                    {productItems.length > 2 && (
-                      <div className="text-xs text-gray-500">+{productItems.length - 2} more</div>
-                    )}
                   </div>
                 </div>
 
@@ -173,7 +170,7 @@ const PrintQueue = ({
                 </div>
 
                 {/* Address */}
-                <div className="col-span-4">
+                <div className="col-span-3">
                   <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
                   <div className="text-xs text-gray-900">
                     {order.shipping_address ? (
