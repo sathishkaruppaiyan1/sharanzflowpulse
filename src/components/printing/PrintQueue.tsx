@@ -1,15 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, Clock, Users, ChevronDown, ChevronUp, Printer } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Order } from '@/types/database';
-import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
-import { toast } from 'sonner';
-import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { Card, CardContent } from '@/components/ui/card';
+import { toast } from '@/hooks/use-toast';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import ShippingLabelPreview from './ShippingLabelPreview';
+import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 interface PrintQueueProps {
   orders: any[];
@@ -21,7 +20,7 @@ interface PrintQueueProps {
   itemsPerPage?: number;
 }
 
-const PrintQueue: React.FC<PrintQueueProps> = ({ 
+const PrintQueue = ({ 
   orders, 
   isShopifyOrders = false, 
   onSelectedCountChange,
@@ -29,391 +28,247 @@ const PrintQueue: React.FC<PrintQueueProps> = ({
   onSelectAll,
   onUnselectAll,
   itemsPerPage = 10
-}) => {
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+}: PrintQueueProps) => {
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
+  const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
+  const [previewOrder, setPreviewOrder] = useState<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showLabelPreview, setShowLabelPreview] = useState(false);
-  const [orderToProcess, setOrderToProcess] = useState<any>(null);
 
-  // Use external selection state if provided, otherwise use internal state
-  const effectiveSelectedOrders = selectedOrderIds.size > 0 ? selectedOrderIds : selectedOrders;
+  // Update local state when external selectedOrderIds changes
+  useEffect(() => {
+    setSelectedOrders(selectedOrderIds);
+  }, [selectedOrderIds]);
 
   // Calculate pagination
   const totalPages = Math.ceil(orders.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentPageOrders = orders.slice(startIndex, endIndex);
+  const paginatedOrders = orders.slice(startIndex, endIndex);
 
+  // Reset to first page when orders change
   useEffect(() => {
-    if (onSelectedCountChange) {
-      onSelectedCountChange(effectiveSelectedOrders.size, effectiveSelectedOrders);
-    }
-  }, [effectiveSelectedOrders, onSelectedCountChange]);
+    setCurrentPage(1);
+  }, [orders.length]);
 
-  const handleSelectOrder = (orderId: string) => {
-    if (selectedOrderIds.size > 0) {
-      // External selection management
-      const newSelected = new Set(selectedOrderIds);
-      if (newSelected.has(orderId)) {
-        newSelected.delete(orderId);
-      } else {
-        newSelected.add(orderId);
-      }
-      onSelectedCountChange?.(newSelected.size, newSelected);
+  const handleSelectOrder = (orderId: string, checked: boolean) => {
+    const newSelected = new Set(selectedOrders);
+    if (checked) {
+      newSelected.add(orderId);
     } else {
-      // Internal selection management
-      const newSelected = new Set(selectedOrders);
-      if (newSelected.has(orderId)) {
-        newSelected.delete(orderId);
-      } else {
-        newSelected.add(orderId);
-      }
-      setSelectedOrders(newSelected);
+      newSelected.delete(orderId);
     }
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
   };
 
-  const handleSelectAll = () => {
-    if (onSelectAll) {
-      onSelectAll(currentPageOrders);
+  const handlePrintSingle = (order: any) => {
+    console.log('Opening print preview for order:', order.id);
+    setPreviewOrder(order);
+    setShowPreview(true);
+  };
+
+  const handlePrintComplete = (orderId: string) => {
+    // Remove from selected orders after successful print
+    const newSelected = new Set(selectedOrders);
+    if (Array.isArray(orderId)) {
+      orderId.forEach(id => newSelected.delete(id));
     } else {
-      const allCurrentIds = new Set(currentPageOrders.map(order => order.id));
-      setSelectedOrders(allCurrentIds);
+      newSelected.delete(orderId);
     }
-  };
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
 
-  const handleUnselectAll = () => {
-    if (onUnselectAll) {
-      onUnselectAll();
-    } else {
-      setSelectedOrders(new Set());
-    }
-  };
-
-  const toggleExpanded = (orderId: string) => {
-    const newExpanded = new Set(expandedOrders);
-    if (newExpanded.has(orderId)) {
-      newExpanded.delete(orderId);
-    } else {
-      newExpanded.add(orderId);
-    }
-    setExpandedOrders(newExpanded);
-  };
-
-  const formatPhoneNumber = (phone: string | null) => {
-    if (!phone) return 'No phone';
-    return phone.replace(/(\+\d{2})(\d{10})/, '$1 $2').replace(/(\d{5})(\d{5})/, '$1 $2');
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    // More prominent notification for stage movement
+    toast({
+      title: "🎉 Order Moved to Packing!", 
+      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
     });
+    console.log('Moving order to packing stage:', orderId);
   };
 
-  const handlePrintLabel = async (order: any) => {
-    try {
-      // Check if it's a Shopify order that needs to be synced first
-      if (isShopifyOrders && !order._isSupabaseOrder) {
-        console.log('Syncing Shopify order to Supabase before printing:', order.id);
-        
-        // Transform Shopify order to the expected format
-        const shopifyOrderData = {
-          id: order.id,
-          name: order.order_number,
-          order_number: order.order_number,
-          customer: order.customer,
-          shipping_address: order.shipping_address,
-          line_items: order.line_items,
-          current_total_price: order.current_total_price,
-          currency: order.currency,
-          created_at: order.created_at
-        };
+  const isPrinting = (orderId: string) => printingOrders.has(orderId);
 
-        const orderId = await supabaseOrderService.syncShopifyOrderToSupabase(shopifyOrderData);
-        console.log('Successfully synced order, new ID:', orderId);
-        
-        // Update the order stage to packing and set printed_at
-        await supabaseOrderService.updateOrderStage(orderId, 'packing');
-        
-        toast.success(`Order ${order.order_number} synced and ready for packing!`);
-      } else {
-        // For orders already in Supabase, just update the stage
-        await supabaseOrderService.updateOrderStage(order.id, 'packing');
-        toast.success(`Order ${order.order_number} moved to packing stage!`);
-      }
-      
-      // Remove the order from selected orders
-      if (selectedOrderIds.size > 0) {
-        const newSelected = new Set(selectedOrderIds);
-        newSelected.delete(order.id);
-        onSelectedCountChange?.(newSelected.size, newSelected);
-      } else {
-        const newSelected = new Set(selectedOrders);
-        newSelected.delete(order.id);
-        setSelectedOrders(newSelected);
-      }
-      
-    } catch (error) {
-      console.error('Error processing order:', error);
-      toast.error('Failed to process order. Please try again.');
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
     }
   };
 
-  const handlePrintLabelPreview = (order: any) => {
-    setOrderToProcess(order);
-    setShowLabelPreview(true);
+  const handleSelectCurrentPage = () => {
+    onSelectAll?.(paginatedOrders);
   };
 
-  const handlePrintComplete = async (orderId: string | string[]) => {
-    const ids = Array.isArray(orderId) ? orderId : [orderId];
-    
-    for (const id of ids) {
-      const order = currentPageOrders.find(o => o.id === id);
-      if (order) {
-        await handlePrintLabel(order);
-      }
-    }
-    
-    setShowLabelPreview(false);
-    setOrderToProcess(null);
+  const handleUnselectCurrentPage = () => {
+    onUnselectAll?.();
   };
-
-  if (orders.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders to print</h3>
-        <p className="text-gray-500">All orders have been processed or there are no matching orders.</p>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      {/* Selection Controls */}
-      <div className="flex items-center justify-between bg-blue-50 p-4 rounded-lg">
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">
-            {effectiveSelectedOrders.size} of {currentPageOrders.length} selected
-          </span>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              className="text-blue-600 border-blue-200 hover:bg-blue-100"
-            >
-              Select All ({currentPageOrders.length})
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUnselectAll}
-              className="text-gray-600 border-gray-200 hover:bg-gray-100"
-            >
-              Unselect All
-            </Button>
-          </div>
-        </div>
-        <div className="text-sm text-gray-600">
-          Page {currentPage} of {totalPages} • {orders.length} total orders
-        </div>
-      </div>
-
-      {/* Orders List */}
-      <div className="space-y-4">
-        {currentPageOrders.map((order) => {
-          const isSelected = effectiveSelectedOrders.has(order.id);
-          const isExpanded = expandedOrders.has(order.id);
+    <>
+      <div className="space-y-2">
+        {paginatedOrders.map((order) => {
+          // Get product items with variations and debug logging
+          const rawItems = isShopifyOrders 
+            ? (order.line_items || [])
+            : (order.order_items || []);
+            
+          console.log(`Processing order ${order.id} items:`, rawItems);
           
-          // Normalize items for consistent display
-          const normalizedItems = order.line_items ? 
-            order.line_items.map(normalizeItemForDisplay) : 
-            (order.order_items || []).map(normalizeItemForDisplay);
+          const productItems = rawItems.map(item => {
+            const normalized = normalizeItemForDisplay(item);
+            console.log(`Normalized item for order ${order.id}:`, {
+              original: item,
+              normalized: normalized,
+              variationText: normalized.variationText
+            });
+            return normalized;
+          });
 
           return (
-            <Card key={order.id} className={`transition-all duration-200 ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => handleSelectOrder(order.id)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-semibold text-gray-900">
-                          {order.order_number || order.name}
-                        </h3>
-                        <Badge variant="outline" className="text-xs">
-                          {order._isSupabaseOrder ? 'Supabase' : 'Shopify'}
-                        </Badge>
-                        {order.shopify_order_id && (
-                          <Badge variant="secondary" className="text-xs">
-                            #{order.shopify_order_id}
-                          </Badge>
+            <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
+              <div className="grid grid-cols-12 gap-3 items-start">
+                {/* Checkbox and Order Info */}
+                <div className="col-span-2 flex items-start space-x-2">
+                  <Checkbox
+                    checked={selectedOrders.has(order.id)}
+                    onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
+                    <p className="text-gray-600 text-xs">
+                      {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Products with Variations */}
+                <div className="col-span-3">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
+                  <div className="space-y-1">
+                    {productItems.slice(0, 2).map((item: any, index: number) => (
+                      <div key={index} className="text-xs text-gray-900">
+                        <div className="font-medium">{item.displayName}</div>
+                        <div className="text-blue-600 ml-1 text-xs font-medium">
+                          {item.variationText}
+                        </div>
+                      </div>
+                    ))}
+                    {productItems.length > 2 && (
+                      <div className="text-xs text-gray-500">+{productItems.length - 2} more</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="col-span-2">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Details:</h4>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="text-gray-900">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                    <div className="font-medium text-gray-900">₹{order.total_amount || order.current_total_price}</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="col-span-4">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
+                  <div className="text-xs text-gray-900">
+                    {order.shipping_address ? (
+                      <>
+                        <div>{order.shipping_address.address1 || order.shipping_address.address_line_1}</div>
+                        {(order.shipping_address.address2 || order.shipping_address.address_line_2) && (
+                          <div>{order.shipping_address.address2 || order.shipping_address.address_line_2}</div>
                         )}
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Users className="h-4 w-4" />
-                          <span>{order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'No customer'}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatDate(order.created_at)}</span>
-                        </div>
-                        <div className="font-medium">
-                          ₹{order.current_total_price || order.total_amount || '0'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleExpanded(order.id)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handlePrintLabelPreview(order)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <Printer className="h-4 w-4 mr-1" />
-                      Print Label
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-0">
-                {/* Phone Number */}
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="text-sm font-medium text-gray-700 mb-1">Customer Phone</div>
-                  <div className="text-lg font-mono text-gray-900">
-                    {formatPhoneNumber(order.shipping_address?.phone || order.customer?.phone)}
-                  </div>
-                </div>
-
-                {/* Products Section - Now shows all products without truncation */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-gray-900">Products ({normalizedItems.length})</h4>
-                  </div>
-                  
-                  {/* Expanded width container for all products */}
-                  <div className="bg-white border rounded-lg p-3 min-w-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                      {normalizedItems.map((item, index) => (
-                        <div key={index} className="bg-gray-50 rounded-lg p-3 min-w-0">
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900 text-sm leading-tight">
-                              {item.displayName}
-                            </div>
-                            {item.variationText && item.variationText !== 'Standard variant' && (
-                              <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                {item.variationText}
-                              </div>
-                            )}
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                              <span>Qty: {item.quantity}</span>
-                              <span>₹{item.price}</span>
-                            </div>
-                            {item.sku && (
-                              <div className="text-xs text-gray-400 font-mono">
-                                SKU: {item.sku}
-                              </div>
-                            )}
+                        <div>{order.shipping_address.city}, {order.shipping_address.province || order.shipping_address.state}</div>
+                        <div>{order.shipping_address.zip || order.shipping_address.postal_code} {order.shipping_address.country}</div>
+                        {order.shipping_address.phone && (
+                          <div className="flex items-center mt-0.5 text-red-600">
+                            <Phone className="h-2.5 w-2.5 mr-1" />
+                            <span>{order.shipping_address.phone}</span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-gray-500">Address not available</div>
+                    )}
                   </div>
                 </div>
 
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t space-y-3">
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2">Shipping Address</h4>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>{order.shipping_address?.address1}</div>
-                        {order.shipping_address?.address2 && <div>{order.shipping_address.address2}</div>}
-                        <div>
-                          {order.shipping_address?.city}, {order.shipping_address?.province} {order.shipping_address?.zip}
-                        </div>
-                        <div>{order.shipping_address?.country}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                {/* Print Button */}
+                <div className="col-span-1 flex justify-end">
+                  <Button 
+                    onClick={() => handlePrintSingle(order)}
+                    disabled={isPrinting(order.id)}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center space-x-1 h-7 px-2"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span className="text-xs">Print</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
           );
         })}
+        
+        {orders.length === 0 && (
+          <Card className="text-center py-8">
+            <CardContent>
+              <div className="text-gray-500">No orders found matching your criteria</div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-2 mt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <div className="flex space-x-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <Button
-                key={page}
-                variant={currentPage === page ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentPage(page)}
-                className="w-8 h-8 p-0"
-              >
-                {page}
-              </Button>
-            ))}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </Button>
-        </div>
-      )}
-
-      {/* Label Preview Modal */}
-      {showLabelPreview && orderToProcess && (
-        <ShippingLabelPreview
-          open={showLabelPreview}
-          onClose={() => setShowLabelPreview(false)}
-          orders={[orderToProcess]}
-          onPrintComplete={handlePrintComplete}
-        />
-      )}
-    </div>
+      <ShippingLabelPreview 
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        order={previewOrder}
+        onPrintComplete={handlePrintComplete}
+      />
+    </>
   );
 };
 
