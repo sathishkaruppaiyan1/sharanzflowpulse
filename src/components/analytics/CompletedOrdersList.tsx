@@ -1,12 +1,12 @@
-
 import React from 'react';
-import { Package, Phone, Truck, Hash, Calendar, Download, FileSpreadsheet, FileText, MessageCircle } from 'lucide-react';
+import { Package, Phone, Truck, Hash, Calendar, Download, FileSpreadsheet, FileText, MessageCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Order } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useToast } from '@/hooks/use-toast';
 
 interface CompletedOrdersListProps {
@@ -86,6 +86,48 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       toast({
         title: "Error",
         description: "An error occurred while sending WhatsApp message.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateShopifyStatus = async (order: Order) => {
+    if (!order.shopify_order_id) {
+      toast({
+        title: "No Shopify Order ID",
+        description: "This order doesn't have a Shopify order ID.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!order.tracking_number || !order.carrier) {
+      toast({
+        title: "Missing Information",
+        description: "Order must have tracking number and carrier to update Shopify status.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log(`Updating Shopify status for order ${order.order_number}...`);
+      
+      await supabaseOrderService.updateShopifyOrderFulfillment(
+        order.shopify_order_id.toString(),
+        order.tracking_number,
+        order.carrier as any
+      );
+
+      toast({
+        title: "Shopify Updated",
+        description: `Order ${order.order_number} status updated in Shopify successfully.`,
+      });
+    } catch (error) {
+      console.error('Error updating Shopify status:', error);
+      toast({
+        title: "Shopify Update Failed",
+        description: "Failed to update order status in Shopify. Check console for details.",
         variant: "destructive"
       });
     }
@@ -266,16 +308,28 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      onClick={() => handleSendWhatsApp(order)}
-                      variant="outline"
-                      size="sm"
-                      disabled={!order.tracking_number || !order.carrier || !order.customer?.phone}
-                      className="flex items-center space-x-1"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      <span>WhatsApp</span>
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={() => handleSendWhatsApp(order)}
+                        variant="outline"
+                        size="sm"
+                        disabled={!order.tracking_number || !order.carrier || !order.customer?.phone}
+                        className="flex items-center space-x-1"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        <span>WhatsApp</span>
+                      </Button>
+                      <Button
+                        onClick={() => handleUpdateShopifyStatus(order)}
+                        variant="outline"
+                        size="sm"
+                        disabled={!order.shopify_order_id || !order.tracking_number || !order.carrier}
+                        className="flex items-center space-x-1"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        <span>Update Status</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
