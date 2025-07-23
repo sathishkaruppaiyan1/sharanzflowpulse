@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -12,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/interaktService';
+import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
@@ -80,18 +80,39 @@ const Tracking = () => {
     setShopifyStatus('pending');
     
     try {
+      // Update tracking information in database
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
         carrier: carrier
       });
       
-      // Check if customer has phone number to determine WhatsApp status
+      // Automatically send WhatsApp notification
+      console.log('🚀 Automatically sending WhatsApp notification for tracking update...');
       const phoneNumber = getPhoneNumber(currentOrder);
+      
       if (phoneNumber) {
-        setWhatsappStatus('success');
+        try {
+          const whatsappSuccess = await sendOrderShippedNotification(
+            currentOrder, 
+            trackingNumber, 
+            carrier
+          );
+          
+          if (whatsappSuccess) {
+            setWhatsappStatus('success');
+            console.log('✅ WhatsApp notification sent successfully');
+          } else {
+            setWhatsappStatus('failed');
+            console.log('❌ WhatsApp notification failed');
+          }
+        } catch (whatsappError) {
+          console.error('Error sending WhatsApp notification:', whatsappError);
+          setWhatsappStatus('failed');
+        }
       } else {
         setWhatsappStatus('failed');
+        console.log('❌ No phone number available for WhatsApp notification');
       }
       
       // Set Shopify status based on whether order has Shopify ID
@@ -214,7 +235,7 @@ const Tracking = () => {
                         </div>
                         {whatsappStatus === 'success' && (
                           <p className="text-sm text-green-600 mt-1">
-                            Customer has been notified about the shipment via WhatsApp
+                            Customer has been automatically notified about the shipment via WhatsApp
                           </p>
                         )}
                         {whatsappStatus === 'failed' && (
@@ -300,7 +321,7 @@ const Tracking = () => {
                   )}
                 </div>
                 <p className="text-sm text-gray-600">
-                  Scan order ID first, then scan tracking number barcode
+                  Scan order ID first, then scan tracking number barcode (auto-sends WhatsApp)
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -380,7 +401,7 @@ const Tracking = () => {
                     )}
                     {updateTrackingMutation.isPending && (
                       <p className="text-sm text-blue-600">
-                        Adding tracking information...
+                        Adding tracking information and sending WhatsApp...
                       </p>
                     )}
                   </div>
@@ -485,6 +506,9 @@ const Tracking = () => {
                         <div className="text-sm text-blue-800">
                           <p><strong>Tracking Number:</strong> {trackingNumberInput}</p>
                           <p><strong>Courier:</strong> {detectedCarrier}</p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            📱 WhatsApp will be sent automatically when you add tracking
+                          </p>
                         </div>
                       </div>
                     )}
