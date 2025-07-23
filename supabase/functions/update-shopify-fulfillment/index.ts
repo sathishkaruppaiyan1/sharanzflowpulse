@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -38,8 +37,19 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     console.log('Reading request body...')
-    const requestBody = await req.json()
-    console.log('Request body:', requestBody)
+    const requestText = await req.text()
+    console.log('Request body text:', requestText)
+    
+    let requestBody
+    try {
+      requestBody = requestText ? JSON.parse(requestText) : {}
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     const { shopify_order_id, tracking_number, carrier } = requestBody
 
