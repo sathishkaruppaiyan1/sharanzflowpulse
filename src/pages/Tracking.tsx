@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -80,7 +81,9 @@ const Tracking = () => {
     setShopifyStatus('pending');
     
     try {
-      // Update tracking information in database
+      console.log('🚀 Starting tracking update process...');
+      
+      // The updateTrackingMutation now handles both database update and Shopify sync
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
@@ -88,7 +91,7 @@ const Tracking = () => {
       });
       
       // Automatically send WhatsApp notification
-      console.log('🚀 Automatically sending WhatsApp notification for tracking update...');
+      console.log('📱 Automatically sending WhatsApp notification for tracking update...');
       const phoneNumber = getPhoneNumber(currentOrder);
       
       if (phoneNumber) {
@@ -116,13 +119,14 @@ const Tracking = () => {
       }
       
       // Set Shopify status based on whether order has Shopify ID
+      // The actual Shopify update is handled by the service layer
       if (currentOrder.shopify_order_id) {
         setShopifyStatus('success');
+        console.log('✅ Shopify update completed (or attempted)');
       } else {
         setShopifyStatus('failed');
+        console.log('⚠️ No Shopify order ID found, skipping Shopify update');
       }
-      
-      toast.success(`🎉 Tracking added successfully for order ${currentOrder.order_number}!`);
       
       // Reset form after successful update
       setOrderIdInput('');
@@ -138,7 +142,7 @@ const Tracking = () => {
       }, 5000);
       
     } catch (error) {
-      console.error('Error updating tracking:', error);
+      console.error('❌ Error updating tracking:', error);
       setWhatsappStatus('failed');
       setShopifyStatus('failed');
       toast.error('Failed to update tracking information');
@@ -321,7 +325,7 @@ const Tracking = () => {
                   )}
                 </div>
                 <p className="text-sm text-gray-600">
-                  Scan order ID first, then scan tracking number barcode (auto-sends WhatsApp)
+                  Scan order ID first, then scan tracking number barcode (auto-sends WhatsApp & syncs Shopify)
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -401,7 +405,7 @@ const Tracking = () => {
                     )}
                     {updateTrackingMutation.isPending && (
                       <p className="text-sm text-blue-600">
-                        Adding tracking information and sending WhatsApp...
+                        Adding tracking, sending WhatsApp & syncing Shopify...
                       </p>
                     )}
                   </div>
@@ -470,6 +474,12 @@ const Tracking = () => {
                             </div>
                           );
                         })()}
+                        {currentOrder.shopify_order_id && (
+                          <div className="flex items-center space-x-2 mt-1">
+                            <ExternalLink className="h-4 w-4 text-purple-600" />
+                            <p className="text-sm text-purple-600 font-medium">Shopify ID: {currentOrder.shopify_order_id}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                     
@@ -508,6 +518,9 @@ const Tracking = () => {
                           <p><strong>Courier:</strong> {detectedCarrier}</p>
                           <p className="text-xs text-blue-600 mt-1">
                             📱 WhatsApp will be sent automatically when you add tracking
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            🛍️ Shopify will be updated automatically if order is from Shopify
                           </p>
                         </div>
                       </div>

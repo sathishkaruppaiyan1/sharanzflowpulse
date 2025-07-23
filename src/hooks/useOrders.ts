@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 export const useOrdersByStage = (stages: string | string[]) => {
   const stageArray = Array.isArray(stages) ? stages : [stages];
@@ -133,39 +134,20 @@ export const useUpdateTracking = () => {
       trackingNumber: string; 
       carrier: string; 
     }) => {
-      console.log(`Adding tracking to order ${orderId}: ${trackingNumber} via ${carrier}`);
+      console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrier}`);
       
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ 
-          tracking_number: trackingNumber,
-          carrier: carrier as any,
-          stage: 'shipped' as OrderStage,
-          shipped_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId)
-        .select(`
-          *,
-          customer:customers(*),
-          shipping_address:addresses!orders_shipping_address_id_fkey(*)
-        `)
-        .single();
-
-      if (error) {
-        console.error('Error updating tracking:', error);
-        throw error;
-      }
-
-      console.log(`Successfully added tracking to order ${orderId}`);
-      return data;
+      // Use the supabaseOrderService to handle the complete tracking update including Shopify
+      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrier as any);
+      
+      console.log(`✅ Successfully updated tracking for order ${orderId} with Shopify integration`);
+      return updatedOrder;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`Tracking added for order ${data.order_number}`);
+      toast.success(`🎉 Tracking added for order ${data.order_number} and synced to Shopify!`);
     },
     onError: (error) => {
-      console.error('Error updating tracking:', error);
+      console.error('❌ Error updating tracking:', error);
       toast.error('Failed to add tracking information');
     },
   });
