@@ -86,7 +86,7 @@ export const sendWhatsAppMessage = async (
     })));
 
     // Make the API call with proper headers
-    const response = await fetch(`${baseUrl}/api/v1/public/message/`, {
+    const response = await fetch(`${baseUrl}/v1/public/message/`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${cleanApiKey}`,
