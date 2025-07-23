@@ -67,7 +67,7 @@ const Tracking = () => {
     let carrierDisplayName = '';
     switch (carrier) {
       case 'frenchexpress':
-        carrierDisplayName = 'French Express';
+        carrierDisplayName = 'Franch Express';
         break;
       case 'delhivery':
         carrierDisplayName = 'Delhivery';
@@ -374,7 +374,7 @@ const Tracking = () => {
                             let carrierDisplayName = '';
                             switch (carrier) {
                               case 'frenchexpress':
-                                carrierDisplayName = 'French Express';
+                                carrierDisplayName = 'Franch Express';
                                 break;
                               case 'delhivery':
                                 carrierDisplayName = 'Delhivery';
