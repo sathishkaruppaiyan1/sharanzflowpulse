@@ -112,6 +112,7 @@ export const supabaseOrderService = {
     return data as Order;
   },
 
+  // UPDATED METHOD - Replace your existing updateTracking method with this
   async updateTracking(orderId: string, trackingNumber: string, carrier: CarrierType): Promise<Order> {
     console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrier}`);
     
@@ -168,9 +169,19 @@ export const supabaseOrderService = {
       } catch (shopifyError) {
         console.error('❌ Shopify update failed:', shopifyError);
         console.error('🔍 Shopify error details:', shopifyError.message);
+        
+        // Store the Shopify sync failure for retry later
+        await supabase
+          .from('orders')
+          .update({ 
+            shopify_sync_failed: true,
+            shopify_sync_error: shopifyError.message,
+            shopify_sync_attempted_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+        
         // Don't throw here - we want the order to be updated even if Shopify fails
-        // But we should show a warning to the user
-        console.warn('⚠️  Order tracking updated locally but Shopify sync failed. Please check Shopify manually.');
+        console.warn('⚠️ Order tracking updated locally but Shopify sync failed. Marked for retry.');
       }
     } else {
       console.log('⚠️ No Shopify order ID found, skipping Shopify update');
@@ -179,6 +190,7 @@ export const supabaseOrderService = {
     return order;
   },
 
+  // UPDATED METHOD - Replace your existing updateShopifyOrderFulfillment method with this
   async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
     console.log(`🔄 STARTING Shopify fulfillment update`);
     console.log(`📋 Order ID: ${shopifyOrderId}`);
@@ -194,45 +206,79 @@ export const supabaseOrderService = {
 
       console.log('📤 Calling edge function with payload:', JSON.stringify(requestPayload, null, 2));
 
-      // Use the invoke method with proper body formatting
+      // Use the invoke method with proper headers and error handling
       const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
-        body: requestPayload
+        body: requestPayload,
+        headers: {
+          'Content-Type': 'application/json',
+        }
       });
 
-      console.log('📥 Edge function raw response:', { data, error });
+      console.log('📥 Edge function response:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        errorDetails: error 
+      });
 
       // Check for invocation errors first
       if (error) {
         console.error('❌ Edge function invocation error:', error);
-        throw new Error(`Edge function failed to execute: ${error.message}`);
+        
+        // Log specific error details
+        if (error.message) {
+          console.error('Error message:', error.message);
+        }
+        if (error.context) {
+          console.error('Error context:', error.context);
+        }
+        
+        throw new Error(`Edge function failed to execute: ${error.message || 'Unknown error'}`);
       }
 
+      // Handle null or undefined data
+      if (!data) {
+        console.error('❌ Edge function returned null/undefined data');
+        throw new Error('Edge function returned no data');
+      }
+
+      console.log('📋 Full response data:', JSON.stringify(data, null, 2));
+
       // Check for application errors in the response
-      if (data?.error) {
+      if (data.error) {
         console.error('❌ Shopify API error from edge function:', data.error);
-        console.error('📋 Error details:', data.details);
-        console.error('🔍 Shopify error data:', data.shopifyError);
+        if (data.details) console.error('📋 Error details:', data.details);
+        if (data.shopifyError) console.error('🔍 Shopify error data:', data.shopifyError);
         throw new Error(`Shopify fulfillment failed: ${data.error}`);
       }
 
       // Success case
-      if (data?.success) {
+      if (data.success) {
         console.log('✅ Shopify fulfillment updated successfully');
-        console.log('🎯 Action taken:', data.action);
-        console.log('📊 Fulfillment details:', {
-          id: data.fulfillment?.fulfillment?.id,
-          status: data.fulfillment?.fulfillment?.status,
-          tracking_number: data.fulfillment?.fulfillment?.tracking_number
-        });
-      } else {
-        console.warn('⚠️ Unexpected response from edge function:', data);
-        throw new Error('Unexpected response from Shopify fulfillment service');
+        if (data.action) console.log('🎯 Action taken:', data.action);
+        if (data.fulfillment) {
+          console.log('📊 Fulfillment details:', {
+            id: data.fulfillment?.fulfillment?.id,
+            status: data.fulfillment?.fulfillment?.status,
+            tracking_number: data.fulfillment?.fulfillment?.tracking_number
+          });
+        }
+        return; // Explicit return on success
       }
+
+      // If we get here, the response format is unexpected
+      console.warn('⚠️ Unexpected response format from edge function:', data);
+      throw new Error('Unexpected response format from Shopify fulfillment service');
+
     } catch (error) {
       console.error('💥 FAILED to update Shopify fulfillment:', error);
       console.error('🔍 Error type:', error.constructor.name);
       console.error('📝 Error message:', error.message);
-      console.error('📚 Error stack:', error.stack);
+      
+      // Re-throw with more context
+      if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+        throw new Error('Shopify fulfillment service is currently unavailable. The order was updated locally but Shopify sync failed.');
+      }
+      
       throw error;
     }
   },
