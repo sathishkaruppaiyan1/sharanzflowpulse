@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useApiConfigs } from './useApiConfigs';
@@ -60,17 +59,21 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   const orders = data.orders || [];
   console.log(`Fetched ${orders.length} Shopify orders`);
   
-  // Enhanced phone number logging for debugging
+  // Enhanced phone number logging and processing
   orders.forEach((order: ShopifyOrder) => {
     const shippingPhone = order.shipping_address?.phone;
     const customerPhone = order.customer?.phone;
-    const hasPhone = shippingPhone || customerPhone;
     
     console.log(`Shopify Order ${order.order_number}:`);
     console.log(`  - shipping_address.phone: ${shippingPhone || 'null'}`);
     console.log(`  - customer.phone: ${customerPhone || 'null'}`);
-    console.log(`  - has phone: ${hasPhone ? 'YES' : 'NO'}`);
-    console.log(`  - preferred phone: ${shippingPhone || customerPhone || 'none'}`);
+    
+    // Ensure phone number is available at order level for consistency
+    if (!order.phone) {
+      order.phone = shippingPhone || customerPhone || null;
+    }
+    
+    console.log(`  - order.phone (computed): ${order.phone || 'null'}`);
   });
 
   return orders;

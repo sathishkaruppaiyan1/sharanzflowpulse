@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -142,25 +141,33 @@ serve(async (req) => {
     console.log(`Final count - Total orders fetched: ${allOrders.length}`)
     
     // Transform Shopify orders to include detailed information
-    const transformedOrders = allOrders.map((order: any) => ({
-      id: order.id.toString(),
-      order_number: order.name,
-      customer_name: order.customer 
-        ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
-        : 'Guest',
-      customer: order.customer,
-      total_amount: order.current_total_price,
-      currency: order.currency,
-      created_at: order.created_at,
-      financial_status: order.financial_status || 'pending',
-      fulfillment_status: order.fulfillment_status || 'unfulfilled',
-      line_items: order.line_items || [],
-      shipping_address: order.shipping_address,
-      total_weight: order.total_weight,
-      current_total_price: order.current_total_price
-    }))
+    const transformedOrders = allOrders.map((order: any) => {
+      // Extract phone number from multiple sources
+      const customerPhone = order.customer?.phone;
+      const shippingPhone = order.shipping_address?.phone;
+      const orderPhone = shippingPhone || customerPhone || null;
+      
+      return {
+        id: order.id.toString(),
+        order_number: order.name,
+        customer_name: order.customer 
+          ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
+          : 'Guest',
+        customer: order.customer,
+        total_amount: order.current_total_price,
+        currency: order.currency,
+        created_at: order.created_at,
+        financial_status: order.financial_status || 'pending',
+        fulfillment_status: order.fulfillment_status || 'unfulfilled',
+        line_items: order.line_items || [],
+        shipping_address: order.shipping_address,
+        total_weight: order.total_weight,
+        current_total_price: order.current_total_price,
+        phone: orderPhone // Add phone at order level for consistency
+      }
+    })
 
-    console.log(`Returning ${transformedOrders.length} transformed orders`)
+    console.log(`Returning ${transformedOrders.length} transformed orders with phone numbers`)
 
     return new Response(
       JSON.stringify({ orders: transformedOrders }),

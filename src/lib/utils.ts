@@ -1,4 +1,3 @@
-
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -6,17 +5,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Helper function to get phone number from order
+// Enhanced helper function to get phone number from order with better fallback logic
 export const getPhoneNumber = (order: any) => {
   // Debug logging to trace phone number sources
-  console.log('getPhoneNumber debug for order:', order.order_number);
-  console.log('- customer.phone:', order.customer?.phone);
-  console.log('- shipping_address exists:', !!order.shipping_address);
+  console.log('getPhoneNumber debug for order:', order.order_number || order.name || order.id);
   
-  // Only try customer phone since shipping address doesn't have phone in our schema
-  const phone = order.customer?.phone || null;
-  console.log('- final phone:', phone);
-  return phone;
+  let phone = null;
+  
+  // Check multiple sources for phone number
+  if (order.customer?.phone) {
+    console.log('- Found customer.phone:', order.customer.phone);
+    phone = order.customer.phone;
+  } else if (order.shipping_address?.phone) {
+    console.log('- Found shipping_address.phone:', order.shipping_address.phone);
+    phone = order.shipping_address.phone;
+  } else if (order.phone) {
+    console.log('- Found order.phone:', order.phone);
+    phone = order.phone;
+  }
+  
+  // Clean up phone number format
+  if (phone) {
+    phone = phone.toString().trim();
+    // Remove empty strings
+    if (phone === '' || phone === 'null' || phone === 'undefined') {
+      phone = null;
+    }
+  }
+  
+  console.log('- Final phone result:', phone || 'N/A');
+  return phone || 'N/A';
 };
 
 // Code 128 character set and encoding patterns
