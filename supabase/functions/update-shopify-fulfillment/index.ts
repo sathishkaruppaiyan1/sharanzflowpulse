@@ -1,4 +1,5 @@
 
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -327,7 +328,15 @@ serve(async (req) => {
     console.log('Create fulfillment response headers:', Object.fromEntries(fulfillmentResponse.headers.entries()))
 
     if (!fulfillmentResponse.ok) {
-      const errorText = await fulfillmentResponse.text()
+      // Get response text safely, handling empty responses
+      let errorText = ''
+      try {
+        errorText = await fulfillmentResponse.text()
+      } catch (e) {
+        console.error('Could not read error response text:', e)
+        errorText = 'Unable to read error response'
+      }
+
       console.error('Error creating Shopify fulfillment:', {
         status: fulfillmentResponse.status,
         statusText: fulfillmentResponse.statusText,
@@ -335,33 +344,49 @@ serve(async (req) => {
         error: errorText
       })
       
-      // Try to parse the error response for more details
-      try {
-        const errorData = JSON.parse(errorText)
-        console.error('Parsed Shopify error:', errorData)
-        
+      // Handle specific Shopify error cases
+      if (fulfillmentResponse.status === 406) {
         return new Response(
           JSON.stringify({ 
-            error: 'Failed to create Shopify fulfillment', 
+            error: 'Order cannot be fulfilled - it may already be fulfilled or have invalid line items', 
             status: fulfillmentResponse.status,
             statusText: fulfillmentResponse.statusText,
-            shopifyError: errorData,
-            details: errorText 
+            details: errorText || 'Shopify returned 406 Not Acceptable'
           }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      } catch (parseError) {
-        console.error('Could not parse error response:', parseError)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to create Shopify fulfillment', 
-            status: fulfillmentResponse.status,
-            statusText: fulfillmentResponse.statusText,
-            details: errorText 
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+      
+      // Try to parse the error response for more details if not empty
+      if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText)
+          console.error('Parsed Shopify error:', errorData)
+          
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to create Shopify fulfillment', 
+              status: fulfillmentResponse.status,
+              statusText: fulfillmentResponse.statusText,
+              shopifyError: errorData,
+              details: errorText 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError)
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create Shopify fulfillment', 
+          status: fulfillmentResponse.status,
+          statusText: fulfillmentResponse.statusText,
+          details: errorText || 'No error details available'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const fulfillmentResult = await fulfillmentResponse.json()
@@ -399,3 +424,4 @@ serve(async (req) => {
     )
   }
 })
+
