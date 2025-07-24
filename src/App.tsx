@@ -14,6 +14,7 @@ import Orders from './pages/Orders';
 import Printing from './pages/Printing';
 import Packing from './pages/Packing';
 import Tracking from './pages/Tracking';
+import Delivery from './pages/Delivery';
 import Analytics from './pages/Analytics';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
@@ -100,6 +101,7 @@ const App = () => {
                 <Route path="/printing" element={<Printing />} />
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/tracking" element={<Tracking />} />
+                <Route path="/delivery" element={<Delivery />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
