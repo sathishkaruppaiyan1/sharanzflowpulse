@@ -1,5 +1,4 @@
 
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -136,7 +135,109 @@ serve(async (req) => {
       trackingCompany
     })
 
-    // First, get the order details to check current status
+    // First, get existing fulfillments for this order
+    const fulfillmentsUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`
+    console.log('Fetching existing fulfillments from:', fulfillmentsUrl)
+    
+    const fulfillmentsResponse = await fetch(fulfillmentsUrl, {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': shopifyConfig.access_token,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    console.log('Fulfillments fetch response status:', fulfillmentsResponse.status)
+
+    if (fulfillmentsResponse.ok) {
+      const fulfillmentsData = await fulfillmentsResponse.json()
+      console.log('Existing fulfillments:', {
+        count: fulfillmentsData.fulfillments?.length || 0,
+        fulfillments: fulfillmentsData.fulfillments?.map((f: any) => ({
+          id: f.id,
+          status: f.status,
+          tracking_number: f.tracking_number,
+          tracking_company: f.tracking_company
+        }))
+      })
+      
+      if (fulfillmentsData.fulfillments && fulfillmentsData.fulfillments.length > 0) {
+        // Find an active fulfillment (not cancelled)
+        const activeFulfillment = fulfillmentsData.fulfillments.find((f: any) => 
+          f.status !== 'cancelled' && f.status !== 'failure'
+        )
+        
+        if (activeFulfillment) {
+          console.log('Found existing active fulfillment, updating tracking info:', activeFulfillment.id)
+          
+          const updateUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments/${activeFulfillment.id}.json`
+          console.log('Update URL:', updateUrl)
+          
+          const updatePayload = {
+            fulfillment: {
+              id: activeFulfillment.id,
+              tracking_number: tracking_number,
+              tracking_company: trackingCompany,
+              notify_customer: true
+            }
+          }
+          
+          console.log('Update payload:', JSON.stringify(updatePayload, null, 2))
+          
+          const updateResponse = await fetch(updateUrl, {
+            method: 'PUT',
+            headers: {
+              'X-Shopify-Access-Token': shopifyConfig.access_token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatePayload),
+          })
+
+          console.log('Update fulfillment response status:', updateResponse.status)
+          console.log('Update fulfillment response headers:', Object.fromEntries(updateResponse.headers.entries()))
+
+          if (updateResponse.ok) {
+            const updateResult = await updateResponse.json()
+            console.log('Fulfillment updated successfully:', {
+              id: updateResult.fulfillment?.id,
+              tracking_number: updateResult.fulfillment?.tracking_number,
+              tracking_company: updateResult.fulfillment?.tracking_company,
+              status: updateResult.fulfillment?.status
+            })
+            
+            console.log('=== SHOPIFY FULFILLMENT UPDATE SUCCESS ===')
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                fulfillment: updateResult,
+                action: 'updated_existing_fulfillment'
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          } else {
+            const errorText = await updateResponse.text()
+            console.error('Error updating fulfillment:', {
+              status: updateResponse.status,
+              statusText: updateResponse.statusText,
+              headers: Object.fromEntries(updateResponse.headers.entries()),
+              error: errorText
+            })
+            
+            return new Response(
+              JSON.stringify({ 
+                error: 'Failed to update existing fulfillment', 
+                status: updateResponse.status,
+                statusText: updateResponse.statusText,
+                details: errorText || 'No error details available'
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
+      }
+    }
+
+    // If no existing fulfillment found or if fetching failed, get order details and try to create new fulfillment
     const orderUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}.json`
     console.log('Fetching order from:', orderUrl)
 
@@ -188,109 +289,7 @@ serve(async (req) => {
       )
     }
 
-    // Check if order is already fulfilled
-    if (orderData.order.fulfillment_status === 'fulfilled') {
-      console.log('Order is already fulfilled, attempting to update existing fulfillment')
-      
-      // Get existing fulfillments
-      const fulfillmentsUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments.json`
-      console.log('Fetching existing fulfillments from:', fulfillmentsUrl)
-      
-      const fulfillmentsResponse = await fetch(fulfillmentsUrl, {
-        method: 'GET',
-        headers: {
-          'X-Shopify-Access-Token': shopifyConfig.access_token,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      console.log('Fulfillments fetch response status:', fulfillmentsResponse.status)
-
-      if (fulfillmentsResponse.ok) {
-        const fulfillmentsData = await fulfillmentsResponse.json()
-        console.log('Existing fulfillments:', {
-          count: fulfillmentsData.fulfillments?.length || 0,
-          fulfillments: fulfillmentsData.fulfillments?.map((f: any) => ({
-            id: f.id,
-            status: f.status,
-            tracking_number: f.tracking_number,
-            tracking_company: f.tracking_company
-          }))
-        })
-        
-        if (fulfillmentsData.fulfillments && fulfillmentsData.fulfillments.length > 0) {
-          // Find an active fulfillment (not cancelled)
-          const activeFulfillment = fulfillmentsData.fulfillments.find((f: any) => 
-            f.status !== 'cancelled' && f.status !== 'failure'
-          )
-          
-          if (activeFulfillment) {
-            console.log('Updating existing active fulfillment:', activeFulfillment.id)
-            
-            const updateUrl = `https://${shopDomain}/admin/api/2023-10/orders/${shopify_order_id}/fulfillments/${activeFulfillment.id}.json`
-            console.log('Update URL:', updateUrl)
-            
-            const updatePayload = {
-              fulfillment: {
-                id: activeFulfillment.id,
-                tracking_number: tracking_number,
-                tracking_company: trackingCompany,
-                notify_customer: true
-              }
-            }
-            
-            console.log('Update payload:', JSON.stringify(updatePayload, null, 2))
-            
-            const updateResponse = await fetch(updateUrl, {
-              method: 'PUT',
-              headers: {
-                'X-Shopify-Access-Token': shopifyConfig.access_token,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(updatePayload),
-            })
-
-            console.log('Update fulfillment response status:', updateResponse.status)
-            console.log('Update fulfillment response headers:', Object.fromEntries(updateResponse.headers.entries()))
-
-            if (updateResponse.ok) {
-              const updateResult = await updateResponse.json()
-              console.log('Fulfillment updated successfully:', {
-                id: updateResult.fulfillment?.id,
-                tracking_number: updateResult.fulfillment?.tracking_number,
-                tracking_company: updateResult.fulfillment?.tracking_company,
-                status: updateResult.fulfillment?.status
-              })
-              
-              console.log('=== SHOPIFY FULFILLMENT UPDATE SUCCESS ===')
-              return new Response(
-                JSON.stringify({ 
-                  success: true, 
-                  fulfillment: updateResult,
-                  action: 'updated_existing'
-                }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              )
-            } else {
-              const errorText = await updateResponse.text()
-              console.error('Error updating fulfillment:', {
-                status: updateResponse.status,
-                statusText: updateResponse.statusText,
-                headers: Object.fromEntries(updateResponse.headers.entries()),
-                error: errorText
-              })
-              
-              // If updating failed, fall through to create new fulfillment
-              console.log('Failed to update existing fulfillment, will create new one')
-            }
-          } else {
-            console.log('No active fulfillments found (all are cancelled/failed), will create new one')
-          }
-        }
-      }
-    }
-
-    // Create new fulfillment
+    // Create new fulfillment if no existing one was found/updated
     console.log('Creating new fulfillment...')
     const lineItems = orderData.order.line_items.map((item: any) => ({
       id: item.id,
@@ -403,7 +402,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         fulfillment: fulfillmentResult,
-        action: 'created_new'
+        action: 'created_new_fulfillment'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
@@ -424,4 +423,3 @@ serve(async (req) => {
     )
   }
 })
-
