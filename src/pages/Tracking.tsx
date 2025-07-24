@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
@@ -29,6 +28,51 @@ const Tracking = () => {
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [shopifyStatus, setShopifyStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
+
+  const orderInputRef = useRef<HTMLInputElement>(null);
+  const trackingInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep order input focused when order is not locked
+  useEffect(() => {
+    if (!isOrderLocked && orderInputRef.current) {
+      orderInputRef.current.focus();
+    }
+  }, [isOrderLocked]);
+
+  // Re-focus order input when it loses focus (only when not locked)
+  useEffect(() => {
+    if (!isOrderLocked) {
+      const handleFocus = () => {
+        if (orderInputRef.current && document.activeElement !== orderInputRef.current) {
+          orderInputRef.current.focus();
+        }
+      };
+
+      const interval = setInterval(handleFocus, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isOrderLocked]);
+
+  // Keep tracking input focused when order is locked
+  useEffect(() => {
+    if (isOrderLocked && trackingInputRef.current) {
+      trackingInputRef.current.focus();
+    }
+  }, [isOrderLocked]);
+
+  // Re-focus tracking input when it loses focus (only when order is locked)
+  useEffect(() => {
+    if (isOrderLocked) {
+      const handleFocus = () => {
+        if (trackingInputRef.current && document.activeElement !== trackingInputRef.current) {
+          trackingInputRef.current.focus();
+        }
+      };
+
+      const interval = setInterval(handleFocus, 100);
+      return () => clearInterval(interval);
+    }
+  }, [isOrderLocked]);
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
@@ -335,12 +379,14 @@ const Tracking = () => {
                   <label className="text-sm font-medium text-gray-700">Order ID Scanner</label>
                   <div className="flex space-x-2">
                     <Input
+                      ref={orderInputRef}
                       placeholder="Scan or enter Order ID"
                       value={orderIdInput}
                       onChange={(e) => setOrderIdInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && !isOrderLocked && handleOrderScan()}
                       className="flex-1"
                       disabled={isOrderLocked}
+                      autoFocus
                     />
                     <Button 
                       onClick={handleOrderScan}
@@ -365,6 +411,7 @@ const Tracking = () => {
                     <label className="text-sm font-medium text-gray-700">Tracking Number Scanner</label>
                     <div className="flex space-x-2">
                       <Input
+                        ref={trackingInputRef}
                         placeholder="Scan tracking number barcode"
                         value={trackingNumberInput}
                         onChange={(e) => {
@@ -387,6 +434,7 @@ const Tracking = () => {
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleTrackingNumberScan()}
                         className="flex-1"
+                        autoFocus
                       />
                       <Button 
                         onClick={handleTrackingNumberScan}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,48 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+
+  // Keep order input focused when in order step
+  useEffect(() => {
+    if (step === 'order' && orderInputRef.current) {
+      orderInputRef.current.focus();
+    }
+  }, [step]);
+
+  // Re-focus order input when it loses focus (only in order step)
+  useEffect(() => {
+    if (step === 'order') {
+      const handleFocus = () => {
+        if (orderInputRef.current && document.activeElement !== orderInputRef.current) {
+          orderInputRef.current.focus();
+        }
+      };
+
+      const interval = setInterval(handleFocus, 100);
+      return () => clearInterval(interval);
+    }
+  }, [step]);
+
+  // Keep SKU input focused when in SKU step
+  useEffect(() => {
+    if (step === 'sku' && skuInputRef.current) {
+      skuInputRef.current.focus();
+    }
+  }, [step]);
+
+  // Re-focus SKU input when it loses focus (only in SKU step)
+  useEffect(() => {
+    if (step === 'sku') {
+      const handleFocus = () => {
+        if (skuInputRef.current && document.activeElement !== skuInputRef.current) {
+          skuInputRef.current.focus();
+        }
+      };
+
+      const interval = setInterval(handleFocus, 100);
+      return () => clearInterval(interval);
+    }
+  }, [step]);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
     return orders.find(order => 
@@ -271,6 +313,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             onKeyPress={handleOrderKeyPress}
             disabled={isProcessing || step === 'sku'}
             className="flex-1"
+            autoFocus
           />
           <Button 
             variant="outline" 
@@ -326,6 +369,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               onKeyPress={handleSKUKeyPress}
               disabled={isProcessing}
               className="flex-1"
+              autoFocus
             />
             <Button 
               variant="outline" 
