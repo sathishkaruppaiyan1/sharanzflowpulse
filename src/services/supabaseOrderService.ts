@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
@@ -170,18 +171,8 @@ export const supabaseOrderService = {
         console.error('❌ Shopify update failed:', shopifyError);
         console.error('🔍 Shopify error details:', shopifyError.message);
         
-        // Store the Shopify sync failure for retry later
-        await supabase
-          .from('orders')
-          .update({ 
-            shopify_sync_failed: true,
-            shopify_sync_error: shopifyError.message,
-            shopify_sync_attempted_at: new Date().toISOString()
-          })
-          .eq('id', orderId);
-        
         // Don't throw here - we want the order to be updated even if Shopify fails
-        console.warn('⚠️ Order tracking updated locally but Shopify sync failed. Marked for retry.');
+        console.warn('⚠️ Order tracking updated locally but Shopify sync failed.');
       }
     } else {
       console.log('⚠️ No Shopify order ID found, skipping Shopify update');
@@ -190,7 +181,7 @@ export const supabaseOrderService = {
     return order;
   },
 
-  // UPDATED METHOD - Replace your existing updateShopifyOrderFulfillment method with this
+  // FIXED METHOD - Better error handling and proper request format
   async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
     console.log(`🔄 STARTING Shopify fulfillment update`);
     console.log(`📋 Order ID: ${shopifyOrderId}`);
@@ -204,48 +195,38 @@ export const supabaseOrderService = {
         carrier: carrier
       };
 
-      console.log('📤 Calling edge function with payload:', JSON.stringify(requestPayload, null, 2));
+      console.log('📤 Sending request to edge function:', JSON.stringify(requestPayload, null, 2));
 
-      // Use the invoke method with proper headers and error handling
-      const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
-        body: requestPayload,
+      // Use fetch directly for better control over the request
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/update-shopify-fulfillment`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'apikey': supabase.supabaseKey,
+        },
+        body: JSON.stringify(requestPayload)
       });
 
-      console.log('📥 Edge function response:', { 
-        hasData: !!data, 
-        hasError: !!error,
-        errorDetails: error 
-      });
+      console.log('📥 Raw response status:', response.status);
+      console.log('📥 Raw response headers:', Object.fromEntries(response.headers.entries()));
 
-      // Check for invocation errors first
-      if (error) {
-        console.error('❌ Edge function invocation error:', error);
-        
-        // Log specific error details
-        if (error.message) {
-          console.error('Error message:', error.message);
-        }
-        if (error.context) {
-          console.error('Error context:', error.context);
-        }
-        
-        throw new Error(`Edge function failed to execute: ${error.message || 'Unknown error'}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
-      // Handle null or undefined data
-      if (!data) {
-        console.error('❌ Edge function returned null/undefined data');
-        throw new Error('Edge function returned no data');
-      }
-
-      console.log('📋 Full response data:', JSON.stringify(data, null, 2));
+      const data = await response.json();
+      console.log('📋 Response data:', JSON.stringify(data, null, 2));
 
       // Check for application errors in the response
       if (data.error) {
-        console.error('❌ Shopify API error from edge function:', data.error);
+        console.error('❌ Shopify API error:', data.error);
         if (data.details) console.error('📋 Error details:', data.details);
         if (data.shopifyError) console.error('🔍 Shopify error data:', data.shopifyError);
         throw new Error(`Shopify fulfillment failed: ${data.error}`);
@@ -262,11 +243,11 @@ export const supabaseOrderService = {
             tracking_number: data.fulfillment?.fulfillment?.tracking_number
           });
         }
-        return; // Explicit return on success
+        return;
       }
 
       // If we get here, the response format is unexpected
-      console.warn('⚠️ Unexpected response format from edge function:', data);
+      console.warn('⚠️ Unexpected response format:', data);
       throw new Error('Unexpected response format from Shopify fulfillment service');
 
     } catch (error) {
@@ -275,11 +256,7 @@ export const supabaseOrderService = {
       console.error('📝 Error message:', error.message);
       
       // Re-throw with more context
-      if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-        throw new Error('Shopify fulfillment service is currently unavailable. The order was updated locally but Shopify sync failed.');
-      }
-      
-      throw error;
+      throw new Error(`Shopify fulfillment update failed: ${error.message}`);
     }
   },
 
