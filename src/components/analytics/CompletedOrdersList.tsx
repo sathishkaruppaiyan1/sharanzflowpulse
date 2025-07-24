@@ -125,11 +125,28 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       });
     } catch (error) {
       console.error('Error updating Shopify status:', error);
-      toast({
-        title: "Shopify Update Failed",
-        description: "Failed to update order status in Shopify. Check console for details.",
-        variant: "destructive"
-      });
+      
+      // Handle specific Shopify fulfillment errors
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Order cannot be fulfilled') || errorMessage.includes('already be fulfilled')) {
+        toast({
+          title: "Order Already Fulfilled",
+          description: `Order ${order.order_number} is already fulfilled in Shopify or cannot be fulfilled at this time.`,
+          variant: "destructive"
+        });
+      } else if (errorMessage.includes('Invalid JWT') || errorMessage.includes('Unauthorized')) {
+        toast({
+          title: "Authentication Error",
+          description: "Please refresh the page and try again.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Shopify Update Failed",
+          description: "Failed to update order status in Shopify. Check console for details.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
