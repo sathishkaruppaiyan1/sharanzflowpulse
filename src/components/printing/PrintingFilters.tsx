@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import ProductSearchSelect from './ProductSearchSelect';
+import { extractUniqueColors, extractUniqueSizes, getColorsForProduct, getSizesForProduct, parseVariationInfo } from '@/utils/variationUtils';
 
 interface PrintingFiltersProps {
   orders: any[];
@@ -14,13 +15,15 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
   const [filters, setFilters] = useState({
     filterType: 'contains',
     product: 'all',
-    variation: 'all',
+    color: 'all',
+    size: 'all',
+    variation: 'all', // Keep this for backward compatibility
     orderDate: '',
     sortOrder: 'newest'
   });
 
-  // Extract unique products and variations from real Shopify orders
-  const { uniqueProducts, uniqueVariations, filteredVariations } = useMemo(() => {
+  // Extract unique products, colors, and sizes from orders
+  const { uniqueProducts, uniqueColors, uniqueSizes, productSpecificColors, productSpecificSizes, filteredVariations } = useMemo(() => {
     const products = new Set<string>();
     const allVariations = new Set<string>();
     const productVariationsMap = new Map<string, Set<string>>();
@@ -46,14 +49,25 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       }
     });
 
-    // Get variations for selected product
+    // Get all unique colors and sizes
+    const allColors = extractUniqueColors(orders);
+    const allSizes = extractUniqueSizes(orders);
+
+    // Get colors and sizes for selected product
+    const productColors = filters.product !== 'all' ? getColorsForProduct(orders, filters.product) : allColors;
+    const productSizes = filters.product !== 'all' ? getSizesForProduct(orders, filters.product) : allSizes;
+
+    // Get variations for selected product (for backward compatibility)
     const productSpecificVariations: string[] = filters.product !== 'all' && productVariationsMap.has(filters.product)
       ? Array.from(productVariationsMap.get(filters.product) || new Set<string>())
       : Array.from(allVariations);
 
     return {
       uniqueProducts: Array.from(products),
-      uniqueVariations: Array.from(allVariations),
+      uniqueColors: allColors,
+      uniqueSizes: allSizes,
+      productSpecificColors: productColors,
+      productSpecificSizes: productSizes,
       filteredVariations: productSpecificVariations
     };
   }, [orders, filters.product]);
@@ -69,25 +83,55 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
         if (!order.line_items || !Array.isArray(order.line_items)) return false;
         
         if (filters.filterType === 'contains') {
-          // Order contains this product (among possibly others)
           const hasProduct = order.line_items.some((item: any) => 
             (item.title || item.name) === filters.product
           );
-          console.log(`Order ${order.id} contains product ${filters.product}:`, hasProduct);
           return hasProduct;
         } else { // only_has
-          // Order ONLY has this product (no other products)
           const onlyHasProduct = order.line_items.every((item: any) => 
             (item.title || item.name) === filters.product
           );
-          console.log(`Order ${order.id} only has product ${filters.product}:`, onlyHasProduct);
           return onlyHasProduct;
         }
       });
       console.log('After product filter:', filtered.length);
     }
 
-    // Apply variation filter - Only if a specific variation is selected
+    // Apply color filter
+    if (filters.color !== 'all') {
+      console.log('Filtering by color:', filters.color);
+      filtered = filtered.filter(order => {
+        if (!order.line_items || !Array.isArray(order.line_items)) return false;
+        const hasColor = order.line_items.some((item: any) => {
+          if (item.variant_title) {
+            const variationInfo = parseVariationInfo(item.variant_title);
+            return variationInfo.color === filters.color;
+          }
+          return false;
+        });
+        return hasColor;
+      });
+      console.log('After color filter:', filtered.length);
+    }
+
+    // Apply size filter
+    if (filters.size !== 'all') {
+      console.log('Filtering by size:', filters.size);
+      filtered = filtered.filter(order => {
+        if (!order.line_items || !Array.isArray(order.line_items)) return false;
+        const hasSize = order.line_items.some((item: any) => {
+          if (item.variant_title) {
+            const variationInfo = parseVariationInfo(item.variant_title);
+            return variationInfo.size === filters.size;
+          }
+          return false;
+        });
+        return hasSize;
+      });
+      console.log('After size filter:', filtered.length);
+    }
+
+    // Apply variation filter (for backward compatibility)
     if (filters.variation !== 'all') {
       console.log('Filtering by variation:', filters.variation);
       filtered = filtered.filter(order => {
@@ -95,7 +139,6 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
         const hasVariation = order.line_items.some((item: any) => 
           item.variant_title === filters.variation
         );
-        console.log(`Order ${order.id} has variation ${filters.variation}:`, hasVariation);
         return hasVariation;
       });
       console.log('After variation filter:', filtered.length);
@@ -119,9 +162,9 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       const dateB = new Date(b.created_at || 0).getTime();
       
       if (filters.sortOrder === 'newest') {
-        return dateB - dateA; // Newest first
+        return dateB - dateA;
       } else {
-        return dateA - dateB; // Oldest first
+        return dateA - dateB;
       }
     });
 
@@ -133,37 +176,44 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     const clearedFilters = {
       filterType: 'contains',
       product: 'all',
+      color: 'all',
+      size: 'all',
       variation: 'all',
       orderDate: '',
       sortOrder: 'newest'
     };
     setFilters(clearedFilters);
-    // Apply cleared filters immediately - show all orders with default sorting
+    // Apply cleared filters immediately
     let filtered = [...orders];
     filtered.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA; // Newest first (default)
+      return dateB - dateA;
     });
     onFilterChange(filtered);
   };
 
-  // Reset variation when product changes
+  // Reset color, size, and variation when product changes
   useEffect(() => {
-    if (filters.product !== 'all' && filters.variation !== 'all') {
-      // Check if current variation is still valid for selected product
-      if (!filteredVariations.includes(filters.variation)) {
-        setFilters(prev => ({ ...prev, variation: 'all' }));
+    if (filters.product !== 'all') {
+      const shouldResetColor = filters.color !== 'all' && !productSpecificColors.includes(filters.color);
+      const shouldResetSize = filters.size !== 'all' && !productSpecificSizes.includes(filters.size);
+      const shouldResetVariation = filters.variation !== 'all' && !filteredVariations.includes(filters.variation);
+      
+      if (shouldResetColor || shouldResetSize || shouldResetVariation) {
+        setFilters(prev => ({ 
+          ...prev, 
+          color: shouldResetColor ? 'all' : prev.color,
+          size: shouldResetSize ? 'all' : prev.size,
+          variation: shouldResetVariation ? 'all' : prev.variation
+        }));
       }
     }
-  }, [filters.product, filteredVariations, filters.variation]);
-
-  // Don't auto-apply filters on mount - let user manually trigger filtering
-  // This prevents the automatic filtering from overriding manual filter clicks
+  }, [filters.product, productSpecificColors, productSpecificSizes, filteredVariations, filters.color, filters.size, filters.variation]);
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Filter Type</label>
           <Select
@@ -187,6 +237,46 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
           placeholder="Any product"
           label="Product"
         />
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Color</label>
+          <Select
+            value={filters.color}
+            onValueChange={(value) => setFilters({ ...filters, color: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Any color" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any color</SelectItem>
+              {productSpecificColors.map(color => (
+                <SelectItem key={color} value={color}>
+                  {color}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Size</label>
+          <Select
+            value={filters.size}
+            onValueChange={(value) => setFilters({ ...filters, size: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Any size" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any size</SelectItem>
+              {productSpecificSizes.map(size => (
+                <SelectItem key={size} value={size}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <ProductSearchSelect
           products={filteredVariations}
