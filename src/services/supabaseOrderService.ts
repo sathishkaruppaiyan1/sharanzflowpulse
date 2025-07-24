@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
@@ -181,7 +180,7 @@ export const supabaseOrderService = {
     return order;
   },
 
-  // FIXED METHOD - Better error handling and proper request format
+  // FIXED METHOD - Use hardcoded values instead of protected properties
   async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
     console.log(`🔄 STARTING Shopify fulfillment update`);
     console.log(`📋 Order ID: ${shopifyOrderId}`);
@@ -197,13 +196,13 @@ export const supabaseOrderService = {
 
       console.log('📤 Sending request to edge function:', JSON.stringify(requestPayload, null, 2));
 
-      // Use fetch directly for better control over the request
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/update-shopify-fulfillment`, {
+      // Use fetch directly with hardcoded Supabase values
+      const response = await fetch(`https://jmqpqgxqhfctyfjtlbbm.supabase.co/functions/v1/update-shopify-fulfillment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
-          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6IjV4RHNqeUoxSFQxd011YWMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2ptcXBxZ3hxaGZjdHlmanRsYmJtLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI4MTYwOTI5Yi04ZjkzLTQwY2YtOWFiZC01NDU0MTkzYzBiNTAiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzUzMzc0OTUzLCJpYXQiOjE3NTMzNzEzNTMsImV4cCI6MjA2NzQ1NTkzOX0.-yFmt-q8qrob0h_nUFt_aYRaU6cw0XSAkyjXVx4bgHE`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptcXBxZ3hxaGZjdHlmanRsYmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE4Nzk5MzksImV4cCI6MjA2NzQ1NTkzOX0.-yFmt-q8qrob0h_nUFt_aYRaU6cw0XSAkyjXVx4bgHE',
         },
         body: JSON.stringify(requestPayload)
       });
