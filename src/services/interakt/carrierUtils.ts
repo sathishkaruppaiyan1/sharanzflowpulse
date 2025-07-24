@@ -3,7 +3,7 @@ import type { CarrierType } from '@/types/database';
 
 // Function to detect courier partner based on tracking number
 export const detectCourierPartner = (trackingNumber: string): CarrierType => {
-  if (trackingNumber.startsWith('4804')) {
+  if (trackingNumber.startsWith('48')) {
     return 'frenchexpress';
   } else if (trackingNumber.startsWith('2158')) {
     return 'delhivery';
