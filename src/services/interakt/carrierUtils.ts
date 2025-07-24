@@ -15,7 +15,7 @@ export const detectCourierPartner = (trackingNumber: string): CarrierType => {
 export const generateTrackingLink = (trackingNumber: string, carrier: CarrierType): string => {
   switch (carrier) {
     case 'frenchexpress':
-      return `https://franchexpress.com/courier-tracking/`;
+      return `https://franchexpress.com/courier-tracking/${trackingNumber}`;
     case 'delhivery':
       return `https://www.delhivery.com/track/package/${trackingNumber}`;
     default:
