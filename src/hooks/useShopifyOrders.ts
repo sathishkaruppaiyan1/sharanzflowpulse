@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useApiConfigs } from './useApiConfigs';
@@ -11,6 +12,7 @@ export interface ShopifyOrder {
   created_at: string;
   financial_status: string;
   fulfillment_status: string;
+  phone?: string | null;
   customer?: {
     first_name?: string;
     last_name?: string;
