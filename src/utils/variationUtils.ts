@@ -11,7 +11,8 @@ const COLOR_KEYWORDS = [
   'beige', 'tan', 'khaki', 'coral', 'salmon', 'crimson', 'violet', 'indigo', 'cyan',
   'magenta', 'wine', 'cream', 'ivory', 'pearl', 'rose', 'mint', 'lavender', 'peach',
   'turquoise', 'emerald', 'ruby', 'sapphire', 'amber', 'bronze', 'copper', 'charcoal',
-  'sky', 'sea', 'forest', 'royal', 'dark', 'light', 'bright', 'pastel', 'neon'
+  'sky', 'sea', 'forest', 'royal', 'dark', 'light', 'bright', 'pastel', 'neon',
+  'choco', 'chocolate', 'cocoa', 'coffee', 'mocha', 'espresso', 'caramel', 'vanilla'
 ];
 
 // Common size keywords to identify size variations
