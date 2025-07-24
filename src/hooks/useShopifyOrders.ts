@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useApiConfigs } from './useApiConfigs';
+import { getPhoneNumber } from '@/lib/utils';
 
 export interface ShopifyOrder {
   id: string;
@@ -62,15 +63,25 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   
   // Enhanced phone number logging for debugging
   orders.forEach((order: ShopifyOrder) => {
-    const shippingPhone = order.shipping_address?.phone;
-    const customerPhone = order.customer?.phone;
-    const hasPhone = shippingPhone || customerPhone;
+    console.log(`\n=== Phone Debug for Order ${order.order_number} ===`);
+    console.log('Raw order data structure:');
+    console.log('- customer object:', order.customer);
+    console.log('- shipping_address object:', order.shipping_address);
     
-    console.log(`Shopify Order ${order.order_number}:`);
-    console.log(`  - shipping_address.phone: ${shippingPhone || 'null'}`);
-    console.log(`  - customer.phone: ${customerPhone || 'null'}`);
-    console.log(`  - has phone: ${hasPhone ? 'YES' : 'NO'}`);
-    console.log(`  - preferred phone: ${shippingPhone || customerPhone || 'none'}`);
+    // Test our phone extraction function
+    const extractedPhone = getPhoneNumber(order);
+    console.log('- extracted phone via getPhoneNumber:', extractedPhone);
+    
+    // Check all possible phone locations
+    const phoneLocations = {
+      'customer.phone': order.customer?.phone,
+      'shipping_address.phone': order.shipping_address?.phone,
+      'order.phone': (order as any).phone,
+      'raw phone check': extractedPhone
+    };
+    
+    console.log('- phone locations check:', phoneLocations);
+    console.log('===========================================\n');
   });
 
   return orders;

@@ -62,9 +62,8 @@ serve(async (req) => {
       console.log('Starting to fetch all orders from Shopify...')
 
       while (hasMoreOrders && allOrders.length < 10000) {
-        // Build URL with proper pagination
-        // Note: Cannot use 'order' parameter with 'since_id' - Shopify API restriction
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        // Build URL with proper pagination - include phone numbers in fields
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight,phone`
         
         // Add since_id for pagination if we have it
         if (sinceId) {
@@ -141,24 +140,53 @@ serve(async (req) => {
     const allOrders = await fetchAllOrders()
     console.log(`Final count - Total orders fetched: ${allOrders.length}`)
     
-    // Transform Shopify orders to include detailed information
-    const transformedOrders = allOrders.map((order: any) => ({
-      id: order.id.toString(),
-      order_number: order.name,
-      customer_name: order.customer 
-        ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
-        : 'Guest',
-      customer: order.customer,
-      total_amount: order.current_total_price,
-      currency: order.currency,
-      created_at: order.created_at,
-      financial_status: order.financial_status || 'pending',
-      fulfillment_status: order.fulfillment_status || 'unfulfilled',
-      line_items: order.line_items || [],
-      shipping_address: order.shipping_address,
-      total_weight: order.total_weight,
-      current_total_price: order.current_total_price
-    }))
+    // Transform Shopify orders to include detailed information with enhanced phone logging
+    const transformedOrders = allOrders.map((order: any) => {
+      // Enhanced phone number debugging
+      console.log(`\n=== Phone Debug for Shopify Order ${order.name} ===`)
+      console.log('Raw Shopify order phone sources:')
+      console.log('- order.phone:', order.phone)
+      console.log('- order.customer?.phone:', order.customer?.phone)
+      console.log('- order.shipping_address?.phone:', order.shipping_address?.phone)
+      console.log('- order.billing_address?.phone:', order.billing_address?.phone)
+      
+      // Determine the best phone number source
+      const phoneNumber = order.shipping_address?.phone || 
+                         order.customer?.phone || 
+                         order.phone || 
+                         order.billing_address?.phone
+      
+      console.log('- selected phone:', phoneNumber)
+      console.log('================================================\n')
+      
+      return {
+        id: order.id.toString(),
+        order_number: order.name,
+        customer_name: order.customer 
+          ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
+          : 'Guest',
+        customer: order.customer ? {
+          ...order.customer,
+          // Ensure phone is included in customer object
+          phone: order.customer.phone || order.shipping_address?.phone || order.phone
+        } : null,
+        total_amount: order.current_total_price,
+        currency: order.currency,
+        created_at: order.created_at,
+        financial_status: order.financial_status || 'pending',
+        fulfillment_status: order.fulfillment_status || 'unfulfilled',
+        line_items: order.line_items || [],
+        shipping_address: order.shipping_address ? {
+          ...order.shipping_address,
+          // Ensure phone is included in shipping address
+          phone: order.shipping_address.phone || order.customer?.phone || order.phone
+        } : null,
+        total_weight: order.total_weight,
+        current_total_price: order.current_total_price,
+        // Add phone at order level as well
+        phone: phoneNumber
+      }
+    })
 
     console.log(`Returning ${transformedOrders.length} transformed orders`)
 
