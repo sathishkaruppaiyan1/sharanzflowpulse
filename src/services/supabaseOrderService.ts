@@ -186,20 +186,17 @@ export const supabaseOrderService = {
     console.log(`🚚 Carrier: ${carrier}`);
     
     try {
-      const requestBody = {
+      const requestPayload = {
         shopify_order_id: shopifyOrderId,
         tracking_number: trackingNumber,
         carrier: carrier
       };
 
-      console.log('📤 Calling edge function with payload:', JSON.stringify(requestBody, null, 2));
+      console.log('📤 Calling edge function with payload:', JSON.stringify(requestPayload, null, 2));
 
-      // Use the invoke method with proper error handling and make sure to send the body
+      // Use the invoke method with proper body formatting
       const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
-        body: JSON.stringify(requestBody),
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        body: requestPayload
       });
 
       console.log('📥 Edge function raw response:', { data, error });
