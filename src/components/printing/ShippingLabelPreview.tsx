@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,6 +57,27 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     return baseTitle;
   };
 
+  // Helper function to calculate dynamic font size based on number of items
+  const getProductFontSize = (itemCount: number) => {
+    if (itemCount <= 3) return '10px';
+    if (itemCount <= 5) return '9px';
+    if (itemCount <= 7) return '8px';
+    if (itemCount <= 10) return '7px';
+    return '6px'; // For more than 10 items
+  };
+
+  // Helper function to get line height based on font size
+  const getLineHeight = (fontSize: string) => {
+    const sizeMap: { [key: string]: string } = {
+      '10px': '1.3',
+      '9px': '1.2',
+      '8px': '1.1',
+      '7px': '1.0',
+      '6px': '0.9'
+    };
+    return sizeMap[fontSize] || '1.0';
+  };
+
   const createLabelHTML = (orderData: any, isLast: boolean = false) => {
     try {
       console.log('Creating label HTML for order:', orderData);
@@ -83,10 +103,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       // Get phone number using our helper function
       const phoneNumber = getPhoneNumber(orderData) || 'N/A';
 
-      const totalItems = orderData.line_items ? 
-        orderData.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
-
+      const lineItems = orderData.line_items || [];
+      const totalItems = lineItems.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
       const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
+
+      // Calculate dynamic font size based on number of line items
+      const productFontSize = getProductFontSize(lineItems.length);
+      const lineHeight = getLineHeight(productFontSize);
 
       // Generate Code 128 barcode SVG
       const barcodeSVG = generateCode128Barcode(trackingNumber);
@@ -151,13 +174,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <!-- Separator Line -->
           <div style="border-bottom: 1px solid #000; margin: 0;"></div>
 
-          <!-- Products Section with Variations -->
+          <!-- Products Section with Dynamic Font Size -->
           <div style="flex: 1; padding: 8px; display: flex; flex-direction: column;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 12px;">PRODUCTS:</div>
-            <div style="padding: 6px 0; flex: 1; overflow: hidden; font-size: 10px; background: #fff;">
-              ${orderData.line_items ? orderData.line_items.map((item: any) => {
+            <div style="padding: 6px 0; flex: 1; overflow: hidden; font-size: ${productFontSize}; line-height: ${lineHeight}; background: #fff;">
+              ${lineItems.length > 0 ? lineItems.map((item: any) => {
                 const productWithVariation = formatProductWithVariation(item);
-                return `<div style="margin-bottom: 3px;">
+                return `<div style="margin-bottom: 2px; word-wrap: break-word; overflow: hidden;">
                   • ${productWithVariation} (Qty: ${item.quantity || 1})
                 </div>`;
               }).join('') : '<div>• Order Items</div>'}
@@ -400,10 +423,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   const phoneNumber = getPhoneNumber(displayOrder) || 'N/A';
 
-  const totalItems = displayOrder.line_items ? 
-    displayOrder.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : 1;
-
+  const lineItems = displayOrder.line_items || [];
+  const totalItems = lineItems.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
   const totalWeight = displayOrder.total_weight ? `${displayOrder.total_weight}g` : '750g';
+
+  // Calculate dynamic font size for preview
+  const previewFontSize = getProductFontSize(lineItems.length);
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -434,7 +459,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 <strong>Bulk Print:</strong> {ordersToProcess.length} labels will be printed with Code 128 barcodes and orders will be automatically moved to packing stage.
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Preview shows the first label. All labels will use the same template with proper Code 128 barcode format.
+                Preview shows the first label. All labels will use the same template with proper Code 128 barcode format and dynamic font sizing.
               </p>
             </div>
           )}
@@ -500,12 +525,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             {/* Separator */}
             <Separator className="bg-black h-px" />
 
-            {/* Products Section with Variations */}
+            {/* Products Section with Dynamic Font Size */}
             <div className="flex-1 p-2 flex flex-col">
               <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
-              <div className="py-1 flex-1 overflow-hidden text-xs bg-white">
-                {displayOrder.line_items ? displayOrder.line_items.map((item: any, index: number) => (
-                  <div key={index} className="mb-1">
+              <div className="py-1 flex-1 overflow-hidden bg-white" style={{ fontSize: previewFontSize, lineHeight: getLineHeight(previewFontSize) }}>
+                {lineItems.length > 0 ? lineItems.map((item: any, index: number) => (
+                  <div key={index} className="mb-0.5 break-words">
                     <div>• {formatProductWithVariation(item)} (Qty: {item.quantity || 1})</div>
                   </div>
                 )) : (
