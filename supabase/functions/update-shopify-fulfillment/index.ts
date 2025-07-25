@@ -345,9 +345,9 @@ serve(async (req) => {
       
       // Handle specific Shopify error cases
       if (fulfillmentResponse.status === 406) {
-        console.log('Order already fulfilled - attempting to update existing fulfillment')
+        console.log('Order already fulfilled - need to update existing fulfillment instead')
         
-        // Try to get fulfillments again and update the existing one
+        // Make another attempt to get fulfillments and update with correct tracking
         try {
           const retryFulfillmentsResponse = await fetch(fulfillmentsUrl, {
             method: 'GET',
@@ -359,42 +359,61 @@ serve(async (req) => {
           
           if (retryFulfillmentsResponse.ok) {
             const retryFulfillmentsData = await retryFulfillmentsResponse.json()
-            const existingFulfillment = retryFulfillmentsData.fulfillments?.[0]
+            console.log('Retry fulfillments data:', retryFulfillmentsData.fulfillments)
             
-            if (existingFulfillment) {
-              console.log('Found existing fulfillment on retry, updating tracking info')
+            if (retryFulfillmentsData.fulfillments && retryFulfillmentsData.fulfillments.length > 0) {
+              const existingFulfillment = retryFulfillmentsData.fulfillments.find((f: any) => 
+                f.status !== 'cancelled' && f.status !== 'failure'
+              ) || retryFulfillmentsData.fulfillments[0]
               
-              const retryUpdateUrl = `https://${shopDomain}/admin/api/2024-04/orders/${shopify_order_id}/fulfillments/${existingFulfillment.id}.json`
-              const retryUpdatePayload = {
-                fulfillment: {
-                  id: existingFulfillment.id,
-                  tracking_number: tracking_number,
-                  tracking_company: trackingCompany,
-                  notify_customer: true
-                }
-              }
-              
-              const retryUpdateResponse = await fetch(retryUpdateUrl, {
-                method: 'PUT',
-                headers: {
-                  'X-Shopify-Access-Token': shopifyConfig.access_token,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(retryUpdatePayload),
-              })
-              
-              if (retryUpdateResponse.ok) {
-                const retryUpdateResult = await retryUpdateResponse.json()
-                console.log('Successfully updated existing fulfillment on retry')
+              if (existingFulfillment) {
+                console.log('Found existing fulfillment on retry, force updating tracking info:', existingFulfillment.id)
                 
-                return new Response(
-                  JSON.stringify({ 
-                    success: true, 
-                    fulfillment: retryUpdateResult,
-                    action: 'updated_existing_fulfillment_after_retry'
-                  }),
-                  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                )
+                const forceUpdateUrl = `https://${shopDomain}/admin/api/2024-04/orders/${shopify_order_id}/fulfillments/${existingFulfillment.id}.json`
+                const forceUpdatePayload = {
+                  fulfillment: {
+                    id: existingFulfillment.id,
+                    tracking_number: tracking_number,
+                    tracking_company: trackingCompany,
+                    notify_customer: true
+                  }
+                }
+                
+                console.log('Force update payload:', JSON.stringify(forceUpdatePayload, null, 2))
+                
+                const forceUpdateResponse = await fetch(forceUpdateUrl, {
+                  method: 'PUT',
+                  headers: {
+                    'X-Shopify-Access-Token': shopifyConfig.access_token,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(forceUpdatePayload),
+                })
+                
+                console.log('Force update response status:', forceUpdateResponse.status)
+                
+                if (forceUpdateResponse.ok) {
+                  const forceUpdateResult = await forceUpdateResponse.json()
+                  console.log('Successfully force updated existing fulfillment:', {
+                    id: forceUpdateResult.fulfillment?.id,
+                    tracking_number: forceUpdateResult.fulfillment?.tracking_number,
+                    tracking_company: forceUpdateResult.fulfillment?.tracking_company,
+                    status: forceUpdateResult.fulfillment?.status
+                  })
+                  
+                  return new Response(
+                    JSON.stringify({ 
+                      success: true, 
+                      fulfillment: forceUpdateResult,
+                      action: 'force_updated_existing_fulfillment',
+                      message: 'Fulfillment tracking information updated successfully'
+                    }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  )
+                } else {
+                  const forceUpdateError = await forceUpdateResponse.text()
+                  console.error('Force update failed:', forceUpdateError)
+                }
               }
             }
           }
@@ -402,17 +421,16 @@ serve(async (req) => {
           console.error('Error during retry attempt:', retryError)
         }
         
-        // For 406 errors, still consider it a success since the order is already fulfilled
-        console.log('Order already fulfilled - considering this a success since tracking may already be set')
-        
+        // If we still can't update, return an error
         return new Response(
           JSON.stringify({ 
-            success: true,
-            message: 'Order already fulfilled in Shopify',
-            action: 'order_already_fulfilled',
-            details: 'Order fulfillment status is already set - no update needed'
+            error: 'Failed to update fulfillment tracking information', 
+            status: fulfillmentResponse.status,
+            statusText: fulfillmentResponse.statusText,
+            details: 'Order is already fulfilled but tracking information could not be updated',
+            action: 'update_failed'
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
       

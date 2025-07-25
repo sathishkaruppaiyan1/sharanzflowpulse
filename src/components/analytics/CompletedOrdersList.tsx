@@ -121,17 +121,24 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
 
       toast({
         title: "Shopify Updated",
-        description: `Order ${order.order_number} status updated in Shopify successfully.`,
+        description: `Order ${order.order_number} fulfillment status updated in Shopify successfully.`,
       });
     } catch (error) {
       console.error('Error updating Shopify status:', error);
       
       // Handle specific Shopify fulfillment errors
       const errorMessage = error.message || '';
-      if (errorMessage.includes('Order cannot be fulfilled') || errorMessage.includes('already be fulfilled')) {
+      
+      if (errorMessage.includes('Failed to update fulfillment tracking information')) {
         toast({
-          title: "Order Already Fulfilled",
-          description: `Order ${order.order_number} is already fulfilled in Shopify or cannot be fulfilled at this time.`,
+          title: "Update Failed",
+          description: `Order ${order.order_number} is already fulfilled but tracking information could not be updated. Please check Shopify manually.`,
+          variant: "destructive"
+        });
+      } else if (errorMessage.includes('Order cannot be fulfilled') || errorMessage.includes('already be fulfilled')) {
+        toast({
+          title: "Already Fulfilled",
+          description: `Order ${order.order_number} is already fulfilled in Shopify. Tracking information may need manual update.`,
           variant: "destructive"
         });
       } else if (errorMessage.includes('Invalid JWT') || errorMessage.includes('Unauthorized')) {
@@ -143,7 +150,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       } else {
         toast({
           title: "Shopify Update Failed",
-          description: "Failed to update order status in Shopify. Check console for details.",
+          description: `Failed to update order ${order.order_number} status in Shopify. Please try again or check manually.`,
           variant: "destructive"
         });
       }
