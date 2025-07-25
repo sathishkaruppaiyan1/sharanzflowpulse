@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeItemForDisplay, getVariationDisplayText } from '@/utils/productVariationUtils';
+import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 
 interface PackingScannerProps {
   orders: any[];
@@ -28,6 +29,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
 
   // Keep order input focused when in order step
   useEffect(() => {
@@ -123,6 +125,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const order = findOrderByNumber(orderIdInput.trim());
       
       if (!order) {
+        // Play error sound for order not found
+        playErrorSound();
         toast({
           title: "Order Not Found",
           description: `No order found with number: ${orderIdInput}`,
@@ -132,6 +136,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       }
 
       if (order.stage !== 'packing') {
+        // Play error sound for wrong stage
+        playErrorSound();
         toast({
           title: "Order Not Ready",
           description: `Order ${order.order_number} is in ${order.stage} stage, not ready for packing.`,
@@ -143,6 +149,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       // Check if all items are already packed
       const unpackedItems = order.order_items?.filter((item: any) => !item.packed) || [];
       if (unpackedItems.length === 0) {
+        // Play warning sound for already complete order
+        playWarningSound();
         toast({
           title: "Order Complete",
           description: `All items in order ${order.order_number} are already packed.`,
@@ -151,6 +159,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
+      // Play success sound for valid order
+      playSuccessSound();
       setSelectedOrder(order);
       setScannedItems({});
       setStep('sku');
@@ -167,6 +177,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
     } catch (error) {
       console.error('Error processing order scan:', error);
+      playErrorSound();
       toast({
         title: "Scan Error",
         description: "Failed to process order. Please try again.",
@@ -186,6 +197,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const item = findItemBySKU(skuInput.trim(), selectedOrder);
       
       if (!item) {
+        // Play error sound for item not found
+        playErrorSound();
         toast({
           title: "Item Not Found",
           description: `No item found with SKU/Name: ${skuInput} in order ${selectedOrder.order_number}`,
@@ -200,6 +213,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const currentScans = scannedItems[item.id] || 0;
       
       if (currentScans >= item.quantity) {
+        // Play warning sound for already complete item
+        playWarningSound();
         // Use enhanced variation display for completed items
         const normalizedItem = normalizeItemForDisplay(item);
         const variationText = getVariationDisplayText(normalizedItem);
@@ -213,6 +228,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         skuInputRef.current?.focus();
         return;
       }
+
+      // Play success sound for valid item scan
+      playSuccessSound();
 
       // Increment scan count
       const newScannedItems = {
@@ -247,6 +265,8 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const newTotal = Object.values(newScannedItems).reduce((sum: number, count: number) => sum + count, 0);
       
       if (newTotal >= progress.total) {
+        // Play complete sound for finished order
+        playCompleteSound();
         toast({
           title: "Order Complete! 🎉",
           description: `Order ${selectedOrder.order_number} fully packed and moved to tracking stage.`,
@@ -260,6 +280,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
     } catch (error) {
       console.error('Error processing SKU scan:', error);
+      playErrorSound();
       toast({
         title: "Scan Error",
         description: "Failed to process SKU. Please try again.",
