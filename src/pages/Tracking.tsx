@@ -32,6 +32,34 @@ const Tracking = () => {
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
 
+  // Helper function to check if input looks like a tracking number
+  const looksLikeTrackingNumber = (input: string) => {
+    const cleanInput = input.trim();
+    // Common tracking number patterns
+    const trackingPatterns = [
+      /^48\d{13}$/,        // French Express pattern
+      /^2158\d{10}$/,      // Delhivery pattern
+      /^[A-Z]{2}\d{9}[A-Z]{2}$/, // International tracking
+      /^\d{10,22}$/,       // Generic numeric tracking (10-22 digits)
+      /^[A-Z0-9]{8,30}$/   // Alphanumeric tracking codes
+    ];
+    
+    return trackingPatterns.some(pattern => pattern.test(cleanInput));
+  };
+
+  // Helper function to check if input looks like an order ID
+  const looksLikeOrderId = (input: string) => {
+    const cleanInput = input.trim();
+    // Order ID patterns - typically shorter and different format
+    return (
+      cleanInput.startsWith('#') ||           // Order numbers with #
+      /^[A-Z0-9]{1,10}$/.test(cleanInput) ||  // Short alphanumeric IDs
+      /^\d{1,8}$/.test(cleanInput) ||         // Short numeric IDs
+      cleanInput.includes('ORDER') ||         // Contains ORDER keyword
+      cleanInput.includes('ORD')              // Contains ORD keyword
+    );
+  };
+
   // Keep order input focused when order is not locked
   useEffect(() => {
     if (!isOrderLocked && orderInputRef.current) {
@@ -77,12 +105,21 @@ const Tracking = () => {
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
     
+    const cleanInput = orderIdInput.trim();
+    
+    // Check if input looks like a tracking number instead of order ID
+    if (looksLikeTrackingNumber(cleanInput)) {
+      toast.error('This looks like a tracking number, not an order ID. Please scan the order barcode first.');
+      setOrderIdInput('');
+      return;
+    }
+    
     // Find order by order number or ID
     const order = trackingOrders.find(o => 
-      o.order_number === orderIdInput || 
-      o.id === orderIdInput ||
-      o.order_number === `#${orderIdInput}` ||
-      o.order_number.replace('#', '') === orderIdInput
+      o.order_number === cleanInput || 
+      o.id === cleanInput ||
+      o.order_number === `#${cleanInput}` ||
+      o.order_number.replace('#', '') === cleanInput
     );
     
     if (order) {
@@ -104,8 +141,16 @@ const Tracking = () => {
   const handleTrackingNumberScan = async () => {
     if (!trackingNumberInput.trim() || !currentOrder) return;
     
-    // Auto-detect carrier based on tracking number pattern
     const trackingNumber = trackingNumberInput.trim();
+    
+    // Check if input looks like an order ID instead of tracking number
+    if (looksLikeOrderId(trackingNumber)) {
+      toast.error('This looks like an order ID, not a tracking number. Please scan the tracking barcode.');
+      setTrackingNumberInput('');
+      return;
+    }
+    
+    // Auto-detect carrier based on tracking number pattern
     const carrier = detectCourierPartner(trackingNumber);
     
     let carrierDisplayName = '';
@@ -127,15 +172,15 @@ const Tracking = () => {
     try {
       console.log('🚀 Starting tracking update process...');
       
-      // The updateTrackingMutation now handles both database update and Shopify sync
+      // Update tracking information (this handles database and Shopify sync)
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
         carrier: carrier
       });
       
-      // Automatically send WhatsApp notification
-      console.log('📱 Automatically sending WhatsApp notification for tracking update...');
+      // Send WhatsApp notification separately (not in the mutation to avoid duplication)
+      console.log('📱 Sending WhatsApp notification for tracking update...');
       const phoneNumber = getPhoneNumber(currentOrder);
       
       if (phoneNumber) {
@@ -163,7 +208,6 @@ const Tracking = () => {
       }
       
       // Set Shopify status based on whether order has Shopify ID
-      // The actual Shopify update is handled by the service layer
       if (currentOrder.shopify_order_id) {
         setShopifyStatus('success');
         console.log('✅ Shopify update completed (or attempted)');
@@ -380,7 +424,7 @@ const Tracking = () => {
                   <div className="flex space-x-2">
                     <Input
                       ref={orderInputRef}
-                      placeholder="Scan or enter Order ID"
+                      placeholder="Scan or enter Order ID (not tracking number)"
                       value={orderIdInput}
                       onChange={(e) => setOrderIdInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && !isOrderLocked && handleOrderScan()}
@@ -412,7 +456,7 @@ const Tracking = () => {
                     <div className="flex space-x-2">
                       <Input
                         ref={trackingInputRef}
-                        placeholder="Scan tracking number barcode"
+                        placeholder="Scan tracking number barcode (not order ID)"
                         value={trackingNumberInput}
                         onChange={(e) => {
                           setTrackingNumberInput(e.target.value);
