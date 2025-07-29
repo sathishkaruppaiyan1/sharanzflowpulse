@@ -10,8 +10,8 @@ import { Scan, Package, Truck, CheckCircle, Search, Edit, X } from 'lucide-react
 import { toast } from 'sonner';
 import { Order } from '@/types/database';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
-import TrackingQueue from '@/components/tracking/TrackingQueue';
-import TrackingStats from '@/components/tracking/TrackingStats';
+import { TrackingQueue } from '@/components/tracking/TrackingQueue';
+import { TrackingStats } from '@/components/tracking/TrackingStats';
 import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
@@ -36,7 +36,6 @@ const Tracking = () => {
         .from('orders')
         .select(`
           *,
-          customer:customers(*),
           order_items (
             id,
             title,
@@ -357,9 +356,7 @@ const Tracking = () => {
                           <div className="flex justify-between items-center">
                             <div>
                               <p className="font-medium">{order.order_number}</p>
-                              <p className="text-sm text-gray-600">
-                                {order.customer?.first_name} {order.customer?.last_name}
-                              </p>
+                              <p className="text-sm text-gray-600">{order.customer_name}</p>
                               <p className="text-xs text-gray-500">
                                 {order.order_items?.reduce((sum, item) => sum + item.quantity, 0)} items
                               </p>
