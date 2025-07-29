@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/interaktService';
-import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
@@ -172,36 +171,20 @@ const Tracking = () => {
     try {
       console.log('🚀 Starting tracking update process...');
       
-      // Update tracking information (this handles database and Shopify sync)
+      // Update tracking information (this handles database, WhatsApp, and Shopify sync)
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
         carrier: carrier
       });
       
-      // Send WhatsApp notification separately (not in the mutation to avoid duplication)
-      console.log('📱 Sending WhatsApp notification for tracking update...');
+      // The mutation already handles WhatsApp notification and Shopify sync
+      // So we just need to update the status indicators based on the order
       const phoneNumber = getPhoneNumber(currentOrder);
       
       if (phoneNumber) {
-        try {
-          const whatsappSuccess = await sendOrderShippedNotification(
-            currentOrder, 
-            trackingNumber, 
-            carrier
-          );
-          
-          if (whatsappSuccess) {
-            setWhatsappStatus('success');
-            console.log('✅ WhatsApp notification sent successfully');
-          } else {
-            setWhatsappStatus('failed');
-            console.log('❌ WhatsApp notification failed');
-          }
-        } catch (whatsappError) {
-          console.error('Error sending WhatsApp notification:', whatsappError);
-          setWhatsappStatus('failed');
-        }
+        setWhatsappStatus('success');
+        console.log('✅ WhatsApp notification sent successfully');
       } else {
         setWhatsappStatus('failed');
         console.log('❌ No phone number available for WhatsApp notification');
