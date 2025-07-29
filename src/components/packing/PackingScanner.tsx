@@ -26,7 +26,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
-  const [allowAutoFocus, setAllowAutoFocus] = useState(true);
+  const [focusLocked, setFocusLocked] = useState(false);
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -35,36 +35,35 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
   // Initial focus on order input when component mounts
   useEffect(() => {
-    if (step === 'order' && orderInputRef.current && allowAutoFocus) {
+    if (step === 'order' && orderInputRef.current && !focusLocked) {
       const timer = setTimeout(() => {
         orderInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [step, allowAutoFocus]);
+  }, [step, focusLocked]);
 
-  // Focus management - only refocus if allowed and not interfering with other elements
+  // Focus management - only refocus if no other element is actively being used
   useEffect(() => {
-    if (!allowAutoFocus) return;
+    if (focusLocked) return;
 
     const handleFocusManagement = () => {
       const activeElement = document.activeElement;
-      
-      // Check if user is interacting with buttons, dialogs, or other interactive elements
-      const isInteractingWithUI = activeElement?.tagName === 'BUTTON' || 
-                                 activeElement?.getAttribute('role') === 'button' ||
-                                 activeElement?.tagName === 'A' ||
-                                 activeElement?.closest('[role="dialog"]') ||
-                                 activeElement?.closest('[data-dialog-content]') ||
-                                 activeElement?.closest('.manage-button') ||
-                                 activeElement?.closest('[data-radix-collection-item]');
+      const isClickableElement = activeElement?.tagName === 'BUTTON' || 
+                                activeElement?.getAttribute('role') === 'button' ||
+                                activeElement?.tagName === 'A' ||
+                                activeElement?.closest('[role="dialog"]') ||
+                                activeElement?.closest('[data-dialog-content]') ||
+                                activeElement?.closest('.manage-button');
 
-      // Don't interfere if user is actively using other UI elements
-      if (isInteractingWithUI) {
+      // Don't steal focus from clickable elements or dialog content
+      if (isClickableElement) {
+        setFocusLocked(true);
+        setTimeout(() => setFocusLocked(false), 2000); // Release lock after 2 seconds
         return;
       }
 
-      // Only refocus to scanner inputs if no important UI interaction is happening
+      // Only refocus to scanner inputs if focus is lost and no important UI is active
       if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
         orderInputRef.current.focus();
       } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
@@ -72,34 +71,19 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       }
     };
 
-    const interval = setInterval(handleFocusManagement, 800);
+    const interval = setInterval(handleFocusManagement, 500);
     return () => clearInterval(interval);
-  }, [step, allowAutoFocus]);
+  }, [step, focusLocked]);
 
   // Focus SKU input when switching to SKU step
   useEffect(() => {
-    if (step === 'sku' && skuInputRef.current && allowAutoFocus) {
+    if (step === 'sku' && skuInputRef.current && !focusLocked) {
       const timer = setTimeout(() => {
         skuInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [step, allowAutoFocus]);
-
-  // Handle button interactions - temporarily disable auto-focus when buttons are clicked
-  useEffect(() => {
-    const handleButtonClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      if (target?.closest('button') && !target?.closest('.scanner-input-container')) {
-        setAllowAutoFocus(false);
-        // Re-enable auto-focus after button interaction is complete
-        setTimeout(() => setAllowAutoFocus(true), 1500);
-      }
-    };
-
-    document.addEventListener('click', handleButtonClick);
-    return () => document.removeEventListener('click', handleButtonClick);
-  }, []);
+  }, [step, focusLocked]);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
     return orders.find(order => 
@@ -144,6 +128,25 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     };
   }, [selectedOrder, scannedItems]);
 
+  // Handle clicks outside scanner to temporarily lock focus
+  const handleUserInteraction = () => {
+    setFocusLocked(true);
+    setTimeout(() => setFocusLocked(false), 1000);
+  };
+
+  // Add event listener for user interactions
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target?.closest('button') && !target?.closest('.scanner-input')) {
+        handleUserInteraction();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
   const handleOrderScan = async () => {
     if (!orderIdInput.trim()) return;
     
@@ -153,6 +156,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const order = findOrderByNumber(orderIdInput.trim());
       
       if (!order) {
+        // Play error sound for order not found
         playErrorSound();
         toast({
           title: "Order Not Found",
@@ -163,6 +167,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       }
 
       if (order.stage !== 'packing') {
+        // Play error sound for wrong stage
         playErrorSound();
         toast({
           title: "Order Not Ready",
@@ -175,6 +180,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       // Check if all items are already packed
       const unpackedItems = order.order_items?.filter((item: any) => !item.packed) || [];
       if (unpackedItems.length === 0) {
+        // Play warning sound for already complete order
         playWarningSound();
         toast({
           title: "Order Complete",
@@ -184,6 +190,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
+      // Play success sound for valid order
       playSuccessSound();
       setSelectedOrder(order);
       setScannedItems({});
@@ -196,9 +203,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
       // Focus on SKU input after a short delay
       setTimeout(() => {
-        if (allowAutoFocus) {
-          skuInputRef.current?.focus();
-        }
+        skuInputRef.current?.focus();
       }, 100);
 
     } catch (error) {
@@ -223,6 +228,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const item = findItemBySKU(skuInput.trim(), selectedOrder);
       
       if (!item) {
+        // Play error sound for item not found
         playErrorSound();
         toast({
           title: "Item Not Found",
@@ -230,9 +236,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "destructive"
         });
         setSkuInput('');
-        if (allowAutoFocus) {
-          skuInputRef.current?.focus();
-        }
+        skuInputRef.current?.focus();
         return;
       }
 
@@ -240,7 +244,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const currentScans = scannedItems[item.id] || 0;
       
       if (currentScans >= item.quantity) {
+        // Play warning sound for already complete item
         playWarningSound();
+        // Use enhanced variation display for completed items
         const normalizedItem = normalizeItemForDisplay(item);
         const variationText = getVariationDisplayText(normalizedItem);
         
@@ -250,12 +256,11 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "default"
         });
         setSkuInput('');
-        if (allowAutoFocus) {
-          skuInputRef.current?.focus();
-        }
+        skuInputRef.current?.focus();
         return;
       }
 
+      // Play success sound for valid item scan
       playSuccessSound();
 
       // Increment scan count
@@ -268,6 +273,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       // Check if this item is now complete
       const isItemComplete = newScannedItems[item.id] >= item.quantity;
       
+      // Use enhanced variation display for scan confirmation
       const normalizedItem = normalizeItemForDisplay(item);
       const variationText = getVariationDisplayText(normalizedItem);
       
@@ -290,6 +296,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const newTotal = Object.values(newScannedItems).reduce((sum: number, count: number) => sum + count, 0);
       
       if (newTotal >= progress.total) {
+        // Play complete sound for finished order
         playCompleteSound();
         toast({
           title: "Order Complete! 🎉",
@@ -298,7 +305,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         resetScanner();
       } else {
         setTimeout(() => {
-          if (allowAutoFocus) {
+          if (!focusLocked) {
             skuInputRef.current?.focus();
           }
         }, 100);
@@ -323,10 +330,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     setSkuInput('');
     setSelectedOrder(null);
     setScannedItems({});
-    setAllowAutoFocus(true);
+    setFocusLocked(false);
     
     setTimeout(() => {
-      if (allowAutoFocus) {
+      if (!focusLocked) {
         orderInputRef.current?.focus();
       }
     }, 100);
@@ -352,7 +359,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   return (
     <div className="space-y-6">
       {/* Order ID Scanner */}
-      <div className="space-y-3 scanner-input-container">
+      <div className="space-y-3">
         <h3 className="font-medium text-gray-900">Order ID Scanner</h3>
         <div className="flex space-x-2">
           <Input
@@ -361,9 +368,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             value={orderIdInput}
             onChange={(e) => setOrderIdInput(e.target.value)}
             onKeyPress={handleOrderKeyPress}
-            onFocus={() => setAllowAutoFocus(true)}
+            onFocus={() => setFocusLocked(false)}
             disabled={isProcessing || step === 'sku'}
-            className="flex-1"
+            className="flex-1 scanner-input"
             autoFocus
           />
           <Button 
@@ -371,6 +378,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             size="icon"
             onClick={handleOrderScan}
             disabled={!orderIdInput.trim() || isProcessing || step === 'sku'}
+            className="scanner-input"
           >
             <Scan className="h-4 w-4" />
           </Button>
@@ -381,7 +389,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               variant="outline"
               size="sm"
               onClick={resetScanner}
-              className="text-xs"
+              className="text-xs scanner-input"
             >
               <RotateCcw className="h-3 w-3 mr-1" />
               Reset
@@ -411,16 +419,16 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             })()}
           </div>
           
-          <div className="flex space-x-2 scanner-input-container">
+          <div className="flex space-x-2">
             <Input
               ref={skuInputRef}
               placeholder="Scan or enter product SKU or name"
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
-              onFocus={() => setAllowAutoFocus(true)}
+              onFocus={() => setFocusLocked(false)}
               disabled={isProcessing}
-              className="flex-1"
+              className="flex-1 scanner-input"
               autoFocus
             />
             <Button 
@@ -428,6 +436,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               size="icon"
               onClick={handleSKUScan}
               disabled={!skuInput.trim() || isProcessing}
+              className="scanner-input"
             >
               <Scan className="h-4 w-4" />
             </Button>
