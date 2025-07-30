@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,43 +26,64 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
-  const [manualFocusMode, setManualFocusMode] = useState(false);
+  const [focusLocked, setFocusLocked] = useState(false);
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
 
-  // Auto-focus management - only when not in manual mode
+  // Initial focus on order input when component mounts
   useEffect(() => {
-    if (manualFocusMode) return;
+    if (step === 'order' && orderInputRef.current && !focusLocked) {
+      const timer = setTimeout(() => {
+        orderInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [step, focusLocked]);
 
-    const focusTimer = setTimeout(() => {
-      if (step === 'order' && orderInputRef.current) {
-        orderInputRef.current.focus();
-      } else if (step === 'sku' && skuInputRef.current) {
-        skuInputRef.current.focus();
+  // Focus management - only refocus if no other element is actively being used
+  useEffect(() => {
+    if (focusLocked) return;
+
+    const handleFocusManagement = () => {
+      const activeElement = document.activeElement;
+      const isClickableElement = activeElement?.tagName === 'BUTTON' || 
+                                activeElement?.getAttribute('role') === 'button' ||
+                                activeElement?.tagName === 'A' ||
+                                activeElement?.closest('[role="dialog"]') ||
+                                activeElement?.closest('[data-dialog-content]') ||
+                                activeElement?.closest('.manage-button');
+
+      // Don't steal focus from clickable elements or dialog content
+      if (isClickableElement) {
+        setFocusLocked(true);
+        setTimeout(() => setFocusLocked(false), 2000); // Release lock after 2 seconds
+        return;
       }
-    }, 100);
 
-    return () => clearTimeout(focusTimer);
-  }, [step, manualFocusMode]);
-
-  // Handle clicks on other UI elements - switch to manual focus mode
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      // Check if click is on buttons, but not on scanner inputs
-      if (target?.closest('button') && !target?.closest('.scanner-input')) {
-        setManualFocusMode(true);
-        // Reset to auto mode after 3 seconds
-        setTimeout(() => setManualFocusMode(false), 3000);
+      // Only refocus to scanner inputs if focus is lost and no important UI is active
+      if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
+        orderInputRef.current.focus();
+      } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
+        skuInputRef.current.focus();
       }
     };
 
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
+    const interval = setInterval(handleFocusManagement, 500);
+    return () => clearInterval(interval);
+  }, [step, focusLocked]);
+
+  // Focus SKU input when switching to SKU step
+  useEffect(() => {
+    if (step === 'sku' && skuInputRef.current && !focusLocked) {
+      const timer = setTimeout(() => {
+        skuInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [step, focusLocked]);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
     return orders.find(order => 
@@ -105,6 +127,25 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       percentage: totalQty > 0 ? Math.round((scannedQty / totalQty) * 100) : 0
     };
   }, [selectedOrder, scannedItems]);
+
+  // Handle clicks outside scanner to temporarily lock focus
+  const handleUserInteraction = () => {
+    setFocusLocked(true);
+    setTimeout(() => setFocusLocked(false), 1000);
+  };
+
+  // Add event listener for user interactions
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target?.closest('button') && !target?.closest('.scanner-input')) {
+        handleUserInteraction();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
 
   const handleOrderScan = async () => {
     if (!orderIdInput.trim()) return;
@@ -160,12 +201,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         description: `Order ${order.order_number} locked. Scan each item ${order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0)} times total.`,
       });
 
-      // Focus on SKU input after a short delay (only if not in manual mode)
-      if (!manualFocusMode) {
-        setTimeout(() => {
-          skuInputRef.current?.focus();
-        }, 100);
-      }
+      // Focus on SKU input after a short delay
+      setTimeout(() => {
+        skuInputRef.current?.focus();
+      }, 100);
 
     } catch (error) {
       console.error('Error processing order scan:', error);
@@ -197,9 +236,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "destructive"
         });
         setSkuInput('');
-        if (!manualFocusMode) {
-          skuInputRef.current?.focus();
-        }
+        skuInputRef.current?.focus();
         return;
       }
 
@@ -219,9 +256,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "default"
         });
         setSkuInput('');
-        if (!manualFocusMode) {
-          skuInputRef.current?.focus();
-        }
+        skuInputRef.current?.focus();
         return;
       }
 
@@ -269,11 +304,11 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         });
         resetScanner();
       } else {
-        if (!manualFocusMode) {
-          setTimeout(() => {
+        setTimeout(() => {
+          if (!focusLocked) {
             skuInputRef.current?.focus();
-          }, 100);
-        }
+          }
+        }, 100);
       }
 
     } catch (error) {
@@ -295,14 +330,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     setSkuInput('');
     setSelectedOrder(null);
     setScannedItems({});
-    setManualFocusMode(false);
+    setFocusLocked(false);
     
-    // Focus on order input (only if not in manual mode)
-    if (!manualFocusMode) {
-      setTimeout(() => {
+    setTimeout(() => {
+      if (!focusLocked) {
         orderInputRef.current?.focus();
-      }, 100);
-    }
+      }
+    }, 100);
   };
 
   const handleOrderKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -315,10 +349,6 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     if (e.key === 'Enter') {
       handleSKUScan();
     }
-  };
-
-  const handleInputFocus = () => {
-    setManualFocusMode(false); // Reset to auto mode when user manually focuses
   };
 
   // Notify parent about selected order
@@ -338,9 +368,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             value={orderIdInput}
             onChange={(e) => setOrderIdInput(e.target.value)}
             onKeyPress={handleOrderKeyPress}
-            onFocus={handleInputFocus}
+            onFocus={() => setFocusLocked(false)}
             disabled={isProcessing || step === 'sku'}
             className="flex-1 scanner-input"
+            autoFocus
           />
           <Button 
             variant="outline" 
@@ -395,9 +426,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
-              onFocus={handleInputFocus}
+              onFocus={() => setFocusLocked(false)}
               disabled={isProcessing}
               className="flex-1 scanner-input"
+              autoFocus
             />
             <Button 
               variant="outline" 
