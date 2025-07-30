@@ -23,6 +23,7 @@ const TrackingScanner = ({ orders, onOrderTracked, onOrderSelected }: TrackingSc
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
+  const [processedTrackingNumbers, setProcessedTrackingNumbers] = useState<Set<string>>(new Set());
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
@@ -60,10 +61,6 @@ const TrackingScanner = ({ orders, onOrderTracked, onOrderSelected }: TrackingSc
   // Handle button clicks to disable auto-focus temporarily
   const handleButtonClick = useCallback(() => {
     setAutoFocusEnabled(false);
-    // Re-enable auto-focus after 3 seconds
-    setTimeout(() => {
-      setAutoFocusEnabled(true);
-    }, 3000);
   }, []);
 
   // Re-enable auto-focus when user manually clicks on input
@@ -155,11 +152,26 @@ const TrackingScanner = ({ orders, onOrderTracked, onOrderSelected }: TrackingSc
     
     const trackingNumber = trackingInput.trim();
     
+    // Check if this tracking number was already processed for this order
+    const orderTrackingKey = `${selectedOrder.id}-${trackingNumber}`;
+    if (processedTrackingNumbers.has(orderTrackingKey)) {
+      playWarningSound();
+      toast({
+        title: "Already Processed",
+        description: `Tracking number ${trackingNumber} already processed for this order.`,
+        variant: "default"
+      });
+      setTrackingInput('');
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
-      // Use the correct method name from supabaseOrderService
-      await supabaseOrderService.updateTracking(selectedOrder.id, trackingNumber, 'fedex');
+      await supabaseOrderService.updateOrderTracking(selectedOrder.id, trackingNumber);
+      
+      // Mark this tracking number as processed for this order
+      setProcessedTrackingNumbers(prev => new Set(prev).add(orderTrackingKey));
       
       playCompleteSound();
       toast({

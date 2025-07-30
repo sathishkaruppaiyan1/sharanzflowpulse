@@ -41,7 +41,10 @@ const Tracking = () => {
         </div>
 
         <div className="space-y-6">
-          <TrackingQueue orders={trackingOrders} />
+          <TrackingQueue 
+            orders={trackingOrders} 
+            selectedOrder={selectedOrder}
+          />
         </div>
       </div>
     </div>
