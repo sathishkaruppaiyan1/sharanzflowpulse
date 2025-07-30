@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,63 +26,64 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
-  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
+  const [focusLocked, setFocusLocked] = useState(false);
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
 
-  // Auto-focus management when auto-focus is enabled
+  // Initial focus on order input when component mounts
   useEffect(() => {
-    if (!autoFocusEnabled) return;
+    if (step === 'order' && orderInputRef.current && !focusLocked) {
+      const timer = setTimeout(() => {
+        orderInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [step, focusLocked]);
 
-    const focusActiveInput = () => {
-      if (step === 'order' && orderInputRef.current) {
+  // Focus management - only refocus if no other element is actively being used
+  useEffect(() => {
+    if (focusLocked) return;
+
+    const handleFocusManagement = () => {
+      const activeElement = document.activeElement;
+      const isClickableElement = activeElement?.tagName === 'BUTTON' || 
+                                activeElement?.getAttribute('role') === 'button' ||
+                                activeElement?.tagName === 'A' ||
+                                activeElement?.closest('[role="dialog"]') ||
+                                activeElement?.closest('[data-dialog-content]') ||
+                                activeElement?.closest('.manage-button');
+
+      // Don't steal focus from clickable elements or dialog content
+      if (isClickableElement) {
+        setFocusLocked(true);
+        setTimeout(() => setFocusLocked(false), 2000); // Release lock after 2 seconds
+        return;
+      }
+
+      // Only refocus to scanner inputs if focus is lost and no important UI is active
+      if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
         orderInputRef.current.focus();
-      } else if (step === 'sku' && skuInputRef.current) {
+      } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
         skuInputRef.current.focus();
       }
     };
 
-    // Initial focus
-    const timer = setTimeout(focusActiveInput, 100);
+    const interval = setInterval(handleFocusManagement, 500);
+    return () => clearInterval(interval);
+  }, [step, focusLocked]);
 
-    // Periodic refocus if auto-focus is enabled
-    const interval = setInterval(() => {
-      if (autoFocusEnabled && document.activeElement !== orderInputRef.current && document.activeElement !== skuInputRef.current) {
-        focusActiveInput();
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, [step, autoFocusEnabled]);
-
-  // Handle button clicks to disable auto-focus temporarily
-  const handleButtonClick = useCallback(() => {
-    setAutoFocusEnabled(false);
-  }, []);
-
-  // Re-enable auto-focus when user manually clicks on input
-  const handleInputFocus = useCallback(() => {
-    setAutoFocusEnabled(true);
-  }, []);
-
-  // Add click listener to all buttons to disable auto-focus
+  // Focus SKU input when switching to SKU step
   useEffect(() => {
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      if (target?.closest('button') && !target?.closest('.scanner-input')) {
-        handleButtonClick();
-      }
-    };
-
-    document.addEventListener('click', handleDocumentClick);
-    return () => document.removeEventListener('click', handleDocumentClick);
-  }, [handleButtonClick]);
+    if (step === 'sku' && skuInputRef.current && !focusLocked) {
+      const timer = setTimeout(() => {
+        skuInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [step, focusLocked]);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
     return orders.find(order => 
@@ -96,8 +98,18 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const skuMatch = item.sku && item.sku.toLowerCase() === sku.toLowerCase();
       const nameMatch = item.title && item.title.toLowerCase().includes(sku.toLowerCase());
       
+      // Enhanced matching with variation data from Supabase
       const variationText = getVariationDisplayText(item);
       const variationMatch = variationText && variationText.toLowerCase().includes(sku.toLowerCase());
+      
+      console.log(`Scanner matching for SKU "${sku}":`, {
+        itemTitle: item.title,
+        itemSku: item.sku,
+        itemVariant: item.variant_title,
+        skuMatch,
+        nameMatch,
+        variationMatch
+      });
       
       return skuMatch || nameMatch || variationMatch;
     });
@@ -116,6 +128,25 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     };
   }, [selectedOrder, scannedItems]);
 
+  // Handle clicks outside scanner to temporarily lock focus
+  const handleUserInteraction = () => {
+    setFocusLocked(true);
+    setTimeout(() => setFocusLocked(false), 1000);
+  };
+
+  // Add event listener for user interactions
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target?.closest('button') && !target?.closest('.scanner-input')) {
+        handleUserInteraction();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
   const handleOrderScan = async () => {
     if (!orderIdInput.trim()) return;
     
@@ -125,6 +156,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const order = findOrderByNumber(orderIdInput.trim());
       
       if (!order) {
+        // Play error sound for order not found
         playErrorSound();
         toast({
           title: "Order Not Found",
@@ -135,6 +167,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       }
 
       if (order.stage !== 'packing') {
+        // Play error sound for wrong stage
         playErrorSound();
         toast({
           title: "Order Not Ready",
@@ -144,8 +177,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
+      // Check if all items are already packed
       const unpackedItems = order.order_items?.filter((item: any) => !item.packed) || [];
       if (unpackedItems.length === 0) {
+        // Play warning sound for already complete order
         playWarningSound();
         toast({
           title: "Order Complete",
@@ -155,6 +190,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         return;
       }
 
+      // Play success sound for valid order
       playSuccessSound();
       setSelectedOrder(order);
       setScannedItems({});
@@ -164,6 +200,11 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         title: "Order Selected",
         description: `Order ${order.order_number} locked. Scan each item ${order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0)} times total.`,
       });
+
+      // Focus on SKU input after a short delay
+      setTimeout(() => {
+        skuInputRef.current?.focus();
+      }, 100);
 
     } catch (error) {
       console.error('Error processing order scan:', error);
@@ -187,6 +228,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
       const item = findItemBySKU(skuInput.trim(), selectedOrder);
       
       if (!item) {
+        // Play error sound for item not found
         playErrorSound();
         toast({
           title: "Item Not Found",
@@ -194,13 +236,17 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "destructive"
         });
         setSkuInput('');
+        skuInputRef.current?.focus();
         return;
       }
 
+      // Check current scan count for this item
       const currentScans = scannedItems[item.id] || 0;
       
       if (currentScans >= item.quantity) {
+        // Play warning sound for already complete item
         playWarningSound();
+        // Use enhanced variation display for completed items
         const normalizedItem = normalizeItemForDisplay(item);
         const variationText = getVariationDisplayText(normalizedItem);
         
@@ -210,19 +256,24 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "default"
         });
         setSkuInput('');
+        skuInputRef.current?.focus();
         return;
       }
 
+      // Play success sound for valid item scan
       playSuccessSound();
 
+      // Increment scan count
       const newScannedItems = {
         ...scannedItems,
         [item.id]: currentScans + 1
       };
       setScannedItems(newScannedItems);
 
+      // Check if this item is now complete
       const isItemComplete = newScannedItems[item.id] >= item.quantity;
       
+      // Use enhanced variation display for scan confirmation
       const normalizedItem = normalizeItemForDisplay(item);
       const variationText = getVariationDisplayText(normalizedItem);
       
@@ -231,6 +282,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         description: `${item.title || item.name} (${variationText}) scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
       });
 
+      // If item is complete, mark it as packed
       if (isItemComplete) {
         await supabaseOrderService.updateOrderItemPacked(item.id, true);
         onItemPacked(selectedOrder.id, item.id);
@@ -239,16 +291,24 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
       setSkuInput('');
       
+      // Check if all items are complete
       const progress = calculateProgress();
       const newTotal = Object.values(newScannedItems).reduce((sum: number, count: number) => sum + count, 0);
       
       if (newTotal >= progress.total) {
+        // Play complete sound for finished order
         playCompleteSound();
         toast({
           title: "Order Complete! 🎉",
           description: `Order ${selectedOrder.order_number} fully packed and moved to tracking stage.`,
         });
         resetScanner();
+      } else {
+        setTimeout(() => {
+          if (!focusLocked) {
+            skuInputRef.current?.focus();
+          }
+        }, 100);
       }
 
     } catch (error) {
@@ -270,7 +330,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     setSkuInput('');
     setSelectedOrder(null);
     setScannedItems({});
-    setAutoFocusEnabled(true);
+    setFocusLocked(false);
+    
+    setTimeout(() => {
+      if (!focusLocked) {
+        orderInputRef.current?.focus();
+      }
+    }, 100);
   };
 
   const handleOrderKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -285,6 +351,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     }
   };
 
+  // Notify parent about selected order
   React.useEffect(() => {
     onOrderSelected?.(selectedOrder);
   }, [selectedOrder, onOrderSelected]);
@@ -301,15 +368,17 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             value={orderIdInput}
             onChange={(e) => setOrderIdInput(e.target.value)}
             onKeyPress={handleOrderKeyPress}
-            onFocus={handleInputFocus}
+            onFocus={() => setFocusLocked(false)}
             disabled={isProcessing || step === 'sku'}
             className="flex-1 scanner-input"
+            autoFocus
           />
           <Button 
             variant="outline" 
             size="icon"
             onClick={handleOrderScan}
             disabled={!orderIdInput.trim() || isProcessing || step === 'sku'}
+            className="scanner-input"
           >
             <Scan className="h-4 w-4" />
           </Button>
@@ -320,7 +389,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               variant="outline"
               size="sm"
               onClick={resetScanner}
-              className="text-xs"
+              className="text-xs scanner-input"
             >
               <RotateCcw className="h-3 w-3 mr-1" />
               Reset
@@ -329,12 +398,13 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         )}
       </div>
 
-      {/* SKU Scanner */}
+      {/* SKU Scanner - only show if order is selected */}
       {step === 'sku' && (
         <div className="space-y-4">
           <div className="space-y-2">
             <h3 className="font-medium text-gray-900">Product Scanner</h3>
             
+            {/* Progress Bar */}
             {(() => {
               const progress = calculateProgress();
               return (
@@ -356,31 +426,42 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
-              onFocus={handleInputFocus}
+              onFocus={() => setFocusLocked(false)}
               disabled={isProcessing}
               className="flex-1 scanner-input"
+              autoFocus
             />
             <Button 
               variant="outline" 
               size="icon"
               onClick={handleSKUScan}
               disabled={!skuInput.trim() || isProcessing}
+              className="scanner-input"
             >
               <Scan className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Item Status Display */}
+          {/* Enhanced Item Status Display with Supabase variation data */}
           {selectedOrder && selectedOrder.order_items && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">Items to Pack:</h4>
+              <h4 className="text-sm font-medium text-gray-700">Items to Pack (with Supabase Variations):</h4>
               <div className="grid gap-2">
                 {selectedOrder.order_items.map((item: any) => {
                   const scanned = scannedItems[item.id] || 0;
                   const isComplete = scanned >= item.quantity;
                   
+                  // Enhanced normalization with Supabase variation data
                   const normalizedItem = normalizeItemForDisplay(item);
                   const variationText = getVariationDisplayText(normalizedItem);
+                  
+                  console.log(`Scanner display for item ${item.id}:`, {
+                    originalItem: item,
+                    supabaseVariantTitle: item.variant_title,
+                    supabaseVariantOptions: item.variant_options,
+                    normalizedItem,
+                    variationText
+                  });
                   
                   return (
                     <div key={item.id} className={`p-2 rounded-lg border ${isComplete ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
@@ -396,6 +477,14 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
                           </div>
                           <div className="text-xs text-gray-500 space-y-1">
                             <p>SKU: {item.sku || 'N/A'}</p>
+                            {item.variant_title && (
+                              <p>Supabase Variant: {item.variant_title}</p>
+                            )}
+                            {variationText && variationText !== 'No variations' ? (
+                              <p className="text-green-600">✅ Variation from Supabase</p>
+                            ) : (
+                              <p className="text-amber-600">⚠️ Using fallback variation detection</p>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
