@@ -6,6 +6,7 @@ import { Package, MapPin, Calendar, Truck, User, Hash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface DeliveryOrdersListProps {
   stages: string[];
@@ -83,101 +84,103 @@ const DeliveryOrdersList: React.FC<DeliveryOrdersListProps> = ({ stages, title }
       
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Tracking</TableHead>
-                <TableHead>Carrier</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Dates</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">
-                    <div className="flex items-center space-x-2">
-                      <Hash className="h-3 w-3 text-gray-400" />
-                      <span className="text-sm font-mono">{order.order_number}</span>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <User className="h-3 w-3 text-gray-400" />
-                      <span className="text-sm">
-                        {order.customer ? 
-                          `${order.customer.first_name} ${order.customer.last_name}` : 
-                          'N/A'
-                        }
-                      </span>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Badge className={getStatusColor(order.stage)}>
-                      {getStatusLabel(order.stage)}
-                    </Badge>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {order.tracking_number ? (
+          <ScrollArea className="h-[600px] w-full">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Order</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Tracking</TableHead>
+                  <TableHead>Carrier</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Dates</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id} className="hover:bg-gray-50">
+                    <TableCell className="font-medium">
                       <div className="flex items-center space-x-2">
-                        <Truck className="h-3 w-3 text-gray-400" />
-                        <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                          {order.tracking_number}
+                        <Hash className="h-3 w-3 text-gray-400" />
+                        <span className="text-sm font-mono">{order.order_number}</span>
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <User className="h-3 w-3 text-gray-400" />
+                        <span className="text-sm">
+                          {order.customer ? 
+                            `${order.customer.first_name} ${order.customer.last_name}` : 
+                            'N/A'
+                          }
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">No tracking</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <span className="text-sm">
-                      {order.carrier || 'N/A'}
-                    </span>
-                  </TableCell>
-                  
-                  <TableCell>
-                    {order.shipping_address ? (
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="h-3 w-3 text-gray-400" />
-                        <div className="text-sm text-gray-600">
-                          {order.shipping_address.city}, {order.shipping_address.state}
-                          <br />
-                          <span className="text-xs">{order.shipping_address.postal_code}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">No address</span>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>Created: {formatDate(order.created_at)}</span>
-                      </div>
-                      {(order.delivered_at || order.shipped_at) && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>
-                            {order.delivered_at ? `Delivered: ${formatDate(order.delivered_at)}` : 
-                             order.shipped_at ? `Shipped: ${formatDate(order.shipped_at)}` : ''}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Badge className={getStatusColor(order.stage)}>
+                        {getStatusLabel(order.stage)}
+                      </Badge>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {order.tracking_number ? (
+                        <div className="flex items-center space-x-2">
+                          <Truck className="h-3 w-3 text-gray-400" />
+                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                            {order.tracking_number}
                           </span>
                         </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No tracking</span>
                       )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <span className="text-sm">
+                        {order.carrier || 'N/A'}
+                      </span>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {order.shipping_address ? (
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-3 w-3 text-gray-400" />
+                          <div className="text-sm text-gray-600">
+                            {order.shipping_address.city}, {order.shipping_address.state}
+                            <br />
+                            <span className="text-xs">{order.shipping_address.postal_code}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No address</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>Created: {formatDate(order.created_at)}</span>
+                        </div>
+                        {(order.delivered_at || order.shipped_at) && (
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>
+                              {order.delivered_at ? `Delivered: ${formatDate(order.delivered_at)}` : 
+                               order.shipped_at ? `Shipped: ${formatDate(order.shipped_at)}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </CardContent>
       </Card>
     </div>
