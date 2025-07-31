@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +14,7 @@ export interface ApiConfigs {
     api_key: string;
     base_url: string;
   };
-  trackingmore: {
+  parcel_panel: {
     enabled: boolean;
     api_key: string;
     base_url: string;
@@ -34,10 +33,10 @@ const defaultConfigs: ApiConfigs = {
     api_key: '',
     base_url: 'https://api.interakt.ai'
   },
-  trackingmore: {
+  parcel_panel: {
     enabled: false,
     api_key: '',
-    base_url: 'https://api.trackingmore.com'
+    base_url: 'https://api.parcelpanel.com'
   }
 };
 
@@ -68,7 +67,7 @@ export const useApiConfigs = () => {
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
           interakt: { ...defaultConfigs.interakt, ...configData.interakt },
-          trackingmore: { ...defaultConfigs.trackingmore, ...configData.trackingmore }
+          parcel_panel: { ...defaultConfigs.parcel_panel, ...configData.parcel_panel }
         };
         setApiConfigs(mergedConfigs);
       } else {

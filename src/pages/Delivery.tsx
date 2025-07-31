@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,10 +45,10 @@ const Delivery = () => {
       return;
     }
 
-    if (!apiConfigs.trackingmore?.enabled || !apiConfigs.trackingmore?.api_key) {
+    if (!apiConfigs.parcel_panel?.enabled || !apiConfigs.parcel_panel?.api_key) {
       toast({
         title: "Error",
-        description: "TrackingMore API is not configured. Please check settings.",
+        description: "Parcel Panel API is not configured. Please check settings.",
         variant: "destructive",
       });
       return;
@@ -55,10 +56,10 @@ const Delivery = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${apiConfigs.trackingmore.base_url}/v4/trackings/get`, {
-        method: 'GET',
+      const response = await fetch(`${apiConfigs.parcel_panel.base_url}/v1/tracking/track`, {
+        method: 'POST',
         headers: {
-          'Tracking-Api-Key': apiConfigs.trackingmore.api_key,
+          'Authorization': `Bearer ${apiConfigs.parcel_panel.api_key}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -76,19 +77,19 @@ const Delivery = () => {
         const trackingData = data.data;
         const formattedInfo: DeliveryInfo = {
           trackingNumber: trackingData.tracking_number,
-          carrierCode: trackingData.carrier_code,
-          carrierName: trackingData.carrier_name || trackingData.carrier_code,
+          carrierCode: trackingData.courier_code,
+          carrierName: trackingData.courier_name || trackingData.courier_code,
           status: trackingData.status,
-          statusDetail: trackingData.substatus || trackingData.status,
-          originCountry: trackingData.origin_info?.country,
-          destinationCountry: trackingData.destination_info?.country,
-          estimatedDelivery: trackingData.estimated_delivery_time,
-          actualDelivery: trackingData.delivery_time,
-          events: trackingData.origin_info?.trackinfo?.map((event: any) => ({
-            time: event.checkpoint_time,
-            description: event.tracking_detail,
-            location: event.checkpoint_delivery_status,
-            status: event.checkpoint_status,
+          statusDetail: trackingData.sub_status || trackingData.status,
+          originCountry: trackingData.origin_country,
+          destinationCountry: trackingData.destination_country,
+          estimatedDelivery: trackingData.estimated_delivery_date,
+          actualDelivery: trackingData.delivered_at,
+          events: trackingData.tracking_events?.map((event: any) => ({
+            time: event.time,
+            description: event.description,
+            location: event.location,
+            status: event.status,
           })) || [],
         };
         setDeliveryInfo(formattedInfo);
@@ -145,6 +146,9 @@ const Delivery = () => {
               {loading ? 'Tracking...' : 'Track'}
             </Button>
           </div>
+          <p className="text-sm text-gray-600 mt-2">
+            Powered by Parcel Panel - Track packages from all major carriers
+          </p>
         </CardContent>
       </Card>
 
@@ -237,7 +241,7 @@ const Delivery = () => {
             <Package className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No tracking information</h3>
             <p className="text-gray-600 text-center max-w-md">
-              Enter a tracking number above to get detailed delivery information and real-time updates.
+              Enter a tracking number above to get detailed delivery information and real-time updates using Parcel Panel.
             </p>
           </CardContent>
         </Card>
