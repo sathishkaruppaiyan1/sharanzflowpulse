@@ -26,8 +26,8 @@ const ConnectionStatus = () => {
       enabled: apiConfigs.interakt?.enabled && apiConfigs.interakt?.api_key,
     },
     {
-      name: 'TrackingMore',
-      enabled: apiConfigs.trackingmore?.enabled && apiConfigs.trackingmore?.api_key,
+      name: 'Parcel Panel',
+      enabled: apiConfigs.parcel_panel?.enabled && apiConfigs.parcel_panel?.api_key,
     }
   ];
 
