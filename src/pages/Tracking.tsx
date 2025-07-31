@@ -27,6 +27,8 @@ const Tracking = () => {
   const [whatsappStatus, setWhatsappStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [shopifyStatus, setShopifyStatus] = useState<'pending' | 'success' | 'failed' | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
 
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
@@ -59,47 +61,111 @@ const Tracking = () => {
     );
   };
 
-  // Keep order input focused when order is not locked
+  // Enhanced focus management for order input
   useEffect(() => {
-    if (!isOrderLocked && orderInputRef.current) {
+    if (!isOrderLocked && orderInputRef.current && !focusLocked && autoFocusEnabled) {
       orderInputRef.current.focus();
     }
-  }, [isOrderLocked]);
+  }, [isOrderLocked, focusLocked, autoFocusEnabled]);
 
-  // Re-focus order input when it loses focus (only when not locked)
+  // Enhanced focus management for tracking input
   useEffect(() => {
-    if (!isOrderLocked) {
-      const handleFocus = () => {
-        if (orderInputRef.current && document.activeElement !== orderInputRef.current) {
-          orderInputRef.current.focus();
-        }
-      };
-
-      const interval = setInterval(handleFocus, 100);
-      return () => clearInterval(interval);
-    }
-  }, [isOrderLocked]);
-
-  // Keep tracking input focused when order is locked
-  useEffect(() => {
-    if (isOrderLocked && trackingInputRef.current) {
+    if (isOrderLocked && trackingInputRef.current && !focusLocked && autoFocusEnabled) {
       trackingInputRef.current.focus();
     }
-  }, [isOrderLocked]);
+  }, [isOrderLocked, focusLocked, autoFocusEnabled]);
 
-  // Re-focus tracking input when it loses focus (only when order is locked)
+  // Enhanced focus management with better button click detection
   useEffect(() => {
-    if (isOrderLocked) {
-      const handleFocus = () => {
-        if (trackingInputRef.current && document.activeElement !== trackingInputRef.current) {
+    if (!autoFocusEnabled) return;
+
+    const handleFocusManagement = () => {
+      const activeElement = document.activeElement;
+      
+      // Check if user is interacting with any clickable element
+      const isClickableElement = activeElement?.tagName === 'BUTTON' || 
+                                activeElement?.getAttribute('role') === 'button' ||
+                                activeElement?.tagName === 'A' ||
+                                activeElement?.closest('[role="dialog"]') ||
+                                activeElement?.closest('[data-dialog-content]') ||
+                                activeElement?.closest('.manage-button') ||
+                                activeElement?.closest('[data-radix-popper-content-wrapper]') ||
+                                activeElement?.closest('[data-radix-dialog-content]');
+
+      // Don't steal focus from clickable elements or dialog content
+      if (isClickableElement) {
+        setFocusLocked(true);
+        setAutoFocusEnabled(false);
+        // Re-enable auto-focus after a longer delay when user stops interacting
+        setTimeout(() => {
+          setFocusLocked(false);
+          setAutoFocusEnabled(true);
+        }, 3000);
+        return;
+      }
+
+      // Only refocus to scanner inputs if focus is lost and auto-focus is enabled
+      if (autoFocusEnabled && !focusLocked) {
+        if (!isOrderLocked && orderInputRef.current && activeElement !== orderInputRef.current) {
+          orderInputRef.current.focus();
+        } else if (isOrderLocked && trackingInputRef.current && activeElement !== trackingInputRef.current) {
           trackingInputRef.current.focus();
         }
-      };
+      }
+    };
 
-      const interval = setInterval(handleFocus, 100);
-      return () => clearInterval(interval);
-    }
-  }, [isOrderLocked]);
+    const interval = setInterval(handleFocusManagement, 500);
+    return () => clearInterval(interval);
+  }, [isOrderLocked, focusLocked, autoFocusEnabled]);
+
+  // Enhanced user interaction detection
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      
+      // Check if user clicked on any button or interactive element
+      if (target?.closest('button') || 
+          target?.closest('[role="button"]') ||
+          target?.closest('a') ||
+          target?.closest('[data-radix-popper-content-wrapper]') ||
+          target?.closest('[data-radix-dialog-content]') ||
+          target?.closest('.manage-button')) {
+        
+        // Don't disable auto-focus for scanner-specific buttons
+        if (!target?.closest('.scanner-input')) {
+          setFocusLocked(true);
+          setAutoFocusEnabled(false);
+          
+          // Re-enable auto-focus after user stops interacting
+          setTimeout(() => {
+            setFocusLocked(false);
+            setAutoFocusEnabled(true);
+          }, 3000);
+        }
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable auto-focus when user presses Tab or other navigation keys
+      if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'F1' || e.key === 'F2') {
+        setFocusLocked(true);
+        setAutoFocusEnabled(false);
+        
+        setTimeout(() => {
+          setFocusLocked(false);
+          setAutoFocusEnabled(true);
+        }, 2000);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const handleOrderScan = () => {
     if (!orderIdInput.trim()) return;
@@ -228,6 +294,8 @@ const Tracking = () => {
     setIsOrderLocked(false);
     setWhatsappStatus(null);
     setShopifyStatus(null);
+    setFocusLocked(false);
+    setAutoFocusEnabled(true);
   };
 
   if (isLoading) {
@@ -389,7 +457,7 @@ const Tracking = () => {
                       onClick={handleResetOrder}
                       size="sm"
                       variant="outline"
-                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      className="text-red-600 border-red-300 hover:bg-red-50 scanner-input"
                     >
                       Reset
                     </Button>
@@ -411,6 +479,10 @@ const Tracking = () => {
                       value={orderIdInput}
                       onChange={(e) => setOrderIdInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && !isOrderLocked && handleOrderScan()}
+                      onFocus={() => {
+                        setFocusLocked(false);
+                        setAutoFocusEnabled(true);
+                      }}
                       className="flex-1"
                       disabled={isOrderLocked}
                       autoFocus
@@ -419,7 +491,7 @@ const Tracking = () => {
                       onClick={handleOrderScan}
                       size="sm"
                       variant="outline"
-                      className="px-3"
+                      className="px-3 scanner-input"
                       disabled={isOrderLocked || !orderIdInput.trim()}
                     >
                       <Scan className="h-4 w-4" />
@@ -460,6 +532,10 @@ const Tracking = () => {
                           }
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleTrackingNumberScan()}
+                        onFocus={() => {
+                          setFocusLocked(false);
+                          setAutoFocusEnabled(true);
+                        }}
                         className="flex-1"
                         autoFocus
                       />
@@ -467,7 +543,7 @@ const Tracking = () => {
                         onClick={handleTrackingNumberScan}
                         size="sm"
                         variant="default"
-                        className="px-3"
+                        className="px-3 scanner-input"
                         disabled={!trackingNumberInput.trim() || updateTrackingMutation.isPending}
                       >
                         <Package className="h-4 w-4" />
@@ -496,7 +572,7 @@ const Tracking = () => {
                   {currentOrder && (
                     <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" className="scanner-input">
                           <Settings className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>

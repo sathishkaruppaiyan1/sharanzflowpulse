@@ -27,6 +27,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   const [isProcessing, setIsProcessing] = useState(false);
   const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
   const [focusLocked, setFocusLocked] = useState(false);
+  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
   
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -35,55 +36,115 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
   // Initial focus on order input when component mounts
   useEffect(() => {
-    if (step === 'order' && orderInputRef.current && !focusLocked) {
+    if (step === 'order' && orderInputRef.current && !focusLocked && autoFocusEnabled) {
       const timer = setTimeout(() => {
         orderInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [step, focusLocked]);
+  }, [step, focusLocked, autoFocusEnabled]);
 
-  // Focus management - only refocus if no other element is actively being used
+  // Enhanced focus management with better button click detection
   useEffect(() => {
-    if (focusLocked) return;
+    if (!autoFocusEnabled) return;
 
     const handleFocusManagement = () => {
       const activeElement = document.activeElement;
+      
+      // Check if user is interacting with any clickable element
       const isClickableElement = activeElement?.tagName === 'BUTTON' || 
                                 activeElement?.getAttribute('role') === 'button' ||
                                 activeElement?.tagName === 'A' ||
                                 activeElement?.closest('[role="dialog"]') ||
                                 activeElement?.closest('[data-dialog-content]') ||
-                                activeElement?.closest('.manage-button');
+                                activeElement?.closest('.manage-button') ||
+                                activeElement?.closest('[data-radix-popper-content-wrapper]') ||
+                                activeElement?.closest('[data-radix-dialog-content]');
 
       // Don't steal focus from clickable elements or dialog content
       if (isClickableElement) {
         setFocusLocked(true);
-        setTimeout(() => setFocusLocked(false), 2000); // Release lock after 2 seconds
+        setAutoFocusEnabled(false);
+        // Re-enable auto-focus after a longer delay when user stops interacting
+        setTimeout(() => {
+          setFocusLocked(false);
+          setAutoFocusEnabled(true);
+        }, 3000);
         return;
       }
 
-      // Only refocus to scanner inputs if focus is lost and no important UI is active
-      if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
-        orderInputRef.current.focus();
-      } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
-        skuInputRef.current.focus();
+      // Only refocus to scanner inputs if focus is lost and auto-focus is enabled
+      if (autoFocusEnabled && !focusLocked) {
+        if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
+          orderInputRef.current.focus();
+        } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
+          skuInputRef.current.focus();
+        }
       }
     };
 
     const interval = setInterval(handleFocusManagement, 500);
     return () => clearInterval(interval);
-  }, [step, focusLocked]);
+  }, [step, focusLocked, autoFocusEnabled]);
 
   // Focus SKU input when switching to SKU step
   useEffect(() => {
-    if (step === 'sku' && skuInputRef.current && !focusLocked) {
+    if (step === 'sku' && skuInputRef.current && !focusLocked && autoFocusEnabled) {
       const timer = setTimeout(() => {
         skuInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [step, focusLocked]);
+  }, [step, focusLocked, autoFocusEnabled]);
+
+  // Enhanced user interaction detection
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element;
+      
+      // Check if user clicked on any button or interactive element
+      if (target?.closest('button') || 
+          target?.closest('[role="button"]') ||
+          target?.closest('a') ||
+          target?.closest('[data-radix-popper-content-wrapper]') ||
+          target?.closest('[data-radix-dialog-content]') ||
+          target?.closest('.manage-button')) {
+        
+        // Don't disable auto-focus for scanner-specific buttons
+        if (!target?.closest('.scanner-input')) {
+          setFocusLocked(true);
+          setAutoFocusEnabled(false);
+          
+          // Re-enable auto-focus after user stops interacting
+          setTimeout(() => {
+            setFocusLocked(false);
+            setAutoFocusEnabled(true);
+          }, 3000);
+        }
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable auto-focus when user presses Tab or other navigation keys
+      if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'F1' || e.key === 'F2') {
+        setFocusLocked(true);
+        setAutoFocusEnabled(false);
+        
+        setTimeout(() => {
+          setFocusLocked(false);
+          setAutoFocusEnabled(true);
+        }, 2000);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
     return orders.find(order => 
@@ -203,7 +264,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
 
       // Focus on SKU input after a short delay
       setTimeout(() => {
-        skuInputRef.current?.focus();
+        if (!focusLocked && autoFocusEnabled) {
+          skuInputRef.current?.focus();
+        }
       }, 100);
 
     } catch (error) {
@@ -236,7 +299,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "destructive"
         });
         setSkuInput('');
-        skuInputRef.current?.focus();
+        if (!focusLocked && autoFocusEnabled) {
+          skuInputRef.current?.focus();
+        }
         return;
       }
 
@@ -256,7 +321,9 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
           variant: "default"
         });
         setSkuInput('');
-        skuInputRef.current?.focus();
+        if (!focusLocked && autoFocusEnabled) {
+          skuInputRef.current?.focus();
+        }
         return;
       }
 
@@ -305,7 +372,7 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
         resetScanner();
       } else {
         setTimeout(() => {
-          if (!focusLocked) {
+          if (!focusLocked && autoFocusEnabled) {
             skuInputRef.current?.focus();
           }
         }, 100);
@@ -331,9 +398,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
     setSelectedOrder(null);
     setScannedItems({});
     setFocusLocked(false);
+    setAutoFocusEnabled(true);
     
     setTimeout(() => {
-      if (!focusLocked) {
+      if (!focusLocked && autoFocusEnabled) {
         orderInputRef.current?.focus();
       }
     }, 100);
@@ -368,7 +436,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
             value={orderIdInput}
             onChange={(e) => setOrderIdInput(e.target.value)}
             onKeyPress={handleOrderKeyPress}
-            onFocus={() => setFocusLocked(false)}
+            onFocus={() => {
+              setFocusLocked(false);
+              setAutoFocusEnabled(true);
+            }}
             disabled={isProcessing || step === 'sku'}
             className="flex-1 scanner-input"
             autoFocus
@@ -426,7 +497,10 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
               onKeyPress={handleSKUKeyPress}
-              onFocus={() => setFocusLocked(false)}
+              onFocus={() => {
+                setFocusLocked(false);
+                setAutoFocusEnabled(true);
+              }}
               disabled={isProcessing}
               className="flex-1 scanner-input"
               autoFocus
