@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -126,17 +127,21 @@ const Delivery = () => {
         <h2 className="text-3xl font-bold tracking-tight">Delivery Management</h2>
       </div>
 
-      <Tabs defaultValue="track-package" className="space-y-4">
+      <Tabs defaultValue="orders" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="track-package" className="flex items-center space-x-2">
-            <Search className="h-4 w-4" />
-            <span>Track Package</span>
-          </TabsTrigger>
           <TabsTrigger value="orders" className="flex items-center space-x-2">
             <List className="h-4 w-4" />
             <span>Orders</span>
           </TabsTrigger>
+          <TabsTrigger value="track-package" className="flex items-center space-x-2">
+            <Search className="h-4 w-4" />
+            <span>Track Package</span>
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="orders" className="space-y-4">
+          <DeliveryTabs />
+        </TabsContent>
 
         <TabsContent value="track-package" className="space-y-4">
           {/* Search Section */}
@@ -260,10 +265,6 @@ const Delivery = () => {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="orders" className="space-y-4">
-          <DeliveryTabs />
         </TabsContent>
       </Tabs>
     </div>
