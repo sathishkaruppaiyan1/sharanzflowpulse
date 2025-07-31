@@ -2,7 +2,7 @@
 import React from 'react';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import DeliveryOrderCard from './DeliveryOrderCard';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { Package } from 'lucide-react';
 
 interface DeliveryOrdersListProps {
