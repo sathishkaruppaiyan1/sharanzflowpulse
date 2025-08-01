@@ -1,581 +1,344 @@
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Scan, Package, CheckCircle, X, Camera, Keyboard, Lock, ArrowRight, RotateCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useRef, useEffect } from 'react';
+import { Scan, Package, CheckCircle, User, Phone, AlertTriangle, Truck, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
-import { toast } from '@/hooks/use-toast';
-import { supabaseOrderService } from '@/services/supabaseOrderService';
-import { useQueryClient } from '@tanstack/react-query';
-import { normalizeItemForDisplay, getVariationDisplayText } from '@/utils/productVariationUtils';
-import { useSoundNotifications } from '@/hooks/useSoundNotifications';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Order } from '@/types/database';
+import { usePackingScanner } from '@/hooks/usePackingScanner';
+import { toast } from 'sonner';
+import { getPhoneNumber } from '@/lib/utils';
+import { getVariationDisplayText, normalizeItemForDisplay } from '@/utils/productVariationUtils';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PackingScannerProps {
-  orders: any[];
-  onItemPacked: (orderId: string, itemId: string) => void;
-  onOrderSelected?: (order: any | null) => void;
+  orders: Order[];
+  onItemPacked?: (orderId: string, itemId: string) => void;
+  onOrderSelected?: (order: Order | null) => void;
 }
 
 const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScannerProps) => {
-  const [step, setStep] = useState<'order' | 'sku'>('order');
-  const [orderIdInput, setOrderIdInput] = useState('');
+  const [orderInput, setOrderInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [scannedItems, setScannedItems] = useState<{[key: string]: number}>({});
-  const [focusLocked, setFocusLocked] = useState(false);
-  const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
-  
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const orderInputRef = useRef<HTMLInputElement>(null);
   const skuInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-  const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
 
-  // Initial focus on order input when component mounts
+  const { scanItem, getOrderProgress, isOrderComplete } = usePackingScanner(currentOrder);
+
+  // Bulk move mutation
+  const bulkMoveToTracking = useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      const promises = orderIds.map(orderId => 
+        supabase
+          .from('orders')
+          .update({ 
+            stage: 'tracking',
+            packed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+      );
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(`Successfully moved ${selectedOrders.size} orders to tracking stage`);
+      setSelectedOrders(new Set());
+    },
+    onError: (error) => {
+      console.error('Error moving orders to tracking:', error);
+      toast.error('Failed to move some orders. Please try again.');
+    },
+  });
+
+  // Focus order input on mount
   useEffect(() => {
-    if (step === 'order' && orderInputRef.current && !focusLocked && autoFocusEnabled) {
-      const timer = setTimeout(() => {
-        orderInputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [step, focusLocked, autoFocusEnabled]);
-
-  // Enhanced focus management with better button click detection
-  useEffect(() => {
-    if (!autoFocusEnabled) return;
-
-    const handleFocusManagement = () => {
-      const activeElement = document.activeElement;
-      
-      // Check if user is interacting with any clickable element
-      const isClickableElement = activeElement?.tagName === 'BUTTON' || 
-                                activeElement?.getAttribute('role') === 'button' ||
-                                activeElement?.tagName === 'A' ||
-                                activeElement?.closest('[role="dialog"]') ||
-                                activeElement?.closest('[data-dialog-content]') ||
-                                activeElement?.closest('.manage-button') ||
-                                activeElement?.closest('[data-radix-popper-content-wrapper]') ||
-                                activeElement?.closest('[data-radix-dialog-content]');
-
-      // Don't steal focus from clickable elements or dialog content
-      if (isClickableElement) {
-        setFocusLocked(true);
-        setAutoFocusEnabled(false);
-        // Re-enable auto-focus after a longer delay when user stops interacting
-        setTimeout(() => {
-          setFocusLocked(false);
-          setAutoFocusEnabled(true);
-        }, 3000);
-        return;
-      }
-
-      // Only refocus to scanner inputs if focus is lost and auto-focus is enabled
-      if (autoFocusEnabled && !focusLocked) {
-        if (step === 'order' && orderInputRef.current && activeElement !== orderInputRef.current) {
-          orderInputRef.current.focus();
-        } else if (step === 'sku' && skuInputRef.current && activeElement !== skuInputRef.current) {
-          skuInputRef.current.focus();
-        }
-      }
-    };
-
-    const interval = setInterval(handleFocusManagement, 500);
-    return () => clearInterval(interval);
-  }, [step, focusLocked, autoFocusEnabled]);
-
-  // Focus SKU input when switching to SKU step
-  useEffect(() => {
-    if (step === 'sku' && skuInputRef.current && !focusLocked && autoFocusEnabled) {
-      const timer = setTimeout(() => {
-        skuInputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [step, focusLocked, autoFocusEnabled]);
-
-  // Enhanced user interaction detection
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      
-      // Check if user clicked on any button or interactive element
-      if (target?.closest('button') || 
-          target?.closest('[role="button"]') ||
-          target?.closest('a') ||
-          target?.closest('[data-radix-popper-content-wrapper]') ||
-          target?.closest('[data-radix-dialog-content]') ||
-          target?.closest('.manage-button')) {
-        
-        // Don't disable auto-focus for scanner-specific buttons
-        if (!target?.closest('.scanner-input')) {
-          setFocusLocked(true);
-          setAutoFocusEnabled(false);
-          
-          // Re-enable auto-focus after user stops interacting
-          setTimeout(() => {
-            setFocusLocked(false);
-            setAutoFocusEnabled(true);
-          }, 3000);
-        }
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Disable auto-focus when user presses Tab or other navigation keys
-      if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'F1' || e.key === 'F2') {
-        setFocusLocked(true);
-        setAutoFocusEnabled(false);
-        
-        setTimeout(() => {
-          setFocusLocked(false);
-          setAutoFocusEnabled(true);
-        }, 2000);
-      }
-    };
-
-    document.addEventListener('click', handleClick);
-    document.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      document.removeEventListener('click', handleClick);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    orderInputRef.current?.focus();
   }, []);
 
-  const findOrderByNumber = useCallback((orderNumber: string) => {
-    return orders.find(order => 
-      order.order_number?.toLowerCase() === orderNumber.toLowerCase()
+  const handleOrderScan = () => {
+    const orderNumber = orderInput.trim();
+    if (!orderNumber) {
+      toast.error('Please enter an order number');
+      return;
+    }
+
+    const foundOrder = orders.find(order => 
+      order.order_number.toLowerCase().includes(orderNumber.toLowerCase()) ||
+      order.id === orderNumber
     );
-  }, [orders]);
 
-  const findItemBySKU = useCallback((sku: string, order: any) => {
-    if (!order.order_items) return null;
-    
-    return order.order_items.find((item: any) => {
-      const skuMatch = item.sku && item.sku.toLowerCase() === sku.toLowerCase();
-      const nameMatch = item.title && item.title.toLowerCase().includes(sku.toLowerCase());
-      
-      // Enhanced matching with variation data from Supabase
-      const variationText = getVariationDisplayText(item);
-      const variationMatch = variationText && variationText.toLowerCase().includes(sku.toLowerCase());
-      
-      console.log(`Scanner matching for SKU "${sku}":`, {
-        itemTitle: item.title,
-        itemSku: item.sku,
-        itemVariant: item.variant_title,
-        skuMatch,
-        nameMatch,
-        variationMatch
-      });
-      
-      return skuMatch || nameMatch || variationMatch;
-    });
-  }, []);
-
-  const calculateProgress = useCallback(() => {
-    if (!selectedOrder || !selectedOrder.order_items) return { scanned: 0, total: 0, percentage: 0 };
-    
-    const totalQty = selectedOrder.order_items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-    const scannedQty = Object.values(scannedItems).reduce((sum: number, count: number) => sum + count, 0);
-    
-    return {
-      scanned: scannedQty,
-      total: totalQty,
-      percentage: totalQty > 0 ? Math.round((scannedQty / totalQty) * 100) : 0
-    };
-  }, [selectedOrder, scannedItems]);
-
-  // Handle clicks outside scanner to temporarily lock focus
-  const handleUserInteraction = () => {
-    setFocusLocked(true);
-    setTimeout(() => setFocusLocked(false), 1000);
-  };
-
-  // Add event listener for user interactions
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Element;
-      if (target?.closest('button') && !target?.closest('.scanner-input')) {
-        handleUserInteraction();
-      }
-    };
-
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, []);
-
-  const handleOrderScan = async () => {
-    if (!orderIdInput.trim()) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      const order = findOrderByNumber(orderIdInput.trim());
-      
-      if (!order) {
-        // Play error sound for order not found
-        playErrorSound();
-        toast({
-          title: "Order Not Found",
-          description: `No order found with number: ${orderIdInput}`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (order.stage !== 'packing') {
-        // Play error sound for wrong stage
-        playErrorSound();
-        toast({
-          title: "Order Not Ready",
-          description: `Order ${order.order_number} is in ${order.stage} stage, not ready for packing.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Check if all items are already packed
-      const unpackedItems = order.order_items?.filter((item: any) => !item.packed) || [];
-      if (unpackedItems.length === 0) {
-        // Play warning sound for already complete order
-        playWarningSound();
-        toast({
-          title: "Order Complete",
-          description: `All items in order ${order.order_number} are already packed.`,
-          variant: "default"
-        });
-        return;
-      }
-
-      // Play success sound for valid order
-      playSuccessSound();
-      setSelectedOrder(order);
-      setScannedItems({});
-      setStep('sku');
-      
-      toast({
-        title: "Order Selected",
-        description: `Order ${order.order_number} locked. Scan each item ${order.order_items?.reduce((sum: number, item: any) => sum + item.quantity, 0)} times total.`,
-      });
-
-      // Focus on SKU input after a short delay
-      setTimeout(() => {
-        if (!focusLocked && autoFocusEnabled) {
-          skuInputRef.current?.focus();
-        }
-      }, 100);
-
-    } catch (error) {
-      console.error('Error processing order scan:', error);
-      playErrorSound();
-      toast({
-        title: "Scan Error",
-        description: "Failed to process order. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
+    if (!foundOrder) {
+      toast.error(`Order "${orderNumber}" not found in packing queue`);
+      return;
     }
+
+    setCurrentOrder(foundOrder);
+    onOrderSelected?.(foundOrder);
+    setOrderInput('');
+    
+    // Focus SKU input after order is loaded
+    setTimeout(() => skuInputRef.current?.focus(), 100);
+    
+    toast.success(`✅ Order ${foundOrder.order_number} loaded successfully`);
   };
 
-  const handleSKUScan = async () => {
-    if (!skuInput.trim() || !selectedOrder) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      const item = findItemBySKU(skuInput.trim(), selectedOrder);
-      
-      if (!item) {
-        // Play error sound for item not found
-        playErrorSound();
-        toast({
-          title: "Item Not Found",
-          description: `No item found with SKU/Name: ${skuInput} in order ${selectedOrder.order_number}`,
-          variant: "destructive"
-        });
-        setSkuInput('');
-        if (!focusLocked && autoFocusEnabled) {
-          skuInputRef.current?.focus();
-        }
-        return;
-      }
+  const handleSkuScan = () => {
+    const sku = skuInput.trim();
+    if (!sku) {
+      toast.error('Please enter a SKU');
+      return;
+    }
 
-      // Check current scan count for this item
-      const currentScans = scannedItems[item.id] || 0;
-      
-      if (currentScans >= item.quantity) {
-        // Play warning sound for already complete item
-        playWarningSound();
-        // Use enhanced variation display for completed items
-        const normalizedItem = normalizeItemForDisplay(item);
-        const variationText = getVariationDisplayText(normalizedItem);
-        
-        toast({
-          title: "Item Complete",
-          description: `${item.title || item.name} (${variationText}) has been scanned ${item.quantity} times already.`,
-          variant: "default"
-        });
-        setSkuInput('');
-        if (!focusLocked && autoFocusEnabled) {
-          skuInputRef.current?.focus();
-        }
-        return;
-      }
-
-      // Play success sound for valid item scan
-      playSuccessSound();
-
-      // Increment scan count
-      const newScannedItems = {
-        ...scannedItems,
-        [item.id]: currentScans + 1
-      };
-      setScannedItems(newScannedItems);
-
-      // Check if this item is now complete
-      const isItemComplete = newScannedItems[item.id] >= item.quantity;
-      
-      // Use enhanced variation display for scan confirmation
-      const normalizedItem = normalizeItemForDisplay(item);
-      const variationText = getVariationDisplayText(normalizedItem);
-      
-      toast({
-        title: "Item Scanned",
-        description: `${item.title || item.name} (${variationText}) scanned (${newScannedItems[item.id]}/${item.quantity})${isItemComplete ? ' - Complete!' : ''}`,
-      });
-
-      // If item is complete, mark it as packed
-      if (isItemComplete) {
-        await supabaseOrderService.updateOrderItemPacked(item.id, true);
-        onItemPacked(selectedOrder.id, item.id);
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-      }
-
+    const success = scanItem(sku);
+    if (success) {
       setSkuInput('');
-      
-      // Check if all items are complete
-      const progress = calculateProgress();
-      const newTotal = Object.values(newScannedItems).reduce((sum: number, count: number) => sum + count, 0);
-      
-      if (newTotal >= progress.total) {
-        // Play complete sound for finished order
-        playCompleteSound();
-        toast({
-          title: "Order Complete! 🎉",
-          description: `Order ${selectedOrder.order_number} fully packed and moved to tracking stage.`,
-        });
-        resetScanner();
-      } else {
-        setTimeout(() => {
-          if (!focusLocked && autoFocusEnabled) {
-            skuInputRef.current?.focus();
-          }
-        }, 100);
-      }
-
-    } catch (error) {
-      console.error('Error processing SKU scan:', error);
-      playErrorSound();
-      toast({
-        title: "Scan Error",
-        description: "Failed to process SKU. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
+      onItemPacked?.(currentOrder!.id, ''); // Trigger refresh
     }
   };
 
-  const resetScanner = () => {
-    setStep('order');
-    setOrderIdInput('');
-    setSkuInput('');
-    setSelectedOrder(null);
-    setScannedItems({});
-    setFocusLocked(false);
-    setAutoFocusEnabled(true);
-    
-    setTimeout(() => {
-      if (!focusLocked && autoFocusEnabled) {
-        orderInputRef.current?.focus();
-      }
-    }, 100);
-  };
-
-  const handleOrderKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleOrderInputKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleOrderScan();
     }
   };
 
-  const handleSKUKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSkuInputKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSKUScan();
+      handleSkuScan();
     }
   };
 
-  // Notify parent about selected order
-  React.useEffect(() => {
-    onOrderSelected?.(selectedOrder);
-  }, [selectedOrder, onOrderSelected]);
+  const handleSelectOrder = (orderId: string, checked: boolean) => {
+    const newSelected = new Set(selectedOrders);
+    if (checked) {
+      newSelected.add(orderId);
+    } else {
+      newSelected.delete(orderId);
+    }
+    setSelectedOrders(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const readyOrders = orders.filter(order => 
+        order.order_items.every(item => item.packed)
+      );
+      setSelectedOrders(new Set(readyOrders.map(order => order.id)));
+    } else {
+      setSelectedOrders(new Set());
+    }
+  };
+
+  const handleBulkMoveToTracking = async () => {
+    if (selectedOrders.size === 0) {
+      toast.error('Please select orders to move');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      await bulkMoveToTracking.mutateAsync(Array.from(selectedOrders));
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const progress = getOrderProgress();
+  const readyOrders = orders.filter(order => order.order_items.every(item => item.packed));
+  const allReadySelected = readyOrders.length > 0 && readyOrders.every(order => selectedOrders.has(order.id));
 
   return (
     <div className="space-y-6">
-      {/* Order ID Scanner */}
-      <div className="space-y-3">
-        <h3 className="font-medium text-gray-900">Order ID Scanner</h3>
-        <div className="flex space-x-2">
-          <Input
-            ref={orderInputRef}
-            placeholder="Scan or enter Order ID"
-            value={orderIdInput}
-            onChange={(e) => setOrderIdInput(e.target.value)}
-            onKeyPress={handleOrderKeyPress}
-            onFocus={() => {
-              setFocusLocked(false);
-              setAutoFocusEnabled(true);
-            }}
-            disabled={isProcessing || step === 'sku'}
-            className="flex-1 scanner-input"
-            autoFocus
-          />
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={handleOrderScan}
-            disabled={!orderIdInput.trim() || isProcessing || step === 'sku'}
-            className="scanner-input"
-          >
-            <Scan className="h-4 w-4" />
-          </Button>
-        </div>
-        {step === 'sku' && (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
+      {/* Scanner Inputs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">
+            1. Scan Order ID
+          </label>
+          <div className="flex space-x-2">
+            <Input
+              ref={orderInputRef}
+              value={orderInput}
+              onChange={(e) => setOrderInput(e.target.value)}
+              onKeyPress={handleOrderInputKeyPress}
+              placeholder="Enter order number"
+              className="flex-1"
+            />
+            <Button 
+              onClick={handleOrderScan}
               size="sm"
-              onClick={resetScanner}
-              className="text-xs scanner-input"
+              className="px-4"
             >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reset
+              <Package className="h-4 w-4" />
             </Button>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* SKU Scanner - only show if order is selected */}
-      {step === 'sku' && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <h3 className="font-medium text-gray-900">Product Scanner</h3>
-            
-            {/* Progress Bar */}
-            {(() => {
-              const progress = calculateProgress();
-              return (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Progress: {progress.scanned}/{progress.total} items scanned</span>
-                    <span>{progress.percentage}%</span>
-                  </div>
-                  <Progress value={progress.percentage} className="h-2" />
-                </div>
-              );
-            })()}
-          </div>
-          
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">
+            2. Scan Product SKU
+          </label>
           <div className="flex space-x-2">
             <Input
               ref={skuInputRef}
-              placeholder="Scan or enter product SKU or name"
               value={skuInput}
               onChange={(e) => setSkuInput(e.target.value)}
-              onKeyPress={handleSKUKeyPress}
-              onFocus={() => {
-                setFocusLocked(false);
-                setAutoFocusEnabled(true);
-              }}
-              disabled={isProcessing}
-              className="flex-1 scanner-input"
-              autoFocus
+              onKeyPress={handleSkuInputKeyPress}
+              placeholder="Enter product SKU"
+              disabled={!currentOrder}
+              className="flex-1"
             />
             <Button 
-              variant="outline" 
-              size="icon"
-              onClick={handleSKUScan}
-              disabled={!skuInput.trim() || isProcessing}
-              className="scanner-input"
+              onClick={handleSkuScan}
+              disabled={!currentOrder}
+              size="sm"
+              className="px-4"
             >
               <Scan className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Enhanced Item Status Display with Supabase variation data */}
-          {selectedOrder && selectedOrder.order_items && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">Items to Pack (with Supabase Variations):</h4>
-              <div className="grid gap-2">
-                {selectedOrder.order_items.map((item: any) => {
-                  const scanned = scannedItems[item.id] || 0;
-                  const isComplete = scanned >= item.quantity;
-                  
-                  // Enhanced normalization with Supabase variation data
-                  const normalizedItem = normalizeItemForDisplay(item);
-                  const variationText = getVariationDisplayText(normalizedItem);
-                  
-                  console.log(`Scanner display for item ${item.id}:`, {
-                    originalItem: item,
-                    supabaseVariantTitle: item.variant_title,
-                    supabaseVariantOptions: item.variant_options,
-                    normalizedItem,
-                    variationText
-                  });
-                  
-                  return (
-                    <div key={item.id} className={`p-2 rounded-lg border ${isComplete ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium">{item.title || item.name}</p>
-                            {variationText && variationText !== 'No variations' && (
-                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                {variationText}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500 space-y-1">
-                            <p>SKU: {item.sku || 'N/A'}</p>
-                            {item.variant_title && (
-                              <p>Supabase Variant: {item.variant_title}</p>
-                            )}
-                            {variationText && variationText !== 'No variations' ? (
-                              <p className="text-green-600">✅ Variation from Supabase</p>
-                            ) : (
-                              <p className="text-amber-600">⚠️ Using fallback variation detection</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={isComplete ? "default" : "secondary"}>
-                            {scanned}/{item.quantity}
+      {/* Order Progress */}
+      {currentOrder && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-900">
+                    {currentOrder.order_number}
+                  </span>
+                  <Badge variant="outline" className="bg-white">
+                    {progress.packedItems}/{progress.totalItems} packed
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {getPhoneNumber(currentOrder) ? (
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <Phone className="h-3 w-3" />
+                    <span className="text-sm font-medium">{getPhoneNumber(currentOrder)}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-1 text-red-500">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span className="text-sm">No phone</span>
+                  </div>
+                )}
+                
+                {isOrderComplete() && (
+                  <Badge className="bg-green-600">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Ready for Dispatch
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Bulk Order Selection */}
+      <Card className="border-purple-200 bg-purple-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg text-purple-900 flex items-center">
+            <Package className="h-5 w-5 mr-2" />
+            Bulk Order Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Bulk Actions Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                checked={allReadySelected}
+                onCheckedChange={handleSelectAll}
+                className="border-purple-400"
+              />
+              <span className="text-sm font-medium text-purple-900">
+                Select All Ready Orders ({readyOrders.length} ready)
+              </span>
+              {selectedOrders.size > 0 && (
+                <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                  {selectedOrders.size} selected
+                </Badge>
+              )}
+            </div>
+            {selectedOrders.size > 0 && (
+              <Button
+                onClick={handleBulkMoveToTracking}
+                disabled={isBulkProcessing}
+                size="sm"
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Move to Tracking ({selectedOrders.size})
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+
+          {/* Ready Orders List */}
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {readyOrders.length > 0 ? (
+              readyOrders.map((order) => {
+                const isSelected = selectedOrders.has(order.id);
+                const phoneNumber = getPhoneNumber(order);
+                
+                return (
+                  <div 
+                    key={order.id} 
+                    className={`p-3 rounded-lg border flex items-center justify-between ${
+                      isSelected ? 'bg-purple-100 border-purple-300' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                        className="border-purple-400"
+                      />
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-sm text-purple-900">
+                            {order.order_number}
+                          </span>
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                            {order.order_items.length} items ready
                           </Badge>
-                          {isComplete && <CheckCircle className="h-4 w-4 text-green-600 inline ml-1" />}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {order.customer?.first_name} {order.customer?.last_name}
+                          {phoneNumber && (
+                            <span className="ml-2 text-green-600">📱 {phoneNumber}</span>
+                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No orders ready for dispatch</p>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
