@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ArrowLeft, ArrowRight, Package, Truck, CheckCircle, Eye, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { useUpdateOrderStage } from '@/hooks/useOrders';
 import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface StageChangeControlsProps {
   order: Order;
@@ -17,6 +17,7 @@ interface StageChangeControlsProps {
 
 const StageChangeControls = ({ order, currentStage, onStageChange }: StageChangeControlsProps) => {
   const updateOrderStage = useUpdateOrderStage();
+  const queryClient = useQueryClient();
 
   const stages: { value: OrderStage; label: string; icon: React.ReactNode; color: string }[] = [
     { value: 'pending', label: 'Pending', icon: <Eye className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' },
@@ -52,6 +53,10 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
           })
           .eq('id', order.id);
 
+        // Immediately invalidate all order-related queries for instant UI update
+        await queryClient.invalidateQueries({ queryKey: ['orders'] });
+        await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
+        
         toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage! All items marked as unpacked.`);
       } else if (newStage === 'tracking') {
         // When moving to tracking, set packed_at timestamp
@@ -64,13 +69,19 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
           })
           .eq('id', order.id);
 
+        // Immediately invalidate all order-related queries for instant UI update
+        await queryClient.invalidateQueries({ queryKey: ['orders'] });
+        await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
+        
         toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
       } else {
-        // For other stages, use the mutation
+        // For other stages, use the mutation which already handles invalidation
         updateOrderStage.mutate(
           { orderId: order.id, stage: newStage },
           {
-            onSuccess: () => {
+            onSuccess: async () => {
+              // Force immediate refetch of all stage-specific queries
+              await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
               toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
               onStageChange?.();
             },
