@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Package, Truck, MapPin, Calendar, ExternalLink, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +61,7 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
   const getCourierDisplayName = (carrier: CarrierType) => {
     switch (carrier) {
       case 'frenchexpress':
-        return 'French Express';
+        return 'Franch Express';
       case 'delhivery':
         return 'Delhivery';
       default:

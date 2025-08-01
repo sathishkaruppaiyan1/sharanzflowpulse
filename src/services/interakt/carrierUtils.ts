@@ -27,7 +27,7 @@ export const generateTrackingLink = (trackingNumber: string, carrier: CarrierTyp
 export const getCourierDisplayName = (carrier: CarrierType): string => {
   switch (carrier) {
     case 'frenchexpress':
-      return 'FRENCH EXPRESS';
+      return 'FRANCH EXPRESS';
     case 'delhivery':
       return 'DELHIVERY';
     default:
