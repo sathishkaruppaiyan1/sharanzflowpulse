@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings, Shirt, Checkbox, Truck } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings, Shirt, Truck } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
