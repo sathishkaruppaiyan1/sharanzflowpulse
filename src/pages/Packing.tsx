@@ -257,7 +257,7 @@ const Packing = () => {
             </Card>
           </div>
 
-          {/* Orders Ready for Packing */}
+          {/* Orders Ready for Packing with Bulk Actions */}
           <Card className="bg-white">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center">
@@ -265,105 +265,16 @@ const Packing = () => {
                 Orders Ready for Packing
               </CardTitle>
               <CardDescription>
-                {packingOrders.length} orders waiting for packing completion
+                {packingOrders.length} orders waiting for packing completion. Use bulk actions to move multiple ready orders at once.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {packingOrders.map((order) => {
-                  const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
-                  const totalItems = order.order_items?.length || 0;
-                  const isComplete = packedItems === totalItems;
-                  
-                  return (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{order.order_number}</h3>
-                            <p className="text-sm text-gray-500">
-                              {order.customer?.first_name} {order.customer?.last_name}
-                              {order.customer?.phone && (
-                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
-                              )}
-                              <span className="mx-2">•</span>
-                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
-                            </p>
-                            
-                            {/* Show first few items with proper variations */}
-                            <div className="mt-1 text-xs">
-                              <span className="font-medium text-gray-600">Items: </span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {order.order_items?.slice(0, 3).map((item: any, index: number) => {
-                                  const normalizedItem = normalizeItemForDisplay(item);
-                                  const variationText = getVariationDisplayText(normalizedItem);
-                                  
-                                  return (
-                                    <div key={item.id} className="flex items-center space-x-1">
-                                      <span className="text-blue-700 font-medium">
-                                        {item.title || item.name}
-                                      </span>
-                                      {variationText && variationText !== 'No variations' && (
-                                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                          {variationText}
-                                        </Badge>
-                                      )}
-                                      {index < Math.min(order.order_items?.length || 0, 3) - 1 && (
-                                        <span className="text-gray-400">,</span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {(order.order_items?.length || 0) > 3 && (
-                                  <span className="text-gray-500"> + {(order.order_items?.length || 0) - 3} more</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        {isComplete ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Ready for Dispatch
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                            In Progress
-                          </Badge>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedOrderForStageChange(order.id);
-                            setStageChangeDialogOpen(true);
-                          }}
-                        >
-                          <Settings className="h-3 w-3 mr-1" />
-                          Manage
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          Select
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {packingOrders.length === 0 && (
-                  <div className="text-center py-8">
-                    <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No orders ready for packing</p>
-                    <p className="text-sm text-gray-400 mt-1">Orders from printing stage will appear here</p>
-                  </div>
-                )}
-              </div>
+              <PackingQueue
+                orders={packingOrders}
+                onItemPacked={handleItemPacked}
+                onOrderUpdate={() => setRefreshKey(prev => prev + 1)}
+                showBulkActions={true}
+              />
             </CardContent>
           </Card>
         </div>
