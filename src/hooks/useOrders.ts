@@ -152,3 +152,60 @@ export const useUpdateTracking = () => {
     },
   });
 };
+
+export const useBulkUpdateOrderStage = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ orderIds, stage }: { orderIds: string[]; stage: string }) => {
+      console.log(`Bulk updating ${orderIds.length} orders to stage ${stage}`);
+      
+      const updateData: any = { 
+        stage: stage as OrderStage,
+        updated_at: new Date().toISOString()
+      };
+
+      // Add timestamp fields based on stage
+      if (stage === 'packing') {
+        updateData.printed_at = new Date().toISOString();
+      } else if (stage === 'tracking') {
+        updateData.packed_at = new Date().toISOString();
+      } else if (stage === 'shipped') {
+        updateData.shipped_at = new Date().toISOString();
+      } else if (stage === 'delivered') {
+        updateData.delivered_at = new Date().toISOString();
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .in('id', orderIds)
+        .select(`
+          *,
+          customer:customers(*),
+          shipping_address:addresses(*),
+          order_items(
+            *,
+            product:products(*)
+          )
+        `);
+
+      if (error) {
+        console.error('Error bulk updating order stages:', error);
+        throw error;
+      }
+
+      console.log(`Successfully bulk updated ${orderIds.length} orders to stage ${stage}`);
+      return data;
+    },
+    onSuccess: (data) => {
+      // Invalidate all order queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(`Successfully moved ${data.length} orders to ${data[0]?.stage} stage`);
+    },
+    onError: (error) => {
+      console.error('Error bulk updating order stages:', error);
+      toast.error('Failed to bulk update order stages');
+    },
+  });
+};

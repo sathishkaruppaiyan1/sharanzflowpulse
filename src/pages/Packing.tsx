@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { Package, Scan, CheckSquare, Settings, Shirt } from 'lucide-react';
+import { Package, Scan, CheckSquare, Settings, Shirt, Checkbox, Truck } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
 import PackingStats from '@/components/packing/PackingStats';
 import PackingScanner from '@/components/packing/PackingScanner';
+import BulkStageChangeButton from '@/components/common/BulkStageChangeButton';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getVariationDisplayText, normalizeItemForDisplay } from '@/utils/productVariationUtils';
+import { Order } from '@/types/database';
 
 const Packing = () => {
   const { data: packingOrders = [], isLoading, error } = useOrdersByStage('packing');
@@ -18,10 +21,50 @@ const Packing = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [stageChangeDialogOpen, setStageChangeDialogOpen] = useState(false);
   const [selectedOrderForStageChange, setSelectedOrderForStageChange] = useState<string | null>(null);
+  
+  // Bulk selection state
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const handleItemPacked = (orderId: string, itemId: string) => {
     console.log('Item packed:', { orderId, itemId });
     // Force a refresh of the data
+    setRefreshKey(prev => prev + 1);
+  };
+
+  // Get completed orders (all items packed)
+  const completedOrders = packingOrders.filter(order => 
+    order.order_items?.every((item: any) => item.packed)
+  );
+
+  // Handle individual order selection
+  const handleOrderSelect = (orderId: string, checked: boolean) => {
+    const newSelectedIds = new Set(selectedOrderIds);
+    if (checked) {
+      newSelectedIds.add(orderId);
+    } else {
+      newSelectedIds.delete(orderId);
+    }
+    setSelectedOrderIds(newSelectedIds);
+    setSelectAll(newSelectedIds.size === packingOrders.length);
+  };
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(packingOrders.map(order => order.id));
+      setSelectedOrderIds(allIds);
+      setSelectAll(true);
+    } else {
+      setSelectedOrderIds(new Set());
+      setSelectAll(false);
+    }
+  };
+
+  // Handle bulk operation success
+  const handleBulkOperationSuccess = () => {
+    setSelectedOrderIds(new Set());
+    setSelectAll(false);
     setRefreshKey(prev => prev + 1);
   };
 
@@ -64,7 +107,22 @@ const Packing = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Packing Stage" showSearch={false} />
+      <Header 
+        title="Packing Stage" 
+        showSearch={false}
+      >
+        {/* Header Bulk Action Button */}
+        {completedOrders.length > 0 && (
+          <BulkStageChangeButton
+            orders={packingOrders}
+            currentStage="packing"
+            targetStage="tracking"
+            selectedOrderIds={selectedOrderIds}
+            onSuccess={handleBulkOperationSuccess}
+            variant="header"
+          />
+        )}
+      </Header>
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -75,11 +133,22 @@ const Packing = () => {
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium text-gray-600">Ready for Dispatch</h3>
                   <div className="text-2xl font-bold text-blue-600">
-                    {packingOrders.filter(order => 
-                      order.order_items?.every((item: any) => item.packed)
-                    ).length}
+                    {completedOrders.length}
                   </div>
                   <p className="text-xs text-gray-500">Packed orders</p>
+                  {/* Stats Card Bulk Action */}
+                  {completedOrders.length > 0 && (
+                    <div className="pt-2">
+                      <BulkStageChangeButton
+                        orders={packingOrders}
+                        currentStage="packing"
+                        targetStage="tracking"
+                        selectedOrderIds={selectedOrderIds}
+                        onSuccess={handleBulkOperationSuccess}
+                        variant="stats"
+                      />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -257,13 +326,44 @@ const Packing = () => {
             </Card>
           </div>
 
-          {/* Orders Ready for Packing */}
+          {/* Orders Ready for Packing with Bulk Selection */}
           <Card className="bg-white">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center">
-                <Shirt className="h-5 w-5 mr-2 text-blue-600" />
-                Orders Ready for Packing
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Shirt className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {/* Bulk Selection Controls */}
+                  {packingOrders.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <CheckboxUI
+                          checked={selectAll}
+                          onCheckedChange={handleSelectAll}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        <span className="text-sm text-gray-600">
+                          {selectedOrderIds.size > 0 ? `${selectedOrderIds.size} selected` : 'Select all'}
+                        </span>
+                      </div>
+                      
+                      {/* List Bulk Action Button */}
+                      {selectedOrderIds.size > 0 && (
+                        <BulkStageChangeButton
+                          orders={packingOrders}
+                          currentStage="packing"
+                          targetStage="tracking"
+                          selectedOrderIds={selectedOrderIds}
+                          onSuccess={handleBulkOperationSuccess}
+                          variant="list"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
               <CardDescription>
                 {packingOrders.length} orders waiting for packing completion
               </CardDescription>
@@ -274,49 +374,61 @@ const Packing = () => {
                   const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
                   const totalItems = order.order_items?.length || 0;
                   const isComplete = packedItems === totalItems;
+                  const isSelected = selectedOrderIds.has(order.id);
                   
                   return (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h3 className="font-medium text-gray-900">{order.order_number}</h3>
-                            <p className="text-sm text-gray-500">
-                              {order.customer?.first_name} {order.customer?.last_name}
-                              {order.customer?.phone && (
-                                <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
-                              )}
-                              <span className="mx-2">•</span>
-                              {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
-                            </p>
-                            
-                            {/* Show first few items with proper variations */}
-                            <div className="mt-1 text-xs">
-                              <span className="font-medium text-gray-600">Items: </span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {order.order_items?.slice(0, 3).map((item: any, index: number) => {
-                                  const normalizedItem = normalizeItemForDisplay(item);
-                                  const variationText = getVariationDisplayText(normalizedItem);
-                                  
-                                  return (
-                                    <div key={item.id} className="flex items-center space-x-1">
-                                      <span className="text-blue-700 font-medium">
-                                        {item.title || item.name}
-                                      </span>
-                                      {variationText && variationText !== 'No variations' && (
-                                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                          {variationText}
-                                        </Badge>
-                                      )}
-                                      {index < Math.min(order.order_items?.length || 0, 3) - 1 && (
-                                        <span className="text-gray-400">,</span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {(order.order_items?.length || 0) > 3 && (
-                                  <span className="text-gray-500"> + {(order.order_items?.length || 0) - 3} more</span>
+                    <div key={order.id} className={`flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 ${
+                      isSelected ? 'bg-blue-50 border-blue-300' : ''
+                    }`}>
+                      <div className="flex items-center space-x-3">
+                        {/* Checkbox for bulk selection */}
+                        <CheckboxUI
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleOrderSelect(order.id, checked as boolean)}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div>
+                              <h3 className="font-medium text-gray-900">{order.order_number}</h3>
+                              <p className="text-sm text-gray-500">
+                                {order.customer?.first_name} {order.customer?.last_name}
+                                {order.customer?.phone && (
+                                  <span className="ml-2 text-green-600">📱 {order.customer.phone}</span>
                                 )}
+                                <span className="mx-2">•</span>
+                                {isComplete ? 'Complete' : `${packedItems}/${totalItems} packed`}
+                              </p>
+                              
+                              {/* Show first few items with proper variations */}
+                              <div className="mt-1 text-xs">
+                                <span className="font-medium text-gray-600">Items: </span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {order.order_items?.slice(0, 3).map((item: any, index: number) => {
+                                    const normalizedItem = normalizeItemForDisplay(item);
+                                    const variationText = getVariationDisplayText(normalizedItem);
+                                    
+                                    return (
+                                      <div key={item.id} className="flex items-center space-x-1">
+                                        <span className="text-blue-700 font-medium">
+                                          {item.title || item.name}
+                                        </span>
+                                        {variationText && variationText !== 'No variations' && (
+                                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                            {variationText}
+                                          </Badge>
+                                        )}
+                                        {index < Math.min(order.order_items?.length || 0, 3) - 1 && (
+                                          <span className="text-gray-400">,</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {(order.order_items?.length || 0) > 3 && (
+                                    <span className="text-gray-500"> + {(order.order_items?.length || 0) - 3} more</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

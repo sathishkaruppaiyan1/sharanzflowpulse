@@ -8,9 +8,10 @@ interface HeaderProps {
   title: string;
   onMenuClick?: () => void;
   showSearch?: boolean;
+  children?: React.ReactNode;
 }
 
-const Header = ({ title, onMenuClick, showSearch = true }: HeaderProps) => {
+const Header = ({ title, onMenuClick, showSearch = true, children }: HeaderProps) => {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -29,6 +30,7 @@ const Header = ({ title, onMenuClick, showSearch = true }: HeaderProps) => {
         </div>
 
         <div className="flex items-center space-x-4">
+          {children}
           {showSearch && (
             <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
