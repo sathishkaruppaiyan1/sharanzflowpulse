@@ -19,6 +19,17 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
   const updateOrderStage = useUpdateOrderStage();
   const queryClient = useQueryClient();
 
+  // Early return if order is undefined
+  if (!order) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-center p-4">
+          <div className="text-sm text-gray-500">Loading order details...</div>
+        </div>
+      </div>
+    );
+  }
+
   const stages: { value: OrderStage; label: string; icon: React.ReactNode; color: string }[] = [
     { value: 'pending', label: 'Pending', icon: <Eye className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' },
     { value: 'printing', label: 'Printing', icon: <Printer className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
@@ -30,8 +41,9 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
 
   const handleStageChange = async (newStage: OrderStage) => {
     if (newStage === currentStage) return;
+    if (!order?.id) return; // Additional safety check
 
-    console.log(`Changing order ${order.order_number} from ${currentStage} to ${newStage}`);
+    console.log(`Changing order ${order.order_number || 'unknown'} from ${currentStage} to ${newStage}`);
 
     try {
       // Handle special cases when moving to certain stages
@@ -57,7 +69,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
         await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
         
-        toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage! All items marked as unpacked.`);
+        toast.success(`🎉 Order ${order.order_number || 'unknown'} moved to ${newStage} stage! All items marked as unpacked.`);
       } else if (newStage === 'tracking') {
         // When moving to tracking, set packed_at timestamp
         await supabase
@@ -73,7 +85,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
         await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
         
-        toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
+        toast.success(`🎉 Order ${order.order_number || 'unknown'} moved to ${newStage} stage!`);
       } else {
         // For other stages, use the mutation which already handles invalidation
         updateOrderStage.mutate(
@@ -82,7 +94,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
             onSuccess: async () => {
               // Force immediate refetch of all stage-specific queries
               await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
-              toast.success(`🎉 Order ${order.order_number} moved to ${newStage} stage!`);
+              toast.success(`🎉 Order ${order.order_number || 'unknown'} moved to ${newStage} stage!`);
               onStageChange?.();
             },
             onError: (error) => {
@@ -133,7 +145,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
             </Badge>
           )}
         </div>
-        <span className="text-xs text-gray-500">Order: {order.order_number}</span>
+        <span className="text-xs text-gray-500">Order: {order.order_number || 'Unknown'}</span>
       </div>
 
       {/* Quick Stage Navigation */}
