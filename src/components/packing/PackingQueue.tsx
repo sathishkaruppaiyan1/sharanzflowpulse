@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Shirt, ChevronRight } from 'lucide-react';
+import { Package, CheckCircle, ArrowRight, Truck, Square, CheckSquare, Phone, AlertTriangle, Hash, Settings, Shirt } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,21 +21,12 @@ interface PackingQueueProps {
   selectedOrderId?: string;
   onOrderUpdate?: () => void;
   showOrderHeader?: boolean;
-  showBulkActions?: boolean;
 }
 
-const PackingQueue = ({ 
-  orders, 
-  selectedOrderId, 
-  onOrderUpdate, 
-  showOrderHeader = true,
-  showBulkActions = false 
-}: PackingQueueProps) => {
+const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader = true }: PackingQueueProps) => {
   const updateOrderStage = useUpdateOrderStage();
   const queryClient = useQueryClient();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const updateItemPacked = useMutation({
     mutationFn: async ({ itemId, packed }: { itemId: string; packed: boolean }) => {
@@ -84,61 +76,7 @@ const PackingQueue = ({
     return order.order_items.every(item => item.packed);
   };
 
-  const handleSelectOrder = (orderId: string, checked: boolean) => {
-    const newSelected = new Set(selectedOrders);
-    if (checked) {
-      newSelected.add(orderId);
-    } else {
-      newSelected.delete(orderId);
-    }
-    setSelectedOrders(newSelected);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const readyOrders = packingStageOrders.filter(isOrderReadyForShipping);
-      setSelectedOrders(new Set(readyOrders.map(order => order.id)));
-    } else {
-      setSelectedOrders(new Set());
-    }
-  };
-
-  const handleBulkMoveToTracking = async () => {
-    if (selectedOrders.size === 0) {
-      toast.error('Please select orders to move');
-      return;
-    }
-
-    setIsBulkProcessing(true);
-    
-    try {
-      const promises = Array.from(selectedOrders).map(orderId => 
-        supabase
-          .from('orders')
-          .update({ 
-            stage: 'tracking',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', orderId)
-      );
-
-      await Promise.all(promises);
-      
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`Successfully moved ${selectedOrders.size} orders to tracking stage`);
-      setSelectedOrders(new Set());
-      onOrderUpdate?.();
-    } catch (error) {
-      console.error('Error moving orders to tracking:', error);
-      toast.error('Failed to move some orders. Please try again.');
-    } finally {
-      setIsBulkProcessing(false);
-    }
-  };
-
   const packingStageOrders = orders.filter(order => order.stage === 'packing');
-  const readyOrders = packingStageOrders.filter(isOrderReadyForShipping);
-  const allReadySelected = readyOrders.length > 0 && readyOrders.every(order => selectedOrders.has(order.id));
 
   // Enhanced debug function to log customer data
   const debugCustomerData = (order: Order) => {
@@ -154,49 +92,11 @@ const PackingQueue = ({
 
   return (
     <div className="space-y-4">
-      {/* Bulk Actions Header */}
-      {showBulkActions && readyOrders.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  checked={allReadySelected}
-                  onCheckedChange={handleSelectAll}
-                  className="border-blue-400"
-                />
-                <span className="text-sm font-medium text-blue-900">
-                  Select All Ready Orders ({readyOrders.length} ready for dispatch)
-                </span>
-                {selectedOrders.size > 0 && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                    {selectedOrders.size} selected
-                  </Badge>
-                )}
-              </div>
-              {selectedOrders.size > 0 && (
-                <Button
-                  onClick={handleBulkMoveToTracking}
-                  disabled={isBulkProcessing}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Move to Tracking ({selectedOrders.size})
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {packingStageOrders.map((order) => {
         const packedItems = order.order_items.filter(item => item.packed).length;
         const totalItems = order.order_items.length;
         const isReady = isOrderReadyForShipping(order);
         const phoneNumber = getPhoneNumber(order);
-        const isSelected = selectedOrders.has(order.id);
         
         // Enhanced debug log for each order with variation data
         console.log('=== Packing Queue Order with Variations ===');
@@ -211,40 +111,30 @@ const PackingQueue = ({
         })));
         
         return (
-          <Card key={order.id} className={`hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+          <Card key={order.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  {/* Bulk Select Checkbox - only show for ready orders when bulk actions enabled */}
-                  {showBulkActions && isReady && (
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
-                      className="border-blue-400"
-                    />
-                  )}
-                  <div>
-                    <CardTitle className="text-lg">{order.order_number}</CardTitle>
-                    <div className="text-sm text-gray-600">
-                      <p>{order.customer?.first_name} {order.customer?.last_name}</p>
-                      {phoneNumber ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Phone className="h-3 w-3 text-green-600" />
-                          <span className="text-green-600 font-medium">{phoneNumber}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
-                          <span className="text-red-500 font-medium">No phone number</span>
-                        </div>
-                      )}
-                      {/* Additional debug info for development */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="text-xs text-gray-400 mt-1">
-                          Debug: Customer ID: {order.customer_id}, Has Customer: {order.customer ? 'Yes' : 'No'}
-                        </div>
-                      )}
-                    </div>
+                <div>
+                  <CardTitle className="text-lg">{order.order_number}</CardTitle>
+                  <div className="text-sm text-gray-600">
+                    <p>{order.customer?.first_name} {order.customer?.last_name}</p>
+                    {phoneNumber ? (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <Phone className="h-3 w-3 text-green-600" />
+                        <span className="text-green-600 font-medium">{phoneNumber}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 text-red-500" />
+                        <span className="text-red-500 font-medium">No phone number</span>
+                      </div>
+                    )}
+                    {/* Additional debug info for development */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        Debug: Customer ID: {order.customer_id}, Has Customer: {order.customer ? 'Yes' : 'No'}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -390,19 +280,16 @@ const PackingQueue = ({
                   <span>{packedItems} of {totalItems} items packed</span>
                 </div>
                 
-                {/* Individual dispatch button - hide if bulk actions enabled and order is selected */}
-                {!(showBulkActions && isSelected) && (
-                  <Button 
-                    onClick={() => handleMoveToTracking(order.id, order.order_number)}
-                    disabled={!isReady || updateOrderStage.isPending}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Dispatch Order
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                )}
+                <Button 
+                  onClick={() => handleMoveToTracking(order.id, order.order_number)}
+                  disabled={!isReady || updateOrderStage.isPending}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Dispatch Order
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
               </div>
             </CardContent>
           </Card>
