@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +38,7 @@ const defaultConfigs: ApiConfigs = {
   parcel_panel: {
     enabled: false,
     api_key: '',
-    base_url: 'https://api.parcelpanel.com'
+    base_url: 'https://open.parcelpanel.com/api/v2/tracking/order'
   }
 };
 
@@ -67,8 +69,14 @@ export const useApiConfigs = () => {
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
           interakt: { ...defaultConfigs.interakt, ...configData.interakt },
-          parcel_panel: { ...defaultConfigs.parcel_panel, ...configData.parcel_panel }
+          parcel_panel: { 
+            ...defaultConfigs.parcel_panel, 
+            ...configData.parcel_panel,
+            // Use the correct default URL
+            base_url: configData.parcel_panel?.base_url || 'https://open.parcelpanel.com/api/v2/tracking/order'
+          }
         };
+        console.log('Loaded API configs from database:', mergedConfigs);
         setApiConfigs(mergedConfigs);
       } else {
         setApiConfigs(defaultConfigs);
@@ -118,6 +126,7 @@ export const useApiConfigs = () => {
       }
 
       setApiConfigs(configs);
+      console.log('Saved API configs:', configs);
       toast({
         title: "Success",
         description: "API configurations saved successfully",
@@ -147,3 +156,4 @@ export const useApiConfigs = () => {
     refreshConfigs: loadConfigs
   };
 };
+

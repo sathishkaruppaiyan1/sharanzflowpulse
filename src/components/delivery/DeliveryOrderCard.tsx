@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, MapPin, Calendar, Truck } from 'lucide-react';
 import { Order } from '@/types/database';
+import { getCourierDisplayName } from '@/services/interaktService';
 
 interface DeliveryOrderCardProps {
   order: Order;
@@ -65,7 +65,7 @@ const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
         {order.carrier && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Carrier:</span>
-            <span className="font-medium">{order.carrier}</span>
+            <span className="font-medium">{getCourierDisplayName(order.carrier)}</span>
           </div>
         )}
 
