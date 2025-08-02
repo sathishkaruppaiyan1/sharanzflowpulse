@@ -7,14 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTrackingDetails } from '@/hooks/useTrackingDetails';
 
 interface DeliveryOrdersListProps {
   stages: string[];
   title: string;
 }
 
-const DeliveryOrdersList: React.FC<DeliveryOrdersListProps> = ({ stages, title }) => {
-  const { data: orders, isLoading, error } = useOrdersByStage(stages);
+const OrderRowWithTracking: React.FC<{ order: any }> = ({ order }) => {
+  const { data: trackingDetails } = useTrackingDetails(order.id);
 
   const getStatusColor = (stage: string) => {
     switch (stage) {
@@ -47,6 +48,98 @@ const DeliveryOrdersList: React.FC<DeliveryOrdersListProps> = ({ stages, title }
       default: return stage;
     }
   };
+
+  // Use webhook tracking details if available, otherwise fall back to order data
+  const displayStatus = trackingDetails?.status || order.stage;
+  const displayTrackingNumber = trackingDetails?.tracking_number || order.tracking_number;
+  const displayCarrier = trackingDetails?.courier_name || order.carrier;
+
+  return (
+    <TableRow className="hover:bg-gray-50">
+      <TableCell className="font-medium">
+        <div className="flex items-center space-x-2">
+          <Hash className="h-3 w-3 text-gray-400" />
+          <span className="text-sm font-mono">{order.order_number}</span>
+        </div>
+      </TableCell>
+      
+      <TableCell>
+        <div className="flex items-center space-x-2">
+          <User className="h-3 w-3 text-gray-400" />
+          <span className="text-sm">
+            {order.customer ? 
+              `${order.customer.first_name} ${order.customer.last_name}` : 
+              'N/A'
+            }
+          </span>
+        </div>
+      </TableCell>
+      
+      <TableCell>
+        <Badge className={getStatusColor(displayStatus)}>
+          {trackingDetails?.sub_status || getStatusLabel(displayStatus)}
+        </Badge>
+      </TableCell>
+      
+      <TableCell>
+        {displayTrackingNumber ? (
+          <div className="flex items-center space-x-2">
+            <Truck className="h-3 w-3 text-gray-400" />
+            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+              {displayTrackingNumber}
+            </span>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-sm">No tracking</span>
+        )}
+      </TableCell>
+      
+      <TableCell>
+        <span className="text-sm">
+          {displayCarrier || 'N/A'}
+        </span>
+      </TableCell>
+      
+      <TableCell>
+        {order.shipping_address ? (
+          <div className="flex items-center space-x-2">
+            <MapPin className="h-3 w-3 text-gray-400" />
+            <div className="text-sm text-gray-600">
+              {order.shipping_address.city}, {order.shipping_address.state}
+              <br />
+              <span className="text-xs">{order.shipping_address.postal_code}</span>
+            </div>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-sm">No address</span>
+        )}
+      </TableCell>
+      
+      <TableCell>
+        <div className="text-xs text-gray-500 space-y-1">
+          <div className="flex items-center space-x-1">
+            <Calendar className="h-3 w-3" />
+            <span>Created: {formatDate(order.created_at)}</span>
+          </div>
+          {(trackingDetails?.delivered_at || order.delivered_at || trackingDetails?.shipped_at || order.shipped_at) && (
+            <div className="flex items-center space-x-1">
+              <Calendar className="h-3 w-3" />
+              <span>
+                {trackingDetails?.delivered_at || order.delivered_at ? 
+                  `Delivered: ${formatDate(trackingDetails?.delivered_at || order.delivered_at)}` : 
+                 trackingDetails?.shipped_at || order.shipped_at ? 
+                  `Shipped: ${formatDate(trackingDetails?.shipped_at || order.shipped_at)}` : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const DeliveryOrdersList: React.FC<DeliveryOrdersListProps> = ({ stages, title }) => {
+  const { data: orders, isLoading, error } = useOrdersByStage(stages);
 
   if (isLoading) {
     return (
@@ -99,84 +192,7 @@ const DeliveryOrdersList: React.FC<DeliveryOrdersListProps> = ({ stages, title }
               </TableHeader>
               <TableBody>
                 {orders.map((order) => (
-                  <TableRow key={order.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center space-x-2">
-                        <Hash className="h-3 w-3 text-gray-400" />
-                        <span className="text-sm font-mono">{order.order_number}</span>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <User className="h-3 w-3 text-gray-400" />
-                        <span className="text-sm">
-                          {order.customer ? 
-                            `${order.customer.first_name} ${order.customer.last_name}` : 
-                            'N/A'
-                          }
-                        </span>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge className={getStatusColor(order.stage)}>
-                        {getStatusLabel(order.stage)}
-                      </Badge>
-                    </TableCell>
-                    
-                    <TableCell>
-                      {order.tracking_number ? (
-                        <div className="flex items-center space-x-2">
-                          <Truck className="h-3 w-3 text-gray-400" />
-                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                            {order.tracking_number}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">No tracking</span>
-                      )}
-                    </TableCell>
-                    
-                    <TableCell>
-                      <span className="text-sm">
-                        {order.carrier || 'N/A'}
-                      </span>
-                    </TableCell>
-                    
-                    <TableCell>
-                      {order.shipping_address ? (
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-3 w-3 text-gray-400" />
-                          <div className="text-sm text-gray-600">
-                            {order.shipping_address.city}, {order.shipping_address.state}
-                            <br />
-                            <span className="text-xs">{order.shipping_address.postal_code}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">No address</span>
-                      )}
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-xs text-gray-500 space-y-1">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>Created: {formatDate(order.created_at)}</span>
-                        </div>
-                        {(order.delivered_at || order.shipped_at) && (
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>
-                              {order.delivered_at ? `Delivered: ${formatDate(order.delivered_at)}` : 
-                               order.shipped_at ? `Shipped: ${formatDate(order.shipped_at)}` : ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <OrderRowWithTracking key={order.id} order={order} />
                 ))}
               </TableBody>
             </Table>

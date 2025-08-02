@@ -1,15 +1,19 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, MapPin, Calendar, Truck } from 'lucide-react';
 import { Order } from '@/types/database';
 import { getCourierDisplayName } from '@/services/interaktService';
+import { useTrackingDetails } from '@/hooks/useTrackingDetails';
 
 interface DeliveryOrderCardProps {
   order: Order;
 }
 
 const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
+  const { data: trackingDetails } = useTrackingDetails(order.id);
+
   const getStatusColor = (stage: string) => {
     switch (stage) {
       case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
@@ -27,6 +31,11 @@ const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
     });
   };
 
+  // Use webhook tracking details if available, otherwise fall back to order data
+  const displayStatus = trackingDetails?.status || order.stage;
+  const displayTrackingNumber = trackingDetails?.tracking_number || order.tracking_number;
+  const displayCarrier = trackingDetails?.courier_name || getCourierDisplayName(order.carrier);
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
@@ -35,10 +44,11 @@ const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
             <Package className="h-4 w-4 text-gray-600" />
             <span>{order.order_number}</span>
           </div>
-          <Badge className={getStatusColor(order.stage)}>
-            {order.stage === 'shipped' ? 'In Transit' : 
-             order.stage === 'delivered' ? 'Delivered' : 
-             order.stage === 'tracking' ? 'Ready to Ship' : order.stage}
+          <Badge className={getStatusColor(displayStatus)}>
+            {trackingDetails?.sub_status || 
+             (displayStatus === 'shipped' ? 'In Transit' : 
+              displayStatus === 'delivered' ? 'Delivered' : 
+              displayStatus === 'tracking' ? 'Ready to Ship' : displayStatus)}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -50,22 +60,22 @@ const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
           </span>
         </div>
 
-        {order.tracking_number && (
+        {displayTrackingNumber && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 flex items-center">
               <Truck className="h-3 w-3 mr-1" />
               Tracking:
             </span>
             <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-              {order.tracking_number}
+              {displayTrackingNumber}
             </span>
           </div>
         )}
 
-        {order.carrier && (
+        {displayCarrier && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Carrier:</span>
-            <span className="font-medium">{getCourierDisplayName(order.carrier)}</span>
+            <span className="font-medium">{displayCarrier}</span>
           </div>
         )}
 
@@ -85,12 +95,14 @@ const DeliveryOrderCard: React.FC<DeliveryOrderCardProps> = ({ order }) => {
               <Calendar className="h-3 w-3" />
               <span>Created: {formatDate(order.created_at)}</span>
             </div>
-            {(order.delivered_at || order.shipped_at) && (
+            {(trackingDetails?.delivered_at || order.delivered_at || trackingDetails?.shipped_at || order.shipped_at) && (
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  {order.delivered_at ? `Delivered: ${formatDate(order.delivered_at)}` : 
-                   order.shipped_at ? `Shipped: ${formatDate(order.shipped_at)}` : ''}
+                  {trackingDetails?.delivered_at || order.delivered_at ? 
+                    `Delivered: ${formatDate(trackingDetails?.delivered_at || order.delivered_at)}` : 
+                   trackingDetails?.shipped_at || order.shipped_at ? 
+                    `Shipped: ${formatDate(trackingDetails?.shipped_at || order.shipped_at)}` : ''}
                 </span>
               </div>
             )}
