@@ -77,6 +77,11 @@ export class ParcelPanelService {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     console.log('ParcelPanelService initialized with:', { baseUrl, apiKeyExists: Boolean(apiKey) });
+    
+    // Validate base URL format
+    if (baseUrl.includes('/api/')) {
+      console.warn('⚠️ ParcelPanelService: Base URL contains API path, this may cause issues:', baseUrl);
+    }
   }
 
   private getHeaders() {
