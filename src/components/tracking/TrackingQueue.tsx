@@ -13,6 +13,7 @@ import { Order, CarrierType } from '@/types/database';
 import { detectCourierPartner, generateTrackingLink } from '@/services/interaktService';
 import { useState } from 'react';
 import StageChangeControls from '@/components/common/StageChangeControls';
+import TrackingDetailsCard from './TrackingDetailsCard';
 
 interface TrackingQueueProps {
   orders: Order[];
@@ -203,45 +204,53 @@ const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: 
               </div>
 
               {order.tracking_number ? (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-green-600" />
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium text-green-900">Tracking: {order.tracking_number}</span>
-                          <Badge variant="outline" className="text-green-700 border-green-300">
-                            {getCourierDisplayName(order.carrier!)}
-                          </Badge>
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="h-4 w-4 text-green-600" />
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-green-900">Tracking: {order.tracking_number}</span>
+                            <Badge variant="outline" className="text-green-700 border-green-300">
+                              {getCourierDisplayName(order.carrier!)}
+                            </Badge>
+                          </div>
+                          {order.carrier && (
+                            <p className="text-sm text-green-700 mt-1">
+                              Tracking Link: {generateTrackingLink(order.tracking_number, order.carrier)}
+                            </p>
+                          )}
                         </div>
-                        {order.carrier && (
-                          <p className="text-sm text-green-700 mt-1">
-                            Tracking Link: {generateTrackingLink(order.tracking_number, order.carrier)}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      {order.carrier && (
+                      <div className="flex space-x-2">
+                        {order.carrier && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(generateTrackingLink(order.tracking_number!, order.carrier!), '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Track
+                          </Button>
+                        )}
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => window.open(generateTrackingLink(order.tracking_number!, order.carrier!), '_blank')}
+                          onClick={() => handleMarkShipped(order.id)}
+                          disabled={updateOrderStageMutation.isPending}
                         >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Track
+                          <Truck className="h-4 w-4 mr-1" />
+                          Mark Shipped
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        onClick={() => handleMarkShipped(order.id)}
-                        disabled={updateOrderStageMutation.isPending}
-                      >
-                        <Truck className="h-4 w-4 mr-1" />
-                        Mark Shipped
-                      </Button>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Auto-fetched Tracking Details */}
+                  <TrackingDetailsCard 
+                    orderId={order.id} 
+                    orderNumber={order.order_number} 
+                  />
                 </div>
               ) : (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">

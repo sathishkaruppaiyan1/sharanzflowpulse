@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { useParcelPanelService } from '@/services/parcelPanelService';
 
 export const useOrdersByStage = (stages: string | string[]) => {
   const stageArray = Array.isArray(stages) ? stages : [stages];
@@ -123,6 +124,7 @@ export const useUpdateOrderStage = () => {
 
 export const useUpdateTracking = () => {
   const queryClient = useQueryClient();
+  const { service: parcelPanelService, isConfigured } = useParcelPanelService();
   
   return useMutation({
     mutationFn: async ({ 
@@ -137,7 +139,21 @@ export const useUpdateTracking = () => {
       console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrier}`);
       
       // Use the supabaseOrderService to handle the complete tracking update including Shopify
-      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrier as any);
+      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrier as 'frenchexpress' | 'delhivery' | 'other');
+      
+      // Auto-fetch tracking details from Parcel Panel if configured
+      if (isConfigured && parcelPanelService) {
+        try {
+          console.log('🔄 Auto-fetching tracking details from Parcel Panel...');
+          await parcelPanelService.fetchAndStoreTrackingDetails(trackingNumber, orderId);
+          console.log('✅ Tracking details auto-fetched and stored');
+        } catch (error) {
+          console.error('❌ Error auto-fetching tracking details:', error);
+          // Don't block the main process if this fails
+        }
+      } else {
+        console.log('⚠️ Parcel Panel not configured, skipping auto-fetch');
+      }
       
       console.log(`✅ Successfully updated tracking for order ${orderId} with Shopify integration`);
       return updatedOrder;
@@ -160,7 +176,7 @@ export const useBulkUpdateOrderStage = () => {
     mutationFn: async ({ orderIds, stage }: { orderIds: string[]; stage: string }) => {
       console.log(`Bulk updating ${orderIds.length} orders to stage ${stage}`);
       
-      const updateData: any = { 
+      const updateData: Record<string, unknown> = { 
         stage: stage as OrderStage,
         updated_at: new Date().toISOString()
       };

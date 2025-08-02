@@ -38,7 +38,7 @@ const defaultConfigs: ApiConfigs = {
   parcel_panel: {
     enabled: false,
     api_key: '',
-    base_url: 'https://open.parcelpanel.com'
+    base_url: ''
   }
 };
 
@@ -67,15 +67,9 @@ export const useApiConfigs = () => {
         // Merge with defaults to ensure all properties exist
         const configData = data.value as unknown as Partial<ApiConfigs>;
         
-        // Fix incorrect base URL if it exists
-        let parcelPanelBaseUrl = configData.parcel_panel?.base_url || 'https://open.parcelpanel.com';
-        console.log('Original Parcel Panel base URL from database:', parcelPanelBaseUrl);
-        
-        if (parcelPanelBaseUrl.includes('/api/v2/tracking/order')) {
-          console.log('Fixing incorrect Parcel Panel base URL from:', parcelPanelBaseUrl);
-          parcelPanelBaseUrl = 'https://open.parcelpanel.com';
-          console.log('Fixed Parcel Panel base URL to:', parcelPanelBaseUrl);
-        }
+        // Use the base URL from database or empty string
+        let parcelPanelBaseUrl = configData.parcel_panel?.base_url || '';
+        console.log('Parcel Panel base URL from database:', parcelPanelBaseUrl);
         
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
@@ -90,14 +84,7 @@ export const useApiConfigs = () => {
         console.log('Loaded API configs from database:', mergedConfigs);
         setApiConfigs(mergedConfigs);
         
-        // If we fixed the base URL, save it back to the database
-        if (parcelPanelBaseUrl !== configData.parcel_panel?.base_url) {
-          console.log('Auto-saving corrected Parcel Panel base URL to database');
-          // Use setTimeout to avoid blocking the initial load
-          setTimeout(() => {
-            saveConfigs(mergedConfigs);
-          }, 100);
-        }
+
       } else {
         setApiConfigs(defaultConfigs);
       }

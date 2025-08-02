@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
+import { ParcelPanelService } from '@/services/parcelPanelService';
 
 export const supabaseOrderService = {
   async fetchOrders(): Promise<Order[]> {
@@ -143,6 +144,9 @@ export const supabaseOrderService = {
 
     const order = data as Order;
     console.log(`✅ Successfully updated tracking for order ${order.order_number}`);
+
+    // Auto-fetch tracking details from Parcel Panel (will be handled by the tracking update hook)
+    console.log('🔄 Tracking details auto-fetch will be handled by the tracking update hook');
 
     // Send WhatsApp notification via Interakt
     try {

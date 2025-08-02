@@ -1,5 +1,6 @@
 
 import { useApiConfigs } from '@/hooks/useApiConfigs';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ParcelPanelTrackingEvent {
   time: string;
@@ -73,20 +74,19 @@ export class ParcelPanelService {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl: string = 'https://open.parcelpanel.com') {
+  constructor(apiKey: string, baseUrl: string = '') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     console.log('ParcelPanelService initialized with:', { baseUrl, apiKeyExists: Boolean(apiKey) });
     
-    // Validate base URL format
-    if (baseUrl.includes('/api/')) {
-      console.warn('⚠️ ParcelPanelService: Base URL contains API path, this may cause issues:', baseUrl);
+    if (!baseUrl) {
+      console.warn('⚠️ ParcelPanelService: Base URL is not configured');
     }
   }
 
   private getHeaders() {
     return {
-      'Authorization': `Bearer ${this.apiKey}`,
+      'x-parcelpanel-api-key': this.apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     };
@@ -269,6 +269,65 @@ export class ParcelPanelService {
     }
   }
 
+  // New method to automatically fetch and store tracking details
+  async fetchAndStoreTrackingDetails(trackingNumber: string, orderId: string): Promise<void> {
+    try {
+      console.log(`🔄 Auto-fetching tracking details for ${trackingNumber} (Order: ${orderId})`);
+      
+      if (!this.baseUrl) {
+        console.warn('⚠️ Parcel Panel base URL not configured, skipping auto-fetch');
+        return;
+      }
+
+      const response = await this.trackPackage(trackingNumber);
+      
+      if (response.code === 200 && response.data) {
+        console.log('✅ Successfully fetched tracking details from Parcel Panel');
+        
+        // Store tracking details in the database
+        await this.storeTrackingDetails(orderId, response.data);
+        
+        console.log('✅ Tracking details stored in database');
+      } else {
+        console.warn('⚠️ No tracking details found or API error:', response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error auto-fetching tracking details:', error);
+      // Don't throw - this should not block the main tracking update process
+    }
+  }
+
+  // Helper method to store tracking details in database
+  private async storeTrackingDetails(orderId: string, trackingInfo: ParcelPanelTrackingInfo): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('order_tracking_details')
+        .upsert({
+          order_id: orderId,
+          tracking_number: trackingInfo.tracking_number,
+          courier_code: trackingInfo.courier_code,
+          courier_name: trackingInfo.courier_name,
+          status: trackingInfo.status,
+          sub_status: trackingInfo.sub_status,
+          origin_country: trackingInfo.origin_country,
+          destination_country: trackingInfo.destination_country,
+          estimated_delivery_date: trackingInfo.estimated_delivery_date,
+          delivered_at: trackingInfo.delivered_at,
+          shipped_at: trackingInfo.shipped_at,
+          tracking_events: trackingInfo.tracking_events,
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'order_id'
+        });
+
+      if (error) {
+        console.error('❌ Error storing tracking details:', error);
+      }
+    } catch (error) {
+      console.error('❌ Error storing tracking details:', error);
+    }
+  }
+
   // Helper method to determine package status category
   static getStatusCategory(status: string): 'in-transit' | 'out-for-delivery' | 'delivered' | 'undelivered' {
     const normalizedStatus = status.toLowerCase();
@@ -302,7 +361,7 @@ export const useParcelPanelService = () => {
 
   const service = isConfigured ? new ParcelPanelService(
     apiConfigs.parcel_panel.api_key,
-    apiConfigs.parcel_panel.base_url || 'https://open.parcelpanel.com'
+    apiConfigs.parcel_panel.base_url || ''
   ) : null;
 
   return {
