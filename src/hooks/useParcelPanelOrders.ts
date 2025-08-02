@@ -15,16 +15,22 @@ export const useParcelPanelOrders = (params?: {
   const query = useQuery({
     queryKey: ['parcel-panel-orders', params?.page, params?.limit, params?.status],
     queryFn: async (): Promise<ParcelPanelOrderInfo[]> => {
+      console.log('useParcelPanelOrders - Starting query with params:', params);
+      console.log('useParcelPanelOrders - Service exists:', Boolean(service));
+      console.log('useParcelPanelOrders - Is configured:', isConfigured);
+      
       if (!service || !isConfigured) {
         throw new Error('Parcel Panel API is not configured');
       }
 
       const response = await service.fetchOrders(params);
+      console.log('useParcelPanelOrders - Response received:', response);
       
       if (response.code !== 200 || !response.data) {
         throw new Error(response.message || 'Failed to fetch orders');
       }
 
+      console.log('useParcelPanelOrders - Orders found:', response.data.orders?.length || 0);
       return response.data.orders;
     },
     enabled: isConfigured && Boolean(service),

@@ -38,7 +38,7 @@ const defaultConfigs: ApiConfigs = {
   parcel_panel: {
     enabled: false,
     api_key: '',
-    base_url: 'https://open.parcelpanel.com/api/v2/tracking/order'
+    base_url: 'https://open.parcelpanel.com'
   }
 };
 
@@ -73,7 +73,7 @@ export const useApiConfigs = () => {
             ...defaultConfigs.parcel_panel, 
             ...configData.parcel_panel,
             // Use the correct default URL
-            base_url: configData.parcel_panel?.base_url || 'https://open.parcelpanel.com/api/v2/tracking/order'
+            base_url: configData.parcel_panel?.base_url || 'https://open.parcelpanel.com'
           }
         };
         console.log('Loaded API configs from database:', mergedConfigs);

@@ -147,7 +147,7 @@ const ApiConfiguration = () => {
             <Label htmlFor="parcel-panel-base-url">Base URL</Label>
             <Input
               id="parcel-panel-base-url"
-              placeholder="https://open.parcelpanel.com/api/v2/tracking/order"
+              placeholder="https://open.parcelpanel.com"
               value={apiConfigs.parcel_panel.base_url}
               onChange={(e) => handleConfigChange('parcel_panel', 'base_url', e.target.value)}
               disabled={!apiConfigs.parcel_panel.enabled}

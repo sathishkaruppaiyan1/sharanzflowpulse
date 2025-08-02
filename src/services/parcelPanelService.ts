@@ -146,8 +146,11 @@ export class ParcelPanelService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.status) queryParams.append('status', params.status);
 
-      // Use the tracking list endpoint for fetching orders
-      const url = `${this.baseUrl}/api/v2/tracking/list${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      // Use the orders endpoint for fetching orders (not tracking list)
+      const url = `${this.baseUrl}/api/v2/orders${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      
+      console.log('Full URL being called:', url);
+      console.log('Query parameters:', queryParams.toString());
       
       console.log('Fetching from URL:', url);
       
@@ -166,6 +169,14 @@ export class ParcelPanelService {
 
       const data: ParcelPanelOrdersResponse = await response.json();
       console.log('Parcel Panel orders response:', data);
+      console.log('Response structure check:', {
+        hasCode: 'code' in data,
+        hasMessage: 'message' in data,
+        hasData: 'data' in data,
+        dataType: typeof data.data,
+        hasOrders: data.data && 'orders' in data.data,
+        ordersLength: data.data?.orders?.length
+      });
 
       return data;
     } catch (error) {
