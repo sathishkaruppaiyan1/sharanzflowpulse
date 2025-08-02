@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParcelPanelService, ParcelPanelOrderInfo } from '@/services/parcelPanelService';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 export const useParcelPanelOrders = (params?: {
   page?: number;
@@ -11,7 +12,7 @@ export const useParcelPanelOrders = (params?: {
   const { service, isConfigured } = useParcelPanelService();
   const { toast } = useToast();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['parcel-panel-orders', params?.page, params?.limit, params?.status],
     queryFn: async (): Promise<ParcelPanelOrderInfo[]> => {
       if (!service || !isConfigured) {
@@ -38,15 +39,21 @@ export const useParcelPanelOrders = (params?: {
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    onError: (error) => {
-      console.error('Error fetching Parcel Panel orders:', error);
+  });
+
+  // Handle errors using useEffect
+  useEffect(() => {
+    if (query.error) {
+      console.error('Error fetching Parcel Panel orders:', query.error);
       toast({
         title: "Error",
-        description: `Failed to fetch orders: ${error.message}`,
+        description: `Failed to fetch orders: ${query.error.message}`,
         variant: "destructive",
       });
     }
-  });
+  }, [query.error, toast]);
+
+  return query;
 };
 
 export const useParcelPanelOrdersByStatus = (status: string) => {
