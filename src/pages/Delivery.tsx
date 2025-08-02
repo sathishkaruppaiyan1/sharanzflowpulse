@@ -7,35 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Package, Clock, MapPin, Truck, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useApiConfigs } from '@/hooks/useApiConfigs';
+import { useParcelPanelService, ParcelPanelTrackingInfo } from '@/services/parcelPanelService';
 import DeliveryTabs from '@/components/delivery/DeliveryTabs';
-
-interface TrackingEvent {
-  time: string;
-  description: string;
-  location?: string;
-  status?: string;
-}
-
-interface DeliveryInfo {
-  trackingNumber: string;
-  carrierCode: string;
-  carrierName: string;
-  status: string;
-  statusDetail: string;
-  originCountry?: string;
-  destinationCountry?: string;
-  events: TrackingEvent[];
-  estimatedDelivery?: string;
-  actualDelivery?: string;
-}
 
 const Delivery = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
+  const [deliveryInfo, setDeliveryInfo] = useState<ParcelPanelTrackingInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { apiConfigs } = useApiConfigs();
+  const { service: parcelPanelService, isConfigured } = useParcelPanelService();
 
   const trackPackage = async () => {
     if (!trackingNumber.trim()) {
@@ -47,7 +27,7 @@ const Delivery = () => {
       return;
     }
 
-    if (!apiConfigs.parcel_panel?.enabled || !apiConfigs.parcel_panel?.api_key) {
+    if (!isConfigured || !parcelPanelService) {
       toast({
         title: "Error",
         description: "Parcel Panel API is not configured. Please check settings.",
@@ -58,45 +38,16 @@ const Delivery = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${apiConfigs.parcel_panel.base_url}/v1/tracking/track`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiConfigs.parcel_panel.api_key}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tracking_number: trackingNumber.trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const response = await parcelPanelService.trackPackage(trackingNumber.trim());
       
-      if (data.code === 200 && data.data) {
-        const trackingData = data.data;
-        const formattedInfo: DeliveryInfo = {
-          trackingNumber: trackingData.tracking_number,
-          carrierCode: trackingData.courier_code,
-          carrierName: trackingData.courier_name || trackingData.courier_code,
-          status: trackingData.status,
-          statusDetail: trackingData.sub_status || trackingData.status,
-          originCountry: trackingData.origin_country,
-          destinationCountry: trackingData.destination_country,
-          estimatedDelivery: trackingData.estimated_delivery_date,
-          actualDelivery: trackingData.delivered_at,
-          events: trackingData.tracking_events?.map((event: any) => ({
-            time: event.time,
-            description: event.description,
-            location: event.location,
-            status: event.status,
-          })) || [],
-        };
-        setDeliveryInfo(formattedInfo);
+      if (response.code === 200 && response.data) {
+        setDeliveryInfo(response.data);
+        toast({
+          title: "Success",
+          description: "Package tracking information retrieved successfully",
+        });
       } else {
-        throw new Error(data.message || 'Tracking information not found');
+        throw new Error(response.message || 'Tracking information not found');
       }
     } catch (error) {
       console.error('Error tracking package:', error);
@@ -105,6 +56,7 @@ const Delivery = () => {
         description: error instanceof Error ? error.message : "Failed to track package",
         variant: "destructive",
       });
+      setDeliveryInfo(null);
     } finally {
       setLoading(false);
     }
@@ -113,11 +65,30 @@ const Delivery = () => {
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
-      case 'in_transit': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'out_for_delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'exception': return 'bg-red-100 text-red-800 border-red-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'in_transit': 
+      case 'transit': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'out_for_delivery': 
+      case 'out for delivery': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'exception': 
+      case 'returned': 
+      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending': 
+      case 'info_received': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
     }
   };
 
@@ -161,13 +132,20 @@ const Delivery = () => {
                   onKeyPress={(e) => e.key === 'Enter' && trackPackage()}
                   className="flex-1"
                 />
-                <Button onClick={trackPackage} disabled={loading}>
+                <Button onClick={trackPackage} disabled={loading || !isConfigured}>
                   {loading ? 'Tracking...' : 'Track'}
                 </Button>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
-                Powered by Parcel Panel - Track packages from all major carriers
-              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Powered by Parcel Panel - Track packages from all major carriers
+                </p>
+                {!isConfigured && (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    API Not Configured
+                  </Badge>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -180,10 +158,10 @@ const Delivery = () => {
                   <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Package className="mr-2 h-5 w-5" />
-                      {deliveryInfo.trackingNumber}
+                      {deliveryInfo.tracking_number}
                     </div>
                     <Badge className={getStatusColor(deliveryInfo.status)}>
-                      {deliveryInfo.statusDetail}
+                      {deliveryInfo.sub_status || deliveryInfo.status}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
@@ -193,27 +171,41 @@ const Delivery = () => {
                       <Truck className="h-4 w-4 text-gray-500" />
                       <div>
                         <p className="text-sm font-medium">Carrier</p>
-                        <p className="text-sm text-gray-600">{deliveryInfo.carrierName}</p>
+                        <p className="text-sm text-gray-600">
+                          {deliveryInfo.courier_name || deliveryInfo.courier_code}
+                        </p>
                       </div>
                     </div>
                     
-                    {deliveryInfo.originCountry && (
+                    {deliveryInfo.origin_country && (
                       <div className="flex items-center space-x-2">
                         <MapPin className="h-4 w-4 text-gray-500" />
                         <div>
                           <p className="text-sm font-medium">Origin</p>
-                          <p className="text-sm text-gray-600">{deliveryInfo.originCountry}</p>
+                          <p className="text-sm text-gray-600">{deliveryInfo.origin_country}</p>
                         </div>
                       </div>
                     )}
                     
-                    {deliveryInfo.estimatedDelivery && (
+                    {deliveryInfo.estimated_delivery_date && (
                       <div className="flex items-center space-x-2">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <div>
                           <p className="text-sm font-medium">Estimated Delivery</p>
                           <p className="text-sm text-gray-600">
-                            {new Date(deliveryInfo.estimatedDelivery).toLocaleDateString()}
+                            {formatDate(deliveryInfo.estimated_delivery_date)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {deliveryInfo.delivered_at && (
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4 text-green-500" />
+                        <div>
+                          <p className="text-sm font-medium">Delivered At</p>
+                          <p className="text-sm text-gray-600">
+                            {formatDate(deliveryInfo.delivered_at)}
                           </p>
                         </div>
                       </div>
@@ -223,25 +215,34 @@ const Delivery = () => {
               </Card>
 
               {/* Tracking Events */}
-              {deliveryInfo.events.length > 0 && (
+              {deliveryInfo.tracking_events && deliveryInfo.tracking_events.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Tracking History</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {deliveryInfo.events.map((event, index) => (
+                      {deliveryInfo.tracking_events
+                        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+                        .map((event, index) => (
                         <div key={index} className="flex items-start space-x-4 pb-4 border-b border-gray-100 last:border-0">
-                          <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                            index === 0 ? 'bg-blue-600' : 'bg-gray-300'
+                          }`}></div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <p className="text-sm font-medium">{event.description}</p>
                               <p className="text-xs text-gray-500">
-                                {new Date(event.time).toLocaleString()}
+                                {formatDate(event.time)}
                               </p>
                             </div>
                             {event.location && (
                               <p className="text-xs text-gray-600 mt-1">{event.location}</p>
+                            )}
+                            {event.status && (
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                {event.status}
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -260,7 +261,7 @@ const Delivery = () => {
                 <Package className="h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No tracking information</h3>
                 <p className="text-gray-600 text-center max-w-md">
-                  Enter a tracking number above to get detailed delivery information and real-time updates using Parcel Panel.
+                  Enter a tracking number above to get detailed delivery information and real-time updates using Parcel Panel API v2.
                 </p>
               </CardContent>
             </Card>
