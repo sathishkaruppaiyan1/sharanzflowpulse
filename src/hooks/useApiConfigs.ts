@@ -36,7 +36,7 @@ const defaultConfigs: ApiConfigs = {
   parcel_panel: {
     enabled: false,
     api_key: '',
-    base_url: 'https://api.parcelpanel.com'
+    base_url: 'https://open.parcelpanel.com'
   }
 };
 
