@@ -24,17 +24,56 @@ export interface ParcelPanelTrackingInfo {
   updated_at: string;
 }
 
+export interface ParcelPanelOrderInfo {
+  id: string;
+  order_number: string;
+  tracking_number?: string;
+  courier_code?: string;
+  courier_name?: string;
+  status: string;
+  sub_status?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  shipping_address?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postal_code?: string;
+  };
+  total_amount?: number;
+  currency?: string;
+  created_at: string;
+  updated_at: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  tracking_info?: ParcelPanelTrackingInfo;
+}
+
 export interface ParcelPanelResponse {
   code: number;
   message: string;
   data: ParcelPanelTrackingInfo | null;
 }
 
+export interface ParcelPanelOrdersResponse {
+  code: number;
+  message: string;
+  data: {
+    orders: ParcelPanelOrderInfo[];
+    total: number;
+    page: number;
+    limit: number;
+  } | null;
+}
+
 export class ParcelPanelService {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl: string = 'https://api.parcelpanel.com') {
+  constructor(apiKey: string, baseUrl: string = 'https://open.parcelpanel.com') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
   }
@@ -47,6 +86,72 @@ export class ParcelPanelService {
     };
   }
 
+  async testConnection(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('Testing Parcel Panel API connection...');
+      
+      const response = await fetch(`${this.baseUrl}/api/v2/couriers`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `API Error: ${response.status} - ${response.statusText}`
+        };
+      }
+
+      const data = await response.json();
+      console.log('Parcel Panel API connection successful:', data);
+      
+      return {
+        success: true,
+        message: 'API connection successful'
+      };
+    } catch (error) {
+      console.error('Error testing Parcel Panel API connection:', error);
+      return {
+        success: false,
+        message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  async fetchOrders(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ParcelPanelOrdersResponse> {
+    try {
+      console.log('Fetching orders from Parcel Panel API...');
+      
+      const queryParams = new URLSearchParams();
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.status) queryParams.append('status', params.status);
+
+      const url = `${this.baseUrl}/api/v2/tracking/order${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+      }
+
+      const data: ParcelPanelOrdersResponse = await response.json();
+      console.log('Parcel Panel orders response:', data);
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching orders from Parcel Panel:', error);
+      throw error;
+    }
+  }
+
   async trackPackage(trackingNumber: string, courierCode?: string): Promise<ParcelPanelResponse> {
     try {
       console.log(`Tracking package: ${trackingNumber} with courier: ${courierCode || 'auto-detect'}`);
@@ -55,12 +160,11 @@ export class ParcelPanelService {
         tracking_number: trackingNumber.trim(),
       };
 
-      // Add courier code if provided for better accuracy
       if (courierCode) {
         requestBody.courier_code = courierCode;
       }
 
-      const response = await fetch(`${this.baseUrl}/v2/tracking/track`, {
+      const response = await fetch(`${this.baseUrl}/api/v2/tracking/track`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(requestBody),
@@ -110,7 +214,7 @@ export class ParcelPanelService {
 
   async getSupportedCouriers(): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/v2/couriers`, {
+      const response = await fetch(`${this.baseUrl}/api/v2/couriers`, {
         method: 'GET',
         headers: this.getHeaders(),
       });

@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, Clock, MapPin, Truck, List } from 'lucide-react';
+import { Search, Package, Clock, MapPin, Truck, List, AlertCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useParcelPanelService, ParcelPanelTrackingInfo } from '@/services/parcelPanelService';
 import DeliveryTabs from '@/components/delivery/DeliveryTabs';
@@ -14,8 +14,52 @@ const Delivery = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState<ParcelPanelTrackingInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<{ testing: boolean; connected: boolean; message: string }>({
+    testing: false,
+    connected: false,
+    message: ''
+  });
   const { toast } = useToast();
   const { service: parcelPanelService, isConfigured } = useParcelPanelService();
+
+  // Test API connection on component mount
+  useEffect(() => {
+    const testApiConnection = async () => {
+      if (!isConfigured || !parcelPanelService) {
+        setApiStatus({
+          testing: false,
+          connected: false,
+          message: 'API not configured'
+        });
+        return;
+      }
+
+      setApiStatus(prev => ({ ...prev, testing: true }));
+      
+      try {
+        const result = await parcelPanelService.testConnection();
+        setApiStatus({
+          testing: false,
+          connected: result.success,
+          message: result.message
+        });
+        
+        if (result.success) {
+          console.log('✅ Parcel Panel API connection successful');
+        } else {
+          console.error('❌ Parcel Panel API connection failed:', result.message);
+        }
+      } catch (error) {
+        setApiStatus({
+          testing: false,
+          connected: false,
+          message: `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+      }
+    };
+
+    testApiConnection();
+  }, [isConfigured, parcelPanelService]);
 
   const trackPackage = async () => {
     if (!trackingNumber.trim()) {
@@ -98,6 +142,29 @@ const Delivery = () => {
         <h2 className="text-3xl font-bold tracking-tight">Delivery Management</h2>
       </div>
 
+      {/* API Status Indicator */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {apiStatus.testing ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              ) : apiStatus.connected ? (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-600" />
+              )}
+              <span className="text-sm font-medium">
+                Parcel Panel API Status: {apiStatus.testing ? 'Testing...' : apiStatus.message}
+              </span>
+            </div>
+            <Badge variant={apiStatus.connected ? 'default' : 'destructive'}>
+              {apiStatus.connected ? 'Connected' : 'Disconnected'}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="orders" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="orders" className="flex items-center space-x-2">
@@ -138,7 +205,7 @@ const Delivery = () => {
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Powered by Parcel Panel - Track packages from all major carriers
+                  Powered by Parcel Panel API v2 - Track packages from all major carriers
                 </p>
                 {!isConfigured && (
                   <Badge variant="secondary" className="bg-red-100 text-red-800">

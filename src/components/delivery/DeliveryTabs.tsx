@@ -2,7 +2,7 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Truck, CheckCircle, XCircle, Clock } from 'lucide-react';
-import DeliveryOrdersList from './DeliveryOrdersList';
+import ParcelPanelOrdersList from './ParcelPanelOrdersList';
 
 const DeliveryTabs: React.FC = () => {
   return (
@@ -27,29 +27,29 @@ const DeliveryTabs: React.FC = () => {
       </TabsList>
 
       <TabsContent value="in-transit" className="space-y-4">
-        <DeliveryOrdersList 
-          stages={['shipped']} 
+        <ParcelPanelOrdersList 
+          status="in_transit" 
           title="In Transit Orders"
         />
       </TabsContent>
 
       <TabsContent value="out-for-delivery" className="space-y-4">
-        <DeliveryOrdersList 
-          stages={['tracking']} 
+        <ParcelPanelOrdersList 
+          status="out_for_delivery" 
           title="Out for Delivery Orders"
         />
       </TabsContent>
 
       <TabsContent value="delivered" className="space-y-4">
-        <DeliveryOrdersList 
-          stages={['delivered']} 
+        <ParcelPanelOrdersList 
+          status="delivered" 
           title="Delivered Orders"
         />
       </TabsContent>
 
       <TabsContent value="undelivered" className="space-y-4">
-        <DeliveryOrdersList 
-          stages={['exception', 'returned', 'failed']} 
+        <ParcelPanelOrdersList 
+          status="exception" 
           title="Undelivered Orders"
         />
       </TabsContent>
