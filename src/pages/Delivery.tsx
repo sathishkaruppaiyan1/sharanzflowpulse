@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,16 +19,29 @@ const Delivery = () => {
     message: ''
   });
   const { toast } = useToast();
-  const { service: parcelPanelService, isConfigured } = useParcelPanelService();
+  const { service: parcelPanelService, isConfigured, loading: configLoading } = useParcelPanelService();
 
   // Test API connection on component mount
   useEffect(() => {
     const testApiConnection = async () => {
+      console.log('Testing API connection - configLoading:', configLoading);
+      console.log('Testing API connection - isConfigured:', isConfigured);
+      console.log('Testing API connection - parcelPanelService:', parcelPanelService);
+      
+      if (configLoading) {
+        setApiStatus({
+          testing: false,
+          connected: false,
+          message: 'Loading configuration...'
+        });
+        return;
+      }
+
       if (!isConfigured || !parcelPanelService) {
         setApiStatus({
           testing: false,
           connected: false,
-          message: 'API not configured'
+          message: 'API not configured - Please set up Parcel Panel API key in Settings'
         });
         return;
       }
@@ -50,6 +62,7 @@ const Delivery = () => {
           console.error('❌ Parcel Panel API connection failed:', result.message);
         }
       } catch (error) {
+        console.error('API connection test error:', error);
         setApiStatus({
           testing: false,
           connected: false,
@@ -59,7 +72,7 @@ const Delivery = () => {
     };
 
     testApiConnection();
-  }, [isConfigured, parcelPanelService]);
+  }, [isConfigured, parcelPanelService, configLoading]);
 
   const trackPackage = async () => {
     if (!trackingNumber.trim()) {
@@ -158,10 +171,26 @@ const Delivery = () => {
                 Parcel Panel API Status: {apiStatus.testing ? 'Testing...' : apiStatus.message}
               </span>
             </div>
-            <Badge variant={apiStatus.connected ? 'default' : 'destructive'}>
-              {apiStatus.connected ? 'Connected' : 'Disconnected'}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Badge variant={apiStatus.connected ? 'default' : 'destructive'}>
+                {apiStatus.connected ? 'Connected' : 'Disconnected'}
+              </Badge>
+              {!isConfigured && !configLoading && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.location.href = '/settings'}
+                >
+                  Configure API
+                </Button>
+              )}
+            </div>
           </div>
+          {!isConfigured && !configLoading && (
+            <div className="mt-2 text-xs text-gray-600">
+              Go to Settings → API Configuration to set up your Parcel Panel API key
+            </div>
+          )}
         </CardContent>
       </Card>
 

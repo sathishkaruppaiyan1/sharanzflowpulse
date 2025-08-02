@@ -76,6 +76,7 @@ export class ParcelPanelService {
   constructor(apiKey: string, baseUrl: string = 'https://open.parcelpanel.com') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    console.log('ParcelPanelService initialized with:', { baseUrl, apiKeyExists: Boolean(apiKey) });
   }
 
   private getHeaders() {
@@ -89,13 +90,27 @@ export class ParcelPanelService {
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       console.log('Testing Parcel Panel API connection...');
+      console.log('API Key exists:', Boolean(this.apiKey));
+      console.log('Base URL:', this.baseUrl);
       
+      if (!this.apiKey) {
+        return {
+          success: false,
+          message: 'API key is missing'
+        };
+      }
+
       const response = await fetch(`${this.baseUrl}/api/v2/couriers`, {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', response.headers);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error response:', errorText);
         return {
           success: false,
           message: `API Error: ${response.status} - ${response.statusText}`
@@ -249,20 +264,27 @@ export class ParcelPanelService {
 
 // Hook to use Parcel Panel service with API configs
 export const useParcelPanelService = () => {
-  const { apiConfigs } = useApiConfigs();
+  const { apiConfigs, loading } = useApiConfigs();
+  
+  console.log('useParcelPanelService - API configs:', apiConfigs);
+  console.log('useParcelPanelService - Loading:', loading);
   
   const isConfigured = Boolean(
     apiConfigs?.parcel_panel?.enabled && 
-    apiConfigs?.parcel_panel?.api_key
+    apiConfigs?.parcel_panel?.api_key?.trim()
   );
+
+  console.log('useParcelPanelService - Is configured:', isConfigured);
+  console.log('useParcelPanelService - Parcel panel config:', apiConfigs?.parcel_panel);
 
   const service = isConfigured ? new ParcelPanelService(
     apiConfigs.parcel_panel.api_key,
-    apiConfigs.parcel_panel.base_url
+    apiConfigs.parcel_panel.base_url || 'https://open.parcelpanel.com'
   ) : null;
 
   return {
     service,
-    isConfigured
+    isConfigured,
+    loading
   };
 };
