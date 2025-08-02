@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,10 +43,21 @@ export const useTrackingDetails = (orderId: string) => {
         throw error;
       }
 
-      return data as TrackingDetails;
+      // Transform the data to match our interface
+      return {
+        ...data,
+        tracking_events: Array.isArray(data.tracking_events) 
+          ? data.tracking_events.map((event: any) => ({
+              time: event.time || '',
+              description: event.description || '',
+              location: event.location,
+              status: event.status
+            }))
+          : []
+      } as TrackingDetails;
     },
     enabled: Boolean(orderId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
-}; 
+};

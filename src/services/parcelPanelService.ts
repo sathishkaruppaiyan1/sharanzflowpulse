@@ -1,3 +1,4 @@
+
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -296,7 +297,7 @@ export class ParcelPanelService {
     }
   }
 
-  // Updated method to fetch and store tracking details by order number
+  // Method to fetch and store tracking details by order number
   async fetchAndStoreTrackingDetailsByOrderNumber(orderNumber: string, orderId: string): Promise<void> {
     try {
       console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
@@ -324,6 +325,11 @@ export class ParcelPanelService {
     }
   }
 
+  // Method for webhook-triggered updates
+  async fetchAndStoreTrackingDetails(orderNumber: string, orderId: string): Promise<void> {
+    return this.fetchAndStoreTrackingDetailsByOrderNumber(orderNumber, orderId);
+  }
+
   // Helper method to store tracking details in database
   private async storeTrackingDetails(orderId: string, trackingInfo: ParcelPanelTrackingInfo): Promise<void> {
     try {
@@ -341,7 +347,7 @@ export class ParcelPanelService {
           estimated_delivery_date: trackingInfo.estimated_delivery_date,
           delivered_at: trackingInfo.delivered_at,
           shipped_at: trackingInfo.shipped_at,
-          tracking_events: trackingInfo.tracking_events,
+          tracking_events: trackingInfo.tracking_events as any,
           last_updated: new Date().toISOString()
         }, {
           onConflict: 'order_id'
