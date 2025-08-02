@@ -1,4 +1,3 @@
-
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -23,6 +22,7 @@ export interface ParcelPanelTrackingInfo {
   shipped_at?: string;
   created_at: string;
   updated_at: string;
+  order_number?: string;
 }
 
 export interface ParcelPanelOrderInfo {
