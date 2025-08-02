@@ -3,6 +3,7 @@ import { Package, Truck, MapPin, Calendar, ExternalLink, Settings } from 'lucide
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,9 +16,11 @@ import StageChangeControls from '@/components/common/StageChangeControls';
 
 interface TrackingQueueProps {
   orders: Order[];
+  selectedOrderIds?: Set<string>;
+  onOrderSelect?: (orderId: string, checked: boolean) => void;
 }
 
-const TrackingQueue = ({ orders }: TrackingQueueProps) => {
+const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: TrackingQueueProps) => {
   const updateTrackingMutation = useUpdateTracking();
   const updateOrderStageMutation = useUpdateOrderStage();
   const [trackingData, setTrackingData] = useState<Record<string, { trackingNumber: string; carrier: CarrierType }>>({});
@@ -107,6 +110,14 @@ const TrackingQueue = ({ orders }: TrackingQueueProps) => {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
+                  {/* Bulk Selection Checkbox */}
+                  {onOrderSelect && (
+                    <CheckboxUI
+                      checked={selectedOrderIds.has(order.id)}
+                      onCheckedChange={(checked) => onOrderSelect(order.id, checked as boolean)}
+                      className="data-[state=checked]:bg-blue-600"
+                    />
+                  )}
                   <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                     <Package className="h-5 w-5 text-purple-600" />
                   </div>

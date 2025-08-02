@@ -3,11 +3,13 @@ import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Sett
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
+import BulkStageChangeButton from '@/components/common/BulkStageChangeButton';
 import { useOrdersByStage, useUpdateTracking } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
 import { detectCourierPartner } from '@/services/interaktService';
@@ -29,6 +31,10 @@ const Tracking = () => {
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [focusLocked, setFocusLocked] = useState(false);
   const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
+
+  // Bulk selection state
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
@@ -298,6 +304,36 @@ const Tracking = () => {
     setAutoFocusEnabled(true);
   };
 
+  // Handle individual order selection
+  const handleOrderSelect = (orderId: string, checked: boolean) => {
+    const newSelectedIds = new Set(selectedOrderIds);
+    if (checked) {
+      newSelectedIds.add(orderId);
+    } else {
+      newSelectedIds.delete(orderId);
+    }
+    setSelectedOrderIds(newSelectedIds);
+    setSelectAll(newSelectedIds.size === trackingOrders.length);
+  };
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(trackingOrders.map(order => order.id));
+      setSelectedOrderIds(allIds);
+      setSelectAll(true);
+    } else {
+      setSelectedOrderIds(new Set());
+      setSelectAll(false);
+    }
+  };
+
+  // Handle bulk operation success
+  const handleBulkOperationSuccess = () => {
+    setSelectedOrderIds(new Set());
+    setSelectAll(false);
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -334,7 +370,24 @@ const Tracking = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Tracking Stage" showSearch={false} />
+      <Header 
+        title="Tracking Stage" 
+        showSearch={false}
+      >
+        {/* Header Bulk Action Buttons */}
+        {trackingOrders.length > 0 && (
+          <div className="flex items-center space-x-2">
+            <BulkStageChangeButton
+              orders={trackingOrders}
+              currentStage="tracking"
+              targetStage="packing"
+              selectedOrderIds={selectedOrderIds}
+              onSuccess={handleBulkOperationSuccess}
+              variant="header"
+            />
+          </div>
+        )}
+      </Header>
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -693,13 +746,52 @@ const Tracking = () => {
           {/* Orders Ready for Tracking - Full Width List */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Orders Ready for Tracking</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <CardTitle className="text-lg">Orders Ready for Tracking</CardTitle>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {/* Bulk Selection Controls */}
+                  {trackingOrders.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <CheckboxUI
+                          checked={selectAll}
+                          onCheckedChange={handleSelectAll}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        <span className="text-sm text-gray-600">
+                          {selectedOrderIds.size > 0 ? `${selectedOrderIds.size} selected` : 'Select all'}
+                        </span>
+                      </div>
+                      
+                      {/* List Bulk Action Buttons */}
+                      {selectedOrderIds.size > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <BulkStageChangeButton
+                            orders={trackingOrders}
+                            currentStage="tracking"
+                            targetStage="packing"
+                            selectedOrderIds={selectedOrderIds}
+                            onSuccess={handleBulkOperationSuccess}
+                            variant="list"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
               <p className="text-sm text-gray-600">
                 {trackingOrders.length} orders waiting for tracking numbers
               </p>
             </CardHeader>
             <CardContent>
-              <TrackingQueue orders={trackingOrders} />
+              <TrackingQueue 
+                orders={trackingOrders} 
+                selectedOrderIds={selectedOrderIds}
+                onOrderSelect={handleOrderSelect}
+              />
             </CardContent>
           </Card>
         </div>
