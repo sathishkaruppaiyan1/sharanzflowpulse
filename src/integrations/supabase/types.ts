@@ -157,6 +157,71 @@ export type Database = {
           },
         ]
       }
+      order_tracking_details: {
+        Row: {
+          courier_code: string | null
+          courier_name: string | null
+          created_at: string
+          delivered_at: string | null
+          destination_country: string | null
+          estimated_delivery_date: string | null
+          id: string
+          last_updated: string
+          order_id: string
+          origin_country: string | null
+          shipped_at: string | null
+          status: string | null
+          sub_status: string | null
+          tracking_events: Json | null
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          courier_code?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_country?: string | null
+          estimated_delivery_date?: string | null
+          id?: string
+          last_updated?: string
+          order_id: string
+          origin_country?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          sub_status?: string | null
+          tracking_events?: Json | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          courier_code?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_country?: string | null
+          estimated_delivery_date?: string | null
+          id?: string
+          last_updated?: string
+          order_id?: string
+          origin_country?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          sub_status?: string | null
+          tracking_events?: Json | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_tracking_details_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           carrier: Database["public"]["Enums"]["carrier_type"] | null

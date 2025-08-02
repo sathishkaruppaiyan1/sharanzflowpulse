@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -37,8 +35,8 @@ const defaultConfigs: ApiConfigs = {
   },
   parcel_panel: {
     enabled: false,
-    api_key: '',
-    base_url: ''
+    api_key: '873f13e0-846d-4274-b401-8fdce3ff5e6c',
+    base_url: 'https://open.parcelpanel.com'
   }
 };
 
@@ -163,4 +161,3 @@ export const useApiConfigs = () => {
     refreshConfigs: loadConfigs
   };
 };
-

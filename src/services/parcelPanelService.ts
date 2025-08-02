@@ -1,4 +1,3 @@
-
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -74,14 +73,10 @@ export class ParcelPanelService {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl: string = '') {
+  constructor(apiKey: string, baseUrl: string = 'https://open.parcelpanel.com') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     console.log('ParcelPanelService initialized with:', { baseUrl, apiKeyExists: Boolean(apiKey) });
-    
-    if (!baseUrl) {
-      console.warn('⚠️ ParcelPanelService: Base URL is not configured');
-    }
   }
 
   private getHeaders() {
@@ -105,13 +100,13 @@ export class ParcelPanelService {
         };
       }
 
-      const response = await fetch(`${this.baseUrl}/api/v2/couriers`, {
+      // Test with the tracking order endpoint using GET method
+      const response = await fetch(`${this.baseUrl}/api/v2/tracking/order`, {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
       console.log('API Response status:', response.status);
-      console.log('API Response headers:', response.headers);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -122,8 +117,7 @@ export class ParcelPanelService {
         };
       }
 
-      const data = await response.json();
-      console.log('Parcel Panel API connection successful:', data);
+      console.log('Parcel Panel API connection successful');
       
       return {
         success: true,
@@ -135,6 +129,39 @@ export class ParcelPanelService {
         success: false,
         message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
+    }
+  }
+
+  // New method to fetch tracking details by order number
+  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelResponse> {
+    try {
+      console.log(`Fetching tracking details for order: ${orderNumber}`);
+      
+      const requestBody = {
+        order_number: orderNumber
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/v2/tracking/order`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('Fetch tracking response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Fetch tracking error response:', errorText);
+        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+      }
+
+      const data: ParcelPanelResponse = await response.json();
+      console.log('Parcel Panel tracking response:', data);
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching tracking by order number:', error);
+      throw error;
     }
   }
 
@@ -269,17 +296,17 @@ export class ParcelPanelService {
     }
   }
 
-  // New method to automatically fetch and store tracking details
-  async fetchAndStoreTrackingDetails(trackingNumber: string, orderId: string): Promise<void> {
+  // Updated method to fetch and store tracking details by order number
+  async fetchAndStoreTrackingDetailsByOrderNumber(orderNumber: string, orderId: string): Promise<void> {
     try {
-      console.log(`🔄 Auto-fetching tracking details for ${trackingNumber} (Order: ${orderId})`);
+      console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
       
       if (!this.baseUrl) {
         console.warn('⚠️ Parcel Panel base URL not configured, skipping auto-fetch');
         return;
       }
 
-      const response = await this.trackPackage(trackingNumber);
+      const response = await this.fetchTrackingByOrderNumber(orderNumber);
       
       if (response.code === 200 && response.data) {
         console.log('✅ Successfully fetched tracking details from Parcel Panel');
@@ -361,7 +388,7 @@ export const useParcelPanelService = () => {
 
   const service = isConfigured ? new ParcelPanelService(
     apiConfigs.parcel_panel.api_key,
-    apiConfigs.parcel_panel.base_url || ''
+    apiConfigs.parcel_panel.base_url || 'https://open.parcelpanel.com'
   ) : null;
 
   return {

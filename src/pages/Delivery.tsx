@@ -4,13 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, Clock, MapPin, Truck, List, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Package, Clock, MapPin, Truck, List, AlertCircle, CheckCircle, Hash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useParcelPanelService, ParcelPanelTrackingInfo } from '@/services/parcelPanelService';
+import { useTrackingByOrderNumber } from '@/hooks/useTrackingByOrderNumber';
 import DeliveryTabs from '@/components/delivery/DeliveryTabs';
 
 const Delivery = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [orderNumber, setOrderNumber] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState<ParcelPanelTrackingInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState<{ testing: boolean; connected: boolean; message: string }>({
@@ -21,13 +23,12 @@ const Delivery = () => {
   const { toast } = useToast();
   const { service: parcelPanelService, isConfigured, loading: configLoading } = useParcelPanelService();
 
+  // Use the new hook for tracking by order number
+  const { data: orderTrackingData, isLoading: orderTrackingLoading, error: orderTrackingError } = useTrackingByOrderNumber(orderNumber);
+
   // Test API connection on component mount
   useEffect(() => {
     const testApiConnection = async () => {
-      console.log('Testing API connection - configLoading:', configLoading);
-      console.log('Testing API connection - isConfigured:', isConfigured);
-      console.log('Testing API connection - parcelPanelService:', parcelPanelService);
-      
       if (configLoading) {
         setApiStatus({
           testing: false,
@@ -74,6 +75,27 @@ const Delivery = () => {
     testApiConnection();
   }, [isConfigured, parcelPanelService, configLoading]);
 
+  // Handle order tracking results
+  useEffect(() => {
+    if (orderTrackingData) {
+      setDeliveryInfo(orderTrackingData);
+      toast({
+        title: "Success",
+        description: "Order tracking information retrieved successfully",
+      });
+    }
+  }, [orderTrackingData, toast]);
+
+  useEffect(() => {
+    if (orderTrackingError) {
+      toast({
+        title: "Error",
+        description: `Failed to fetch order tracking: ${orderTrackingError.message}`,
+        variant: "destructive",
+      });
+    }
+  }, [orderTrackingError, toast]);
+
   const trackPackage = async () => {
     if (!trackingNumber.trim()) {
       toast({
@@ -117,6 +139,28 @@ const Delivery = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const trackByOrderNumber = () => {
+    if (!orderNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an order number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isConfigured || !parcelPanelService) {
+      toast({
+        title: "Error",
+        description: "Parcel Panel API is not configured. Please check settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // The useTrackingByOrderNumber hook will automatically trigger when orderNumber changes
   };
 
   const getStatusColor = (status: string) => {
@@ -195,7 +239,7 @@ const Delivery = () => {
       </Card>
 
       <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="orders" className="flex items-center space-x-2">
             <List className="h-4 w-4" />
             <span>Orders</span>
@@ -204,37 +248,44 @@ const Delivery = () => {
             <Search className="h-4 w-4" />
             <span>Track Package</span>
           </TabsTrigger>
+          <TabsTrigger value="track-order" className="flex items-center space-x-2">
+            <Hash className="h-4 w-4" />
+            <span>Track by Order</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="space-y-4">
           <DeliveryTabs />
         </TabsContent>
 
-        <TabsContent value="track-package" className="space-y-4">
-          {/* Search Section */}
+        <TabsContent value="track-order" className="space-y-4">
+          {/* Order Number Search Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Search className="mr-2 h-5 w-5" />
-                Track Your Package
+                <Hash className="mr-2 h-5 w-5" />
+                Track by Order Number
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex space-x-2">
                 <Input
-                  placeholder="Enter tracking number..."
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && trackPackage()}
+                  placeholder="Enter order number..."
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && trackByOrderNumber()}
                   className="flex-1"
                 />
-                <Button onClick={trackPackage} disabled={loading || !isConfigured}>
-                  {loading ? 'Tracking...' : 'Track'}
+                <Button 
+                  onClick={trackByOrderNumber} 
+                  disabled={orderTrackingLoading || !isConfigured}
+                >
+                  {orderTrackingLoading ? 'Tracking...' : 'Track'}
                 </Button>
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Powered by Parcel Panel API v2 - Track packages from all major carriers
+                  Track packages using order number via Parcel Panel API
                 </p>
                 {!isConfigured && (
                   <Badge variant="secondary" className="bg-red-100 text-red-800">
@@ -245,7 +296,7 @@ const Delivery = () => {
             </CardContent>
           </Card>
 
-          {/* Delivery Information */}
+          {/* Show tracking results */}
           {deliveryInfo && (
             <div className="space-y-4">
               {/* Status Overview */}
@@ -351,17 +402,53 @@ const Delivery = () => {
           )}
 
           {/* Empty State */}
-          {!deliveryInfo && !loading && (
+          {!deliveryInfo && !orderTrackingLoading && (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Package className="h-12 w-12 text-gray-400 mb-4" />
+                <Hash className="h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No tracking information</h3>
                 <p className="text-gray-600 text-center max-w-md">
-                  Enter a tracking number above to get detailed delivery information and real-time updates using Parcel Panel API v2.
+                  Enter an order number above to get detailed delivery information using Parcel Panel API.
                 </p>
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="track-package" className="space-y-4">
+          {/* Search Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Search className="mr-2 h-5 w-5" />
+                Track Your Package
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Enter tracking number..."
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && trackPackage()}
+                  className="flex-1"
+                />
+                <Button onClick={trackPackage} disabled={loading || !isConfigured}>
+                  {loading ? 'Tracking...' : 'Track'}
+                </Button>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Powered by Parcel Panel API v2 - Track packages from all major carriers
+                </p>
+                {!isConfigured && (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    API Not Configured
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

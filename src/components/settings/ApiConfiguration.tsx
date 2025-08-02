@@ -1,180 +1,268 @@
-
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Save, Loader2 } from 'lucide-react';
-import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { useToast } from '@/hooks/use-toast';
+import { ApiConfigs, useApiConfigs } from '@/hooks/useApiConfigs';
+import { Package } from 'lucide-react';
 
 const ApiConfiguration = () => {
   const { apiConfigs, setApiConfigs, saveConfigs, loading, saving } = useApiConfigs();
   const { toast } = useToast();
+  const [tempConfigs, setTempConfigs] = useState<ApiConfigs>(apiConfigs);
 
-  const handleConfigChange = (service: string, field: string, value: string | boolean) => {
-    setApiConfigs(prev => ({
-      ...prev,
-      [service]: {
-        ...prev[service as keyof typeof prev],
-        [field]: value
-      }
-    }));
-  };
+  useEffect(() => {
+    setTempConfigs(apiConfigs);
+  }, [apiConfigs]);
 
   const handleSave = async () => {
-    await saveConfigs(apiConfigs);
+    try {
+      await saveConfigs(tempConfigs);
+      toast({
+        title: "Success",
+        description: "API configurations saved successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save API configurations",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  const handleTest = async (configType: keyof ApiConfigs) => {
+    if (configType === 'shopify') {
+      toast({
+        title: "Shopify Test",
+        description: "Shopify test is not implemented yet.",
+      });
+    } else if (configType === 'interakt') {
+      toast({
+        title: "Interakt Test",
+        description: "Interakt test is not implemented yet.",
+      });
+    } else if (configType === 'parcel_panel') {
+      // Implement Parcel Panel test logic here
+      toast({
+        title: "Parcel Panel Test",
+        description: "Parcel Panel test is not implemented yet.",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Shopify Integration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Shopify Integration
-            <Switch
-              checked={apiConfigs.shopify.enabled}
-              onCheckedChange={(checked) => handleConfigChange('shopify', 'enabled', checked)}
-            />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="shopify-shop-url">Shop URL</Label>
-            <Input
-              id="shopify-shop-url"
-              placeholder="your-shop.myshopify.com"
-              value={apiConfigs.shopify.shop_url}
-              onChange={(e) => handleConfigChange('shopify', 'shop_url', e.target.value)}
-              disabled={!apiConfigs.shopify.enabled}
-            />
-          </div>
-          <div>
-            <Label htmlFor="shopify-access-token">Access Token</Label>
-            <Input
-              id="shopify-access-token"
-              type="password"
-              placeholder="shpat_..."
-              value={apiConfigs.shopify.access_token}
-              onChange={(e) => handleConfigChange('shopify', 'access_token', e.target.value)}
-              disabled={!apiConfigs.shopify.enabled}
-            />
-          </div>
-          <div>
-            <Label htmlFor="shopify-webhook-secret">Webhook Secret</Label>
-            <Input
-              id="shopify-webhook-secret"
-              type="password"
-              placeholder="Webhook secret"
-              value={apiConfigs.shopify.webhook_secret}
-              onChange={(e) => handleConfigChange('shopify', 'webhook_secret', e.target.value)}
-              disabled={!apiConfigs.shopify.enabled}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">API Configuration</h2>
+      </div>
 
-      {/* Interakt Integration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Interakt Integration
-            <Switch
-              checked={apiConfigs.interakt.enabled}
-              onCheckedChange={(checked) => handleConfigChange('interakt', 'enabled', checked)}
-            />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="interakt-api-key">API Key</Label>
-            <Input
-              id="interakt-api-key"
-              type="password"
-              placeholder="Your Interakt API key"
-              value={apiConfigs.interakt.api_key}
-              onChange={(e) => handleConfigChange('interakt', 'api_key', e.target.value)}
-              disabled={!apiConfigs.interakt.enabled}
-            />
-          </div>
-          <div>
-            <Label htmlFor="interakt-base-url">Base URL</Label>
-            <Input
-              id="interakt-base-url"
-              placeholder="https://api.interakt.ai"
-              value={apiConfigs.interakt.base_url}
-              onChange={(e) => handleConfigChange('interakt', 'base_url', e.target.value)}
-              disabled={!apiConfigs.interakt.enabled}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6">
+        {/* Shopify Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shopify Configuration</CardTitle>
+            <CardDescription>
+              Configure Shopify API for order and product synchronization.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="shopify-enabled"
+                checked={tempConfigs.shopify.enabled}
+                onCheckedChange={(checked) =>
+                  setTempConfigs(prev => ({
+                    ...prev,
+                    shopify: { ...prev.shopify, enabled: checked }
+                  }))
+                }
+              />
+              <Label htmlFor="shopify-enabled">Enable Shopify Integration</Label>
+            </div>
+            <div className="grid gap-4">
+              <div>
+                <Label htmlFor="shopify-shop-url">Shop URL</Label>
+                <Input
+                  id="shopify-shop-url"
+                  placeholder="your-shop-name.myshopify.com"
+                  value={tempConfigs.shopify.shop_url}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      shopify: { ...prev.shopify, shop_url: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="shopify-access-token">Access Token</Label>
+                <Input
+                  id="shopify-access-token"
+                  type="password"
+                  placeholder="Enter your Shopify access token"
+                  value={tempConfigs.shopify.access_token}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      shopify: { ...prev.shopify, access_token: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="shopify-webhook-secret">Webhook Secret</Label>
+                <Input
+                  id="shopify-webhook-secret"
+                  type="password"
+                  placeholder="Enter your Shopify webhook secret"
+                  value={tempConfigs.shopify.webhook_secret}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      shopify: { ...prev.shopify, webhook_secret: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Parcel Panel Integration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Parcel Panel Integration
-            <Switch
-              checked={apiConfigs.parcel_panel.enabled}
-              onCheckedChange={(checked) => handleConfigChange('parcel_panel', 'enabled', checked)}
-            />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="parcel-panel-api-key">API Key</Label>
-            <Input
-              id="parcel-panel-api-key"
-              type="password"
-              placeholder="Your Parcel Panel API key"
-              value={apiConfigs.parcel_panel.api_key}
-              onChange={(e) => handleConfigChange('parcel_panel', 'api_key', e.target.value)}
-              disabled={!apiConfigs.parcel_panel.enabled}
-            />
-          </div>
-          <div>
-            <Label htmlFor="parcel-panel-base-url">Base URL</Label>
-            <Input
-              id="parcel-panel-base-url"
-              placeholder="Enter your Parcel Panel API base URL"
-              value={apiConfigs.parcel_panel.base_url}
-              onChange={(e) => handleConfigChange('parcel_panel', 'base_url', e.target.value)}
-              disabled={!apiConfigs.parcel_panel.enabled}
-            />
-          </div>
-          <p className="text-sm text-gray-600">
-            Parcel Panel provides comprehensive tracking for shipments and delivery monitoring.
-          </p>
-        </CardContent>
-      </Card>
+        {/* Parcel Panel Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Package className="mr-2 h-5 w-5" />
+              Parcel Panel Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure Parcel Panel API for package tracking and delivery management.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="parcel-panel-enabled"
+                checked={tempConfigs.parcel_panel.enabled}
+                onCheckedChange={(checked) =>
+                  setTempConfigs(prev => ({
+                    ...prev,
+                    parcel_panel: { ...prev.parcel_panel, enabled: checked }
+                  }))
+                }
+              />
+              <Label htmlFor="parcel-panel-enabled">Enable Parcel Panel Integration</Label>
+            </div>
+            
+            <div className="grid gap-4">
+              <div>
+                <Label htmlFor="parcel-panel-api-key">API Key</Label>
+                <Input
+                  id="parcel-panel-api-key"
+                  type="password"
+                  placeholder="Enter your Parcel Panel API key (default: 873f13e0-846d-4274-b401-8fdce3ff5e6c)"
+                  value={tempConfigs.parcel_panel.api_key}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      parcel_panel: { ...prev.parcel_panel, api_key: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="parcel-panel-base-url">Base URL</Label>
+                <Input
+                  id="parcel-panel-base-url"
+                  placeholder="https://open.parcelpanel.com"
+                  value={tempConfigs.parcel_panel.base_url}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      parcel_panel: { ...prev.parcel_panel, base_url: e.target.value }
+                    }))
+                  }
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Default endpoint: /api/v2/tracking/order (GET method)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full">
-        {saving ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Saving...
-          </>
-        ) : (
-          <>
-            <Save className="mr-2 h-4 w-4" />
-            Save Configurations
-          </>
-        )}
-      </Button>
+        {/* Interakt Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Interakt Configuration</CardTitle>
+            <CardDescription>
+              Configure Interakt API for customer communication and engagement.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="interakt-enabled"
+                checked={tempConfigs.interakt.enabled}
+                onCheckedChange={(checked) =>
+                  setTempConfigs(prev => ({
+                    ...prev,
+                    interakt: { ...prev.interakt, enabled: checked }
+                  }))
+                }
+              />
+              <Label htmlFor="interakt-enabled">Enable Interakt Integration</Label>
+            </div>
+            <div className="grid gap-4">
+              <div>
+                <Label htmlFor="interakt-api-key">API Key</Label>
+                <Input
+                  id="interakt-api-key"
+                  type="password"
+                  placeholder="Enter your Interakt API key"
+                  value={tempConfigs.interakt.api_key}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      interakt: { ...prev.interakt, api_key: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="interakt-base-url">Base URL</Label>
+                <Input
+                  id="interakt-base-url"
+                  placeholder="https://api.interakt.ai"
+                  value={tempConfigs.interakt.base_url}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      interakt: { ...prev.interakt, base_url: e.target.value }
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="ghost">Cancel</Button>
+        <Button
+          disabled={loading}
+          onClick={handleSave}
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
     </div>
   );
 };
 
 export default ApiConfiguration;
-
