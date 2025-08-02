@@ -112,16 +112,28 @@ const Packing = () => {
         title="Packing Stage" 
         showSearch={false}
       >
-        {/* Header Bulk Action Button */}
-        {completedOrders.length > 0 && (
-          <BulkStageChangeButton
-            orders={packingOrders}
-            currentStage="packing"
-            targetStage="tracking"
-            selectedOrderIds={selectedOrderIds}
-            onSuccess={handleBulkOperationSuccess}
-            variant="header"
-          />
+        {/* Header Bulk Action Buttons */}
+        {packingOrders.length > 0 && (
+          <div className="flex items-center space-x-2">
+            <BulkStageChangeButton
+              orders={packingOrders}
+              currentStage="packing"
+              targetStage="printing"
+              selectedOrderIds={selectedOrderIds}
+              onSuccess={handleBulkOperationSuccess}
+              variant="header"
+            />
+            {completedOrders.length > 0 && (
+              <BulkStageChangeButton
+                orders={packingOrders}
+                currentStage="packing"
+                targetStage="tracking"
+                selectedOrderIds={selectedOrderIds}
+                onSuccess={handleBulkOperationSuccess}
+                variant="header"
+              />
+            )}
+          </div>
         )}
       </Header>
       
@@ -137,17 +149,27 @@ const Packing = () => {
                     {completedOrders.length}
                   </div>
                   <p className="text-xs text-gray-500">Packed orders</p>
-                  {/* Stats Card Bulk Action */}
-                  {completedOrders.length > 0 && (
-                    <div className="pt-2">
+                  {/* Stats Card Bulk Actions */}
+                  {packingOrders.length > 0 && (
+                    <div className="pt-2 space-y-2">
                       <BulkStageChangeButton
                         orders={packingOrders}
                         currentStage="packing"
-                        targetStage="tracking"
+                        targetStage="printing"
                         selectedOrderIds={selectedOrderIds}
                         onSuccess={handleBulkOperationSuccess}
                         variant="stats"
                       />
+                      {completedOrders.length > 0 && (
+                        <BulkStageChangeButton
+                          orders={packingOrders}
+                          currentStage="packing"
+                          targetStage="tracking"
+                          selectedOrderIds={selectedOrderIds}
+                          onSuccess={handleBulkOperationSuccess}
+                          variant="stats"
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -350,16 +372,26 @@ const Packing = () => {
                         </span>
                       </div>
                       
-                      {/* List Bulk Action Button */}
+                      {/* List Bulk Action Buttons */}
                       {selectedOrderIds.size > 0 && (
-                        <BulkStageChangeButton
-                          orders={packingOrders}
-                          currentStage="packing"
-                          targetStage="tracking"
-                          selectedOrderIds={selectedOrderIds}
-                          onSuccess={handleBulkOperationSuccess}
-                          variant="list"
-                        />
+                        <div className="flex items-center space-x-2">
+                          <BulkStageChangeButton
+                            orders={packingOrders}
+                            currentStage="packing"
+                            targetStage="printing"
+                            selectedOrderIds={selectedOrderIds}
+                            onSuccess={handleBulkOperationSuccess}
+                            variant="list"
+                          />
+                          <BulkStageChangeButton
+                            orders={packingOrders}
+                            currentStage="packing"
+                            targetStage="tracking"
+                            selectedOrderIds={selectedOrderIds}
+                            onSuccess={handleBulkOperationSuccess}
+                            variant="list"
+                          />
+                        </div>
                       )}
                     </div>
                   )}

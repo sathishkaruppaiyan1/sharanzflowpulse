@@ -36,6 +36,11 @@ const BulkStageChangeButton = ({
       return orders.filter(order => 
         order.order_items?.every((item: any) => item.packed)
       );
+    } else if (targetStage === 'printing') {
+      // For printing, include orders that are in pending stage (not yet printed)
+      return orders.filter(order => 
+        order.stage === 'pending' || !order.printed_at
+      );
     }
     return orders;
   };
@@ -55,6 +60,7 @@ const BulkStageChangeButton = ({
   const selectedReadyCount = selectedReadyOrders.length;
 
   const stageInfo = {
+    printing: { label: 'Printing', icon: <Package className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
     tracking: { label: 'Tracking', icon: <Truck className="h-4 w-4" />, color: 'bg-orange-100 text-orange-800' },
     shipped: { label: 'Shipped', icon: <Truck className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
     delivered: { label: 'Delivered', icon: <CheckCircle className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
@@ -163,7 +169,10 @@ const BulkStageChangeButton = ({
             </p>
             {selectedOrderIds.size > 0 && selectedReadyCount < count && (
               <p className="mt-1 text-xs text-amber-600">
-                ⚠️ {count - selectedReadyCount} of {count} selected orders are not fully packed yet.
+                {targetStage === 'tracking' 
+                  ? `⚠️ ${count - selectedReadyCount} of ${count} selected orders are not fully packed yet.`
+                  : `⚠️ ${count - selectedReadyCount} of ${count} selected orders are already in ${targetStage} stage.`
+                }
               </p>
             )}
             <p className="mt-2 text-xs text-gray-500">
@@ -176,7 +185,10 @@ const BulkStageChangeButton = ({
               <h4 className="text-sm font-medium">Orders to move:</h4>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {ordersToMove.slice(0, 10).map((order) => {
-                  const isReady = order.order_items?.every((item: any) => item.packed);
+                  const isReady = targetStage === 'tracking' 
+                    ? order.order_items?.every((item: any) => item.packed)
+                    : (order.stage === 'pending' || !order.printed_at);
+                  
                   return (
                     <div key={order.id} className={`flex items-center justify-between p-2 rounded text-sm ${
                       isReady ? 'bg-gray-50' : 'bg-amber-50 border border-amber-200'
@@ -188,7 +200,7 @@ const BulkStageChangeButton = ({
                         </span>
                         {!isReady && (
                           <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                            Not Ready
+                            {targetStage === 'tracking' ? 'Not Ready' : 'Already Printed'}
                           </Badge>
                         )}
                       </div>
