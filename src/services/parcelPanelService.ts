@@ -1,4 +1,3 @@
-
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 
 export interface ParcelPanelTrackingEvent {
@@ -146,14 +145,22 @@ export class ParcelPanelService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.status) queryParams.append('status', params.status);
 
-      const url = `${this.baseUrl}/api/v2/tracking/order${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      // Use the correct endpoint - based on Parcel Panel API docs, orders might be under /tracking/list or similar
+      // Let's try the tracking list endpoint instead
+      const url = `${this.baseUrl}/api/v2/tracking/list${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      
+      console.log('Fetching from URL:', url);
       
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
+      console.log('Fetch orders response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Fetch orders error response:', errorText);
         throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
       }
 
