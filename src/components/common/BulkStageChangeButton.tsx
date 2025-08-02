@@ -41,9 +41,18 @@ const BulkStageChangeButton = ({
   };
 
   const readyOrders = getReadyOrders();
-  const selectedReadyOrders = readyOrders.filter(order => selectedOrderIds.has(order.id));
-  const ordersToMove = selectedOrderIds.size > 0 ? selectedReadyOrders : readyOrders;
+  
+  // When orders are manually selected, use all selected orders
+  // When no orders are selected, use ready orders
+  const ordersToMove = selectedOrderIds.size > 0 
+    ? orders.filter(order => selectedOrderIds.has(order.id))
+    : readyOrders;
+  
   const count = ordersToMove.length;
+
+  // Get count of selected orders that are ready (for display purposes)
+  const selectedReadyOrders = readyOrders.filter(order => selectedOrderIds.has(order.id));
+  const selectedReadyCount = selectedReadyOrders.length;
 
   const stageInfo = {
     tracking: { label: 'Tracking', icon: <Truck className="h-4 w-4" />, color: 'bg-orange-100 text-orange-800' },
@@ -85,7 +94,7 @@ const BulkStageChangeButton = ({
         {stageInfo?.icon}
         <span className="ml-2">
           {selectedOrderIds.size > 0 
-            ? `Move ${selectedReadyOrders.length} Selected to ${stageInfo?.label}`
+            ? `Move ${count} Selected to ${stageInfo?.label}`
             : `Move ${count} Ready to ${stageInfo?.label}`
           }
         </span>
@@ -148,10 +157,15 @@ const BulkStageChangeButton = ({
           <div className="text-sm text-gray-600">
             <p>
               {selectedOrderIds.size > 0 
-                ? `Move ${selectedReadyOrders.length} selected orders from ${currentStage} to ${targetStage}?`
+                ? `Move ${count} selected orders from ${currentStage} to ${targetStage}?`
                 : `Move ${count} ready orders from ${currentStage} to ${targetStage}?`
               }
             </p>
+            {selectedOrderIds.size > 0 && selectedReadyCount < count && (
+              <p className="mt-1 text-xs text-amber-600">
+                ⚠️ {count - selectedReadyCount} of {count} selected orders are not fully packed yet.
+              </p>
+            )}
             <p className="mt-2 text-xs text-gray-500">
               This action will update all selected orders and set appropriate timestamps.
             </p>
@@ -161,14 +175,26 @@ const BulkStageChangeButton = ({
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Orders to move:</h4>
               <div className="max-h-40 overflow-y-auto space-y-1">
-                {ordersToMove.slice(0, 10).map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                    <span className="font-medium">{order.order_number}</span>
-                    <span className="text-gray-500">
-                      {order.customer?.first_name} {order.customer?.last_name}
-                    </span>
-                  </div>
-                ))}
+                {ordersToMove.slice(0, 10).map((order) => {
+                  const isReady = order.order_items?.every((item: any) => item.packed);
+                  return (
+                    <div key={order.id} className={`flex items-center justify-between p-2 rounded text-sm ${
+                      isReady ? 'bg-gray-50' : 'bg-amber-50 border border-amber-200'
+                    }`}>
+                      <span className="font-medium">{order.order_number}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500">
+                          {order.customer?.first_name} {order.customer?.last_name}
+                        </span>
+                        {!isReady && (
+                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                            Not Ready
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
                 {ordersToMove.length > 10 && (
                   <div className="text-xs text-gray-500 text-center py-1">
                     ... and {ordersToMove.length - 10} more orders
