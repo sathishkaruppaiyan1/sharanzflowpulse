@@ -1,3 +1,4 @@
+
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 
 export interface ParcelPanelTrackingEvent {
@@ -145,8 +146,7 @@ export class ParcelPanelService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.status) queryParams.append('status', params.status);
 
-      // Use the correct endpoint - based on Parcel Panel API docs, orders might be under /tracking/list or similar
-      // Let's try the tracking list endpoint instead
+      // Use the tracking list endpoint for fetching orders
       const url = `${this.baseUrl}/api/v2/tracking/list${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
       
       console.log('Fetching from URL:', url);

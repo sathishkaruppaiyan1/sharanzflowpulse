@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -67,8 +68,16 @@ export const useApiConfigs = () => {
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
           interakt: { ...defaultConfigs.interakt, ...configData.interakt },
-          parcel_panel: { ...defaultConfigs.parcel_panel, ...configData.parcel_panel }
+          parcel_panel: { 
+            ...defaultConfigs.parcel_panel, 
+            ...configData.parcel_panel,
+            // Fix incorrect base URL if it exists in the stored config
+            base_url: configData.parcel_panel?.base_url === 'https://open.parcelpanel.com/api/v2/tracking/order' 
+              ? 'https://open.parcelpanel.com'
+              : configData.parcel_panel?.base_url || 'https://open.parcelpanel.com'
+          }
         };
+        console.log('Loaded API configs from database:', mergedConfigs);
         setApiConfigs(mergedConfigs);
       } else {
         setApiConfigs(defaultConfigs);
@@ -85,6 +94,17 @@ export const useApiConfigs = () => {
   const saveConfigs = async (configs: ApiConfigs) => {
     setSaving(true);
     try {
+      // Ensure correct base URL before saving
+      const configsToSave = {
+        ...configs,
+        parcel_panel: {
+          ...configs.parcel_panel,
+          base_url: configs.parcel_panel.base_url === 'https://open.parcelpanel.com/api/v2/tracking/order'
+            ? 'https://open.parcelpanel.com'
+            : configs.parcel_panel.base_url
+        }
+      };
+
       // First check if record exists
       const { data: existingData } = await supabase
         .from('system_settings')
@@ -98,7 +118,7 @@ export const useApiConfigs = () => {
         result = await supabase
           .from('system_settings')
           .update({
-            value: configs as any,
+            value: configsToSave as any,
             updated_at: new Date().toISOString()
           })
           .eq('key', 'api_configs');
@@ -108,7 +128,7 @@ export const useApiConfigs = () => {
           .from('system_settings')
           .insert({
             key: 'api_configs',
-            value: configs as any,
+            value: configsToSave as any,
             updated_at: new Date().toISOString()
           });
       }
@@ -117,7 +137,8 @@ export const useApiConfigs = () => {
         throw result.error;
       }
 
-      setApiConfigs(configs);
+      setApiConfigs(configsToSave);
+      console.log('Saved API configs:', configsToSave);
       toast({
         title: "Success",
         description: "API configurations saved successfully",
