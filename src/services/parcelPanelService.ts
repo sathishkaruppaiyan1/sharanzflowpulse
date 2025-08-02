@@ -1,3 +1,4 @@
+
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -296,6 +297,34 @@ export class ParcelPanelService {
     }
   }
 
+  // Add the missing fetchAndStoreTrackingDetails method
+  async fetchAndStoreTrackingDetails(trackingNumber: string, orderId: string): Promise<void> {
+    try {
+      console.log(`🔄 Auto-fetching tracking details for tracking number: ${trackingNumber} (Order ID: ${orderId})`);
+      
+      if (!this.baseUrl) {
+        console.warn('⚠️ Parcel Panel base URL not configured, skipping auto-fetch');
+        return;
+      }
+
+      const response = await this.trackPackage(trackingNumber);
+      
+      if (response.code === 200 && response.data) {
+        console.log('✅ Successfully fetched tracking details from Parcel Panel');
+        
+        // Store tracking details in the database
+        await this.storeTrackingDetails(orderId, response.data);
+        
+        console.log('✅ Tracking details stored in database');
+      } else {
+        console.warn('⚠️ No tracking details found or API error:', response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error auto-fetching tracking details:', error);
+      // Don't throw - this should not block the main tracking update process
+    }
+  }
+
   // Updated method to fetch and store tracking details by order number
   async fetchAndStoreTrackingDetailsByOrderNumber(orderNumber: string, orderId: string): Promise<void> {
     try {
@@ -341,7 +370,7 @@ export class ParcelPanelService {
           estimated_delivery_date: trackingInfo.estimated_delivery_date,
           delivered_at: trackingInfo.delivered_at,
           shipped_at: trackingInfo.shipped_at,
-          tracking_events: trackingInfo.tracking_events,
+          tracking_events: trackingInfo.tracking_events as any, // Cast to any to handle Json type
           last_updated: new Date().toISOString()
         }, {
           onConflict: 'order_id'
