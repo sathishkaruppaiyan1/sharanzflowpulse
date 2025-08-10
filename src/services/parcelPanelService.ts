@@ -1,4 +1,3 @@
-
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -137,8 +136,9 @@ export class ParcelPanelService {
 
   async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
     try {
-      const url = `https://api.parcelpanel.com/api/v1/trackings?order_number=${orderNumber}`;
+      const url = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${orderNumber}`;
       const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'X-API-KEY': this.apiKey,
