@@ -297,6 +297,44 @@ export class ParcelPanelService {
     }
   }
 
+  async getAnalytics(params?: {
+    start_date?: string;
+    end_date?: string;
+  }): Promise<any> {
+    try {
+      console.log('Fetching analytics from Parcel Panel API...');
+      
+      const queryParams = new URLSearchParams();
+      if (params?.start_date) queryParams.append('start_date', params.start_date);
+      if (params?.end_date) queryParams.append('end_date', params.end_date);
+
+      const url = `${this.baseUrl}/api/v2/analytics${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      
+      console.log('Fetching analytics from URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      console.log('Analytics response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Analytics error response:', errorText);
+        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Parcel Panel analytics response:', data);
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching analytics from Parcel Panel:', error);
+      throw error;
+    }
+  }
+
   // Method to fetch and store tracking details by order number
   async fetchAndStoreTrackingDetailsByOrderNumber(orderNumber: string, orderId: string): Promise<void> {
     try {

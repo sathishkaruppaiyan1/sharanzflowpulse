@@ -84,7 +84,7 @@ export const useParcelPanelAnalytics = () => {
     }
   };
 
-  // Query to fetch stored analytics data
+  // Query to fetch stored analytics data with proper type handling
   const { data: analyticsData, isLoading, refetch } = useQuery({
     queryKey: ['parcel-panel-analytics'],
     queryFn: async (): Promise<AnalyticsData[]> => {
@@ -98,7 +98,22 @@ export const useParcelPanelAnalytics = () => {
         throw error;
       }
 
-      return data || [];
+      // Transform the database data to match our TypeScript interface
+      const transformedData: AnalyticsData[] = (data || []).map(row => ({
+        date: row.date,
+        total_orders: row.total_orders || 0,
+        delivered_orders: row.delivered_orders || 0,
+        in_transit_orders: row.in_transit_orders || 0,
+        out_for_delivery_orders: row.out_for_delivery_orders || 0,
+        exception_orders: row.exception_orders || 0,
+        delivery_rate: row.delivery_rate || 0,
+        avg_delivery_time_days: row.avg_delivery_time_days || 0,
+        top_carriers: Array.isArray(row.top_carriers) ? row.top_carriers as Array<{ name: string; count: number }> : [],
+        top_destinations: Array.isArray(row.top_destinations) ? row.top_destinations as Array<{ country: string; count: number }> : [],
+        status_breakdown: typeof row.status_breakdown === 'object' && row.status_breakdown !== null ? row.status_breakdown as Record<string, number> : {},
+      }));
+
+      return transformedData;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

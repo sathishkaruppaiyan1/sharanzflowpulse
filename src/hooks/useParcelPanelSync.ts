@@ -60,17 +60,7 @@ export const useParcelPanelSync = () => {
 
       await syncCouriers();
 
-      // Stage 4: Sync Analytics
-      setSyncProgress({
-        stage: 'complete',
-        progress: 90,
-        total: 100,
-        status: 'Syncing analytics data...'
-      });
-
-      await syncAnalytics();
-
-      // Complete
+      // Stage 4: Complete (removed analytics sync as it's handled separately)
       setSyncProgress({
         stage: 'complete',
         progress: 100,
@@ -206,46 +196,6 @@ export const useParcelPanelSync = () => {
       console.log('✅ Couriers synced successfully');
     } catch (error) {
       console.error('❌ Failed to sync couriers:', error);
-    }
-  };
-
-  const syncAnalytics = async () => {
-    console.log('📊 Syncing analytics data...');
-    
-    try {
-      // Fetch analytics data from Parcel Panel API
-      const response = await service!.getAnalytics({
-        start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end_date: new Date().toISOString().split('T')[0]
-      });
-
-      if (response.code === 200 && response.data) {
-        const analyticsData = response.data;
-        
-        // Store analytics data in database
-        await supabase
-          .from('parcel_panel_analytics')
-          .upsert({
-            date: new Date().toISOString().split('T')[0],
-            total_orders: analyticsData.total_orders || 0,
-            delivered_orders: analyticsData.delivered_orders || 0,
-            in_transit_orders: analyticsData.in_transit_orders || 0,
-            out_for_delivery_orders: analyticsData.out_for_delivery_orders || 0,
-            exception_orders: analyticsData.exception_orders || 0,
-            delivery_rate: analyticsData.delivery_rate || 0,
-            avg_delivery_time_days: analyticsData.avg_delivery_time_days || 0,
-            top_carriers: JSON.parse(JSON.stringify(analyticsData.top_carriers || [])),
-            top_destinations: JSON.parse(JSON.stringify(analyticsData.top_destinations || [])),
-            status_breakdown: JSON.parse(JSON.stringify(analyticsData.status_breakdown || {})),
-            raw_data: JSON.parse(JSON.stringify(analyticsData))
-          }, {
-            onConflict: 'date'
-          });
-
-        console.log('✅ Analytics data synced successfully');
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync analytics data:', error);
     }
   };
 
