@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useParcelPanelService } from '@/services/parcelPanelService';
 import { useToast } from '@/hooks/use-toast';
@@ -144,10 +145,10 @@ export const useParcelPanelSync = () => {
         try {
           if (order.tracking_number) {
             console.log(`🔍 Fetching tracking for order ${order.order_number}`);
-            const trackingResponse = await service!.trackPackage(order.tracking_number);
+            const response = await service!.fetchTrackingByOrderNumber(order.order_number);
             
-            if (trackingResponse.code === 200 && trackingResponse.data) {
-              const trackingData = trackingResponse.data;
+            if (response.code === 200 && response.data?.trackings?.length > 0) {
+              const trackingData = response.data.trackings[0]; // Get first tracking result
               
               // Store detailed tracking info with proper type handling
               await supabase

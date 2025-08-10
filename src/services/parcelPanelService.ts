@@ -1,3 +1,4 @@
+
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -134,7 +135,7 @@ export class ParcelPanelService {
     }
   }
 
-  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelTrackingInfo[]> {
+  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
     try {
       const url = `https://api.parcelpanel.com/api/v1/trackings?order_number=${orderNumber}`;
       const response = await fetch(url, {
@@ -151,7 +152,7 @@ export class ParcelPanelService {
       }
 
       const data = await response.json() as ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>;
-      return data.data?.trackings || [];
+      return data;
     } catch (error) {
       console.error('Error fetching tracking by order number:', error);
       throw error;
@@ -232,10 +233,10 @@ export class ParcelPanelService {
     try {
       console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
       
-      const trackingInfo = await this.fetchTrackingByOrderNumber(orderNumber);
+      const response = await this.fetchTrackingByOrderNumber(orderNumber);
       
-      if (trackingInfo && trackingInfo.length > 0) {
-        const tracking = trackingInfo[0]; // Get the first tracking result
+      if (response.code === 200 && response.data?.trackings && response.data.trackings.length > 0) {
+        const tracking = response.data.trackings[0]; // Get the first tracking result
         
         console.log(`📦 Storing tracking details for order ${orderNumber}:`, {
           tracking_number: tracking.tracking_number,
