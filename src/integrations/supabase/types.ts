@@ -294,6 +294,60 @@ export type Database = {
           },
         ]
       }
+      parcel_panel_analytics: {
+        Row: {
+          avg_delivery_time_days: number | null
+          created_at: string
+          date: string
+          delivered_orders: number | null
+          delivery_rate: number | null
+          exception_orders: number | null
+          id: string
+          in_transit_orders: number | null
+          out_for_delivery_orders: number | null
+          raw_data: Json | null
+          status_breakdown: Json | null
+          top_carriers: Json | null
+          top_destinations: Json | null
+          total_orders: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_delivery_time_days?: number | null
+          created_at?: string
+          date: string
+          delivered_orders?: number | null
+          delivery_rate?: number | null
+          exception_orders?: number | null
+          id?: string
+          in_transit_orders?: number | null
+          out_for_delivery_orders?: number | null
+          raw_data?: Json | null
+          status_breakdown?: Json | null
+          top_carriers?: Json | null
+          top_destinations?: Json | null
+          total_orders?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_delivery_time_days?: number | null
+          created_at?: string
+          date?: string
+          delivered_orders?: number | null
+          delivery_rate?: number | null
+          exception_orders?: number | null
+          id?: string
+          in_transit_orders?: number | null
+          out_for_delivery_orders?: number | null
+          raw_data?: Json | null
+          status_breakdown?: Json | null
+          top_carriers?: Json | null
+          top_destinations?: Json | null
+          total_orders?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string

@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, List, Hash } from 'lucide-react';
+import { Search, Package, List, Hash, BarChart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTrackingDetails } from '@/hooks/useTrackingDetails';
 import DeliveryTabs from '@/components/delivery/DeliveryTabs';
 import TrackingDetailsCard from '@/components/tracking/TrackingDetailsCard';
+import DeliveryAnalytics from '@/components/delivery/DeliveryAnalytics';
 
 const Delivery = () => {
   const [searchedOrderId, setSearchedOrderId] = useState<string>('');
@@ -37,7 +38,7 @@ const Delivery = () => {
       </div>
 
       <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="orders" className="flex items-center space-x-2">
             <List className="h-4 w-4" />
             <span>Orders</span>
@@ -45,6 +46,10 @@ const Delivery = () => {
           <TabsTrigger value="track-order" className="flex items-center space-x-2">
             <Hash className="h-4 w-4" />
             <span>Webhook Tracking</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center space-x-2">
+            <BarChart className="h-4 w-4" />
+            <span>Analytics</span>
           </TabsTrigger>
         </TabsList>
 
@@ -118,6 +123,10 @@ const Delivery = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <DeliveryAnalytics />
         </TabsContent>
       </Tabs>
     </div>
