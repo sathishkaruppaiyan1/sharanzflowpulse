@@ -75,7 +75,7 @@ const Delivery = () => {
 
             <TabsContent value="in-transit" className="space-y-4">
               <ShopifyDeliveryList 
-                status="shipped" 
+                status="in_transit" 
                 title="In Transit Orders"
               />
             </TabsContent>
@@ -130,7 +130,7 @@ const Delivery = () => {
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  View tracking details from webhook data stored in your database
+                  View tracking details from webhook data or search Parcel Panel directly
                 </p>
               </div>
             </CardContent>
