@@ -1,178 +1,120 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, List, Hash, BarChart, Truck, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useTrackingDetails } from '@/hooks/useTrackingDetails';
-import TrackingDetailsCard from '@/components/tracking/TrackingDetailsCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { RefreshCw, Truck, Package, CheckCircle, AlertTriangle } from 'lucide-react';
 import ShopifyDeliveryList from '@/components/delivery/ShopifyDeliveryList';
 import DeliveryAnalyticsShopify from '@/components/delivery/DeliveryAnalyticsShopify';
+import { useTrackingSync } from '@/hooks/useTrackingSync';
 
 const Delivery = () => {
-  const [searchedOrderId, setSearchedOrderId] = useState<string>('');
-  const { toast } = useToast();
+  const { syncStatus, syncAllTrackingDetails, isConfigured } = useTrackingSync();
 
-  // Use webhook tracking details for searched order
-  const { data: webhookTrackingDetails, isLoading: webhookLoading } = useTrackingDetails(searchedOrderId);
-
-  const handleOrderIdSearch = () => {
-    if (!searchedOrderId.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an order ID",
-        variant: "destructive",
-      });
-      return;
-    }
-    // The webhook data will automatically be fetched via the useTrackingDetails hook
+  const handleManualSync = () => {
+    syncAllTrackingDetails();
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Delivery Management</h2>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Delivery Management</h1>
+          <p className="text-gray-600 mt-2">Track and manage order deliveries with real-time updates</p>
+        </div>
+        
+        {isConfigured && (
+          <div className="flex items-center space-x-4">
+            {syncStatus.isSync && (
+              <div className="flex items-center space-x-2 text-sm text-blue-600">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>
+                  Syncing... {syncStatus.processed}/{syncStatus.total}
+                  {syncStatus.currentOrder && (
+                    <span className="block text-xs text-gray-500">
+                      {syncStatus.currentOrder}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            
+            <Button 
+              onClick={handleManualSync} 
+              disabled={syncStatus.isSync}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Sync Tracking
+            </Button>
+          </div>
+        )}
       </div>
 
-      <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="orders" className="flex items-center space-x-2">
-            <List className="h-4 w-4" />
-            <span>Orders</span>
+      {!isConfigured && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-yellow-800 mb-2">Parcel Panel API Not Configured</h3>
+              <p className="text-yellow-700">
+                Please configure Parcel Panel API in settings to enable automatic tracking sync.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <DeliveryAnalyticsShopify />
+
+      <Tabs defaultValue="in_transit" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="in_transit" className="flex items-center space-x-2">
+            <Truck className="h-4 w-4" />
+            <span>In Transit</span>
           </TabsTrigger>
-          <TabsTrigger value="track-order" className="flex items-center space-x-2">
-            <Hash className="h-4 w-4" />
-            <span>Track Order</span>
+          <TabsTrigger value="out_for_delivery" className="flex items-center space-x-2">
+            <Package className="h-4 w-4" />
+            <span>Out for Delivery</span>
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center space-x-2">
-            <BarChart className="h-4 w-4" />
-            <span>Analytics</span>
+          <TabsTrigger value="delivered" className="flex items-center space-x-2">
+            <CheckCircle className="h-4 w-4" />
+            <span>Delivered</span>
+          </TabsTrigger>
+          <TabsTrigger value="exception" className="flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Issues</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orders" className="space-y-4">
-          <Tabs defaultValue="in-transit" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="in-transit" className="flex items-center space-x-2">
-                <Truck className="h-4 w-4" />
-                <span>In Transit</span>
-              </TabsTrigger>
-              <TabsTrigger value="out-for-delivery" className="flex items-center space-x-2">
-                <Clock className="h-4 w-4" />
-                <span>Out for Delivery</span>
-              </TabsTrigger>
-              <TabsTrigger value="delivered" className="flex items-center space-x-2">
-                <CheckCircle className="h-4 w-4" />
-                <span>Delivered</span>
-              </TabsTrigger>
-              <TabsTrigger value="undelivered" className="flex items-center space-x-2">
-                <XCircle className="h-4 w-4" />
-                <span>Issues</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="in-transit" className="space-y-4">
-              <ShopifyDeliveryList 
-                status="in_transit" 
-                title="In Transit Orders"
-              />
-            </TabsContent>
-
-            <TabsContent value="out-for-delivery" className="space-y-4">
-              <ShopifyDeliveryList 
-                status="out_for_delivery" 
-                title="Out for Delivery Orders"
-              />
-            </TabsContent>
-
-            <TabsContent value="delivered" className="space-y-4">
-              <ShopifyDeliveryList 
-                status="delivered" 
-                title="Delivered Orders"
-              />
-            </TabsContent>
-
-            <TabsContent value="undelivered" className="space-y-4">
-              <ShopifyDeliveryList 
-                status="exception" 
-                title="Orders with Issues"
-              />
-            </TabsContent>
-          </Tabs>
+        <TabsContent value="in_transit">
+          <ShopifyDeliveryList 
+            status="in_transit" 
+            title="Orders In Transit"
+          />
         </TabsContent>
 
-        <TabsContent value="track-order" className="space-y-4">
-          {/* Order ID Search Section for Webhook Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Hash className="mr-2 h-5 w-5" />
-                Track by Order ID
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Enter order ID..."
-                  value={searchedOrderId}
-                  onChange={(e) => setSearchedOrderId(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleOrderIdSearch()}
-                  className="flex-1"
-                />
-                <Button 
-                  onClick={handleOrderIdSearch} 
-                  disabled={webhookLoading}
-                >
-                  {webhookLoading ? 'Loading...' : 'Search'}
-                </Button>
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  View tracking details from webhook data or search Parcel Panel directly
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Show webhook tracking results */}
-          {webhookTrackingDetails && (
-            <TrackingDetailsCard 
-              orderId={searchedOrderId} 
-              orderNumber=""
-            />
-          )}
-
-          {/* Empty State for Webhook Tracking */}
-          {!webhookTrackingDetails && !webhookLoading && searchedOrderId && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Hash className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No tracking data found</h3>
-                <p className="text-gray-600 text-center max-w-md">
-                  No tracking information found for this order ID. Make sure the webhook is properly configured and tracking data has been received.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Default Empty State */}
-          {!searchedOrderId && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Hash className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Search for tracking information</h3>
-                <p className="text-gray-600 text-center max-w-md">
-                  Enter an order ID above to view tracking details from webhook data.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="out_for_delivery">
+          <ShopifyDeliveryList 
+            status="out_for_delivery" 
+            title="Orders Out for Delivery"
+          />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <DeliveryAnalyticsShopify />
+        <TabsContent value="delivered">
+          <ShopifyDeliveryList 
+            status="delivered" 
+            title="Delivered Orders"
+          />
+        </TabsContent>
+
+        <TabsContent value="exception">
+          <ShopifyDeliveryList 
+            status="exception" 
+            title="Orders with Issues"
+          />
         </TabsContent>
       </Tabs>
     </div>

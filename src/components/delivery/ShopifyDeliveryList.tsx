@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, MapPin, Calendar, Truck, AlertCircle } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
-import { useParcelPanelService } from '@/services/parcelPanelService';
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 interface ShopifyDeliveryListProps {
@@ -15,101 +15,83 @@ interface ShopifyDeliveryListProps {
 
 const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title }) => {
   const { orders, loading: ordersLoading, error: ordersError } = useShopifyOrders();
-  const { service, isConfigured } = useParcelPanelService();
 
-  // Fetch Parcel Panel tracking details for all orders
+  // Fetch stored tracking details from database
   const { data: trackingData, isLoading: trackingLoading } = useQuery({
-    queryKey: ['parcel-panel-tracking-bulk', orders?.length || 0],
+    queryKey: ['stored-tracking-details', orders?.length || 0],
     queryFn: async () => {
-      if (!service || !isConfigured || !orders || orders.length === 0) return [];
+      if (!orders || orders.length === 0) return [];
 
-      console.log(`Fetching Parcel Panel tracking for ${orders.length} Shopify orders`);
+      console.log(`Fetching stored tracking details for ${orders.length} orders`);
       
-      const trackingPromises = orders.map(async (order) => {
-        try {
-          // Try to fetch tracking by order number first
-          const response = await service.fetchTrackingByOrderNumber(order.order_number);
-          
-          if (response.code === 200 && response.data && Array.isArray(response.data) && response.data.length > 0) {
-            return {
-              orderNumber: order.order_number,
-              orderId: order.id,
-              tracking: response.data[0] // Take the first tracking result
-            };
-          }
-          
-          return {
-            orderNumber: order.order_number,
-            orderId: order.id,
-            tracking: null
-          };
-        } catch (error) {
-          console.warn(`Failed to fetch tracking for order ${order.order_number}:`, error);
-          return {
-            orderNumber: order.order_number,
-            orderId: order.id,
-            tracking: null
-          };
-        }
-      });
+      const orderIds = orders.map(order => order.id);
+      
+      const { data, error } = await supabase
+        .from('order_tracking_details')
+        .select('*')
+        .in('order_id', orderIds);
 
-      const results = await Promise.all(trackingPromises);
-      console.log(`Parcel Panel tracking results:`, results);
-      return results;
+      if (error) {
+        console.error('Error fetching stored tracking details:', error);
+        return [];
+      }
+
+      console.log(`Found ${data.length} stored tracking records`);
+      return data || [];
     },
-    enabled: isConfigured && Boolean(service) && Boolean(orders) && orders.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes
+    enabled: Boolean(orders) && orders.length > 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 
-  // Filter orders based on Parcel Panel tracking status
+  // Filter orders based on stored tracking status
   const filteredOrders = React.useMemo(() => {
     if (!trackingData || !orders) return [];
 
     return orders.filter(order => {
-      const trackingInfo = trackingData.find(t => t.orderNumber === order.order_number);
-      const parcelPanelStatus = trackingInfo?.tracking?.status?.toLowerCase();
+      const trackingInfo = trackingData.find(t => t.order_id === order.id);
+      const trackingStatus = trackingInfo?.status?.toLowerCase();
       
-      console.log(`Order ${order.order_number}: PP status = ${parcelPanelStatus}, Filter = ${status}`);
+      console.log(`Order ${order.order_number}: Stored status = ${trackingStatus}, Filter = ${status}`);
       
       switch (status) {
         case 'in_transit':
           // In transit: shipped, pickup, transit, etc.
-          return parcelPanelStatus && [
+          return trackingStatus && [
             'transit', 'in_transit', 'shipped', 'pickup', 'dispatched',
-            'on_the_way', 'sorting', 'processing'
-          ].includes(parcelPanelStatus);
+            'on_the_way', 'sorting', 'processing', 'pending'
+          ].includes(trackingStatus);
           
         case 'out_for_delivery':
           // Out for delivery
-          return parcelPanelStatus && [
+          return trackingStatus && [
             'out_for_delivery', 'out_for_delivery_date', 'delivering'
-          ].includes(parcelPanelStatus);
+          ].includes(trackingStatus);
           
         case 'delivered':
           // Delivered successfully
-          return parcelPanelStatus && [
+          return trackingStatus && [
             'delivered', 'delivered_date'
-          ].includes(parcelPanelStatus);
+          ].includes(trackingStatus);
           
         case 'exception':
-          // Problems, undelivered, failed delivery attempts
-          return parcelPanelStatus && [
+          // Problems, undelivered, failed delivery attempts, or no tracking
+          return trackingStatus && [
             'exception', 'undelivered', 'failed_attempt', 'returned',
-            'lost', 'damaged', 'refused', 'address_issue'
-          ].includes(parcelPanelStatus) || 
-          // Also include orders with fulfillment but no tracking data (potential issues)
-          (order.fulfillment_status === 'fulfilled' && !trackingInfo?.tracking);
+            'lost', 'damaged', 'refused', 'address_issue', 'error', 'no_tracking'
+          ].includes(trackingStatus) || 
+          // Orders without any tracking data
+          !trackingInfo;
           
         default:
           return false;
       }
     }).map(order => {
-      // Enhance order with Parcel Panel tracking data
-      const trackingInfo = trackingData.find(t => t.orderNumber === order.order_number);
+      // Enhance order with stored tracking data
+      const trackingInfo = trackingData.find(t => t.order_id === order.id);
       return {
         ...order,
-        parcelPanelTracking: trackingInfo?.tracking || null
+        storedTracking: trackingInfo || null
       };
     });
   }, [orders, trackingData, status]);
@@ -139,20 +121,6 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
     );
   }
 
-  if (!isConfigured) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <AlertCircle className="h-12 w-12 text-yellow-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Parcel Panel Not Configured</h3>
-          <p className="text-gray-600 text-center">
-            Please configure Parcel Panel API in settings to view accurate delivery status.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -168,12 +136,12 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-medium mb-2">No orders found</h3>
-            <p className="text-sm">No orders match the current status criteria from Parcel Panel tracking.</p>
+            <p className="text-sm">No orders match the current status criteria.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredOrders.map((order) => (
-              <ShopifyOrderCardWithTracking key={order.id} order={order} />
+              <ShopifyOrderCardWithStoredTracking key={order.id} order={order} />
             ))}
           </div>
         )}
@@ -182,7 +150,7 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
   );
 };
 
-const ShopifyOrderCardWithTracking: React.FC<{ order: any }> = ({ order }) => {
+const ShopifyOrderCardWithStoredTracking: React.FC<{ order: any }> = ({ order }) => {
   const getStatusColor = (tracking: any) => {
     if (!tracking) return 'bg-gray-100 text-gray-800 border-gray-200';
     
@@ -194,7 +162,7 @@ const ShopifyOrderCardWithTracking: React.FC<{ order: any }> = ({ order }) => {
         return 'bg-orange-100 text-orange-800 border-orange-200';
       case status?.includes('transit') || status?.includes('shipped'): 
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case status?.includes('exception') || status?.includes('undelivered'): 
+      case status?.includes('exception') || status?.includes('error') || status?.includes('no_tracking'): 
         return 'bg-red-100 text-red-800 border-red-200';
       default: 
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -210,16 +178,16 @@ const ShopifyOrderCardWithTracking: React.FC<{ order: any }> = ({ order }) => {
   };
 
   const getDisplayStatus = () => {
-    if (order.parcelPanelTracking?.sub_status) {
-      return order.parcelPanelTracking.sub_status;
+    if (order.storedTracking?.sub_status) {
+      return order.storedTracking.sub_status;
     }
-    if (order.parcelPanelTracking?.status) {
-      return order.parcelPanelTracking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (order.storedTracking?.status) {
+      return order.storedTracking.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
     return order.fulfillment_status || 'Unknown';
   };
 
-  const tracking = order.parcelPanelTracking;
+  const tracking = order.storedTracking;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -303,6 +271,13 @@ const ShopifyOrderCardWithTracking: React.FC<{ order: any }> = ({ order }) => {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Show last updated time */}
+        {tracking?.last_updated && (
+          <div className="pt-1 text-xs text-gray-400">
+            Updated: {formatDate(tracking.last_updated)}
           </div>
         )}
       </CardContent>
