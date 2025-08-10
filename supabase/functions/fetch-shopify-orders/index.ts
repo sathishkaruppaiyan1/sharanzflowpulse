@@ -58,7 +58,7 @@ serve(async (req) => {
       const limit = 250 // Maximum allowed by Shopify
       const maxOrders = 300 // Only fetch last 300 orders
       let hasMoreOrders = true
-      let sinceId = null
+      let pageInfo = null
 
       console.log('Starting to fetch latest 300 orders from Shopify...')
 
@@ -67,18 +67,15 @@ serve(async (req) => {
         const remainingOrders = maxOrders - allOrders.length
         const currentLimit = Math.min(limit, remainingOrders)
 
-        // Build URL with proper pagination - fetch recent orders first
+        // Build URL - use simpler pagination approach
         let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${currentLimit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
         
-        if (sinceId) {
-          // For pagination, we need to use since_id but in reverse order
-          url += `&since_id=${sinceId}&order=created_at+desc`
-        } else {
-          // First request - get most recent orders
-          url += `&order=created_at+desc`
+        // Only add since_id for subsequent requests, without order parameter
+        if (pageInfo) {
+          url += `&since_id=${pageInfo}`
         }
         
-        console.log(`Fetching batch with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}, requesting: ${currentLimit}`)
+        console.log(`Fetching batch with pageInfo: ${pageInfo || 'none'}, current total: ${allOrders.length}, requesting: ${currentLimit}`)
 
         try {
           const shopifyResponse = await fetch(url, {
@@ -113,8 +110,13 @@ serve(async (req) => {
             console.log('No more orders to fetch')
             hasMoreOrders = false
           } else {
+            // Sort orders by created_at descending to get newest first
+            const sortedOrders = orders.sort((a: any, b: any) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+            
             // Add orders to our collection, but don't exceed 300
-            const ordersToAdd = orders.slice(0, remainingOrders)
+            const ordersToAdd = sortedOrders.slice(0, remainingOrders)
             allOrders = allOrders.concat(ordersToAdd)
             
             // Check if we've reached our limit or got fewer than requested
@@ -122,10 +124,10 @@ serve(async (req) => {
               console.log(`Reached limit or last batch - total orders: ${allOrders.length}`)
               hasMoreOrders = false
             } else {
-              // Set the since_id to the last order's ID for next iteration
+              // Set the pageInfo to the last order's ID for next iteration
               const lastOrder = orders[orders.length - 1]
-              sinceId = lastOrder.id
-              console.log(`Next since_id will be: ${sinceId}`)
+              pageInfo = lastOrder.id
+              console.log(`Next pageInfo will be: ${pageInfo}`)
             }
           }
 
@@ -137,6 +139,14 @@ serve(async (req) => {
           throw fetchError
         }
       }
+
+      // Final sort to ensure we have the most recent orders first
+      allOrders.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      
+      // Take only the first 300 (most recent)
+      allOrders = allOrders.slice(0, maxOrders)
 
       console.log(`Finished fetching. Total orders collected: ${allOrders.length} (limited to ${maxOrders})`)
       return allOrders
