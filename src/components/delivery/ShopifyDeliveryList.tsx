@@ -7,7 +7,6 @@ import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useParcelPanelService } from '@/services/parcelPanelService';
 import { useQuery } from '@tanstack/react-query';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
-import DeliveryOrderCard from './DeliveryOrderCard';
 
 interface ShopifyDeliveryListProps {
   status: 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception';
@@ -20,9 +19,9 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
 
   // Fetch Parcel Panel tracking details for all orders
   const { data: trackingData, isLoading: trackingLoading } = useQuery({
-    queryKey: ['parcel-panel-tracking-bulk', orders.length],
+    queryKey: ['parcel-panel-tracking-bulk', orders?.length || 0],
     queryFn: async () => {
-      if (!service || !isConfigured || orders.length === 0) return [];
+      if (!service || !isConfigured || !orders || orders.length === 0) return [];
 
       console.log(`Fetching Parcel Panel tracking for ${orders.length} Shopify orders`);
       
@@ -31,7 +30,7 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
           // Try to fetch tracking by order number first
           const response = await service.fetchTrackingByOrderNumber(order.order_number);
           
-          if (response.code === 200 && response.data && response.data.length > 0) {
+          if (response.code === 200 && response.data && Array.isArray(response.data) && response.data.length > 0) {
             return {
               orderNumber: order.order_number,
               orderId: order.id,
@@ -58,14 +57,14 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
       console.log(`Parcel Panel tracking results:`, results);
       return results;
     },
-    enabled: isConfigured && Boolean(service) && orders.length > 0,
+    enabled: isConfigured && Boolean(service) && Boolean(orders) && orders.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes
   });
 
   // Filter orders based on Parcel Panel tracking status
   const filteredOrders = React.useMemo(() => {
-    if (!trackingData) return [];
+    if (!trackingData || !orders) return [];
 
     return orders.filter(order => {
       const trackingInfo = trackingData.find(t => t.orderNumber === order.order_number);
@@ -283,10 +282,10 @@ const ShopifyOrderCardWithTracking: React.FC<{ order: any }> = ({ order }) => {
               <Calendar className="h-3 w-3" />
               <span>Created: {formatDate(order.created_at)}</span>
             </div>
-            {tracking?.delivered_date && (
+            {tracking?.delivered_at && (
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3" />
-                <span>Delivered: {formatDate(tracking.delivered_date)}</span>
+                <span>Delivered: {formatDate(tracking.delivered_at)}</span>
               </div>
             )}
           </div>
