@@ -1,1 +1,5 @@
+
 project_id = "jmqpqgxqhfctyfjtlbbm"
+
+[functions.parcel-panel-webhook]
+verify_jwt = false
