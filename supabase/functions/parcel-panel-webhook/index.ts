@@ -11,11 +11,30 @@ serve(async (req) => {
   console.log('=== PARCEL PANEL WEBHOOK STARTED ===')
   console.log('Request method:', req.method)
   console.log('Request URL:', req.url)
+  
+  // Add headers logging for debugging
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()))
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request')
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Handle GET requests for testing webhook URL
+  if (req.method === 'GET') {
+    console.log('=== WEBHOOK URL TEST ===')
+    return new Response(
+      JSON.stringify({ 
+        message: 'Parcel Panel webhook endpoint is working!',
+        timestamp: new Date().toISOString(),
+        status: 'active'
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
   }
 
   try {
@@ -36,6 +55,29 @@ serve(async (req) => {
     console.log('Reading webhook payload...')
     const webhookData = await req.json()
     console.log('Webhook data received:', JSON.stringify(webhookData, null, 2))
+
+    // Log webhook receipt to system_settings for debugging
+    const webhookLogEntry = {
+      key: `webhook_received_${Date.now()}`,
+      value: {
+        type: 'parcel_panel_webhook',
+        timestamp: new Date().toISOString(),
+        method: req.method,
+        headers: Object.fromEntries(req.headers.entries()),
+        data: webhookData,
+        status: 'received'
+      }
+    }
+
+    const { error: logError } = await supabase
+      .from('system_settings')
+      .insert(webhookLogEntry)
+
+    if (logError) {
+      console.error('Error logging webhook:', logError)
+    } else {
+      console.log('Webhook logged successfully')
+    }
 
     // Extract tracking information from webhook payload
     const { 
