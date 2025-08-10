@@ -136,16 +136,13 @@ export class ParcelPanelService {
 
   async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
     try {
-      const url = 'https://open.parcelpanel.com/api/v2/tracking/order';
+      const url = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${orderNumber}`;
       const response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'X-API-KEY': this.apiKey,
-        },
-        body: JSON.stringify({
-          order_number: orderNumber
-        })
+        }
       });
       
       if (!response.ok) {
