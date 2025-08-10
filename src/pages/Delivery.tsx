@@ -10,6 +10,10 @@ const Delivery = () => {
   const orderNumber = 'BS2568';
   const { data: trackingData, isLoading, error } = useTrackingByOrderNumber(orderNumber);
 
+  console.log('Delivery page - tracking data:', trackingData);
+  console.log('Delivery page - error:', error);
+  console.log('Delivery page - isLoading:', isLoading);
+
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
@@ -60,7 +64,21 @@ const Delivery = () => {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-red-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading tracking</h3>
-            <p className="text-gray-600 text-center">{error.message}</p>
+            <p className="text-gray-600 text-center mb-4">{error.message}</p>
+            {error.message.includes('not configured') && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-yellow-800">
+                  Please configure your Parcel Panel API in the Settings page to enable tracking functionality.
+                </p>
+              </div>
+            )}
+            {error.message.includes('Failed to fetch') && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-blue-800">
+                  No tracking information found for order {orderNumber}. The order may not exist in Parcel Panel or tracking hasn't been set up yet.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -170,11 +188,14 @@ const Delivery = () => {
 
       {trackingData && (!trackingData.trackings || trackingData.trackings.length === 0) && (
         <Card>
-          <CardContent className="flex items-center justify-center py-12 text-gray-500">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <div className="text-center">
               <h3 className="text-lg font-medium mb-2">No tracking data found</h3>
               <p className="text-sm">No tracking information available for order {orderNumber}</p>
+              <p className="text-xs mt-2 text-gray-400">
+                This may be because the order hasn't shipped yet or tracking hasn't been set up in Parcel Panel.
+              </p>
             </div>
           </CardContent>
         </Card>
