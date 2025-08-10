@@ -2,8 +2,9 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, MapPin, Calendar, Truck, AlertCircle } from 'lucide-react';
+import { Package, MapPin, Calendar, Truck, AlertCircle, RefreshCw } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
+import { useTrackingSync } from '@/hooks/useTrackingSync';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -15,9 +16,10 @@ interface ShopifyDeliveryListProps {
 
 const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title }) => {
   const { orders, loading: ordersLoading, error: ordersError } = useShopifyOrders();
+  const { syncStatus } = useTrackingSync();
 
   // Fetch stored tracking details from database
-  const { data: trackingData, isLoading: trackingLoading } = useQuery({
+  const { data: trackingData, isLoading: trackingLoading, refetch: refetchTracking } = useQuery({
     queryKey: ['stored-tracking-details', orders?.length || 0],
     queryFn: async () => {
       if (!orders || orders.length === 0) return [];
@@ -43,6 +45,15 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
+
+  // Auto-refresh tracking data when sync completes
+  React.useEffect(() => {
+    if (!syncStatus.isSync && syncStatus.processed > 0) {
+      // Sync completed, refresh tracking data
+      console.log('🔄 Sync completed, refreshing tracking data...');
+      refetchTracking();
+    }
+  }, [syncStatus.isSync, syncStatus.processed, refetchTracking]);
 
   // Filter orders based on stored tracking status
   const filteredOrders = React.useMemo(() => {
@@ -99,11 +110,48 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
   const loading = ordersLoading || trackingLoading;
   const error = ordersError;
 
+  // Show sync progress if currently syncing
+  if (syncStatus.isSync) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <RefreshCw className="h-12 w-12 text-blue-500 mx-auto animate-spin" />
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Syncing Tracking Details
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Processing {syncStatus.processed} of {syncStatus.total} orders
+              </p>
+              {syncStatus.currentOrder && (
+                <div className="text-sm text-gray-500">
+                  Currently processing: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{syncStatus.currentOrder}</span>
+                </div>
+              )}
+              <div className="w-full max-w-xs mx-auto mt-4">
+                <div className="bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(syncStatus.processed / syncStatus.total) * 100}%` }}
+                  />
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {Math.round((syncStatus.processed / syncStatus.total) * 100)}% complete
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <LoadingSpinner text="Loading orders and tracking data..." />
+          <LoadingSpinner text="Loading orders..." />
         </CardContent>
       </Card>
     );
