@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ApiConfigs, useApiConfigs } from '@/hooks/useApiConfigs';
 import { Package } from 'lucide-react';
+import ParcelPanelSync from './ParcelPanelSync';
 
 const ApiConfiguration = () => {
   const { apiConfigs, setApiConfigs, saveConfigs, loading, saving } = useApiConfigs();
@@ -194,6 +195,9 @@ const ApiConfiguration = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* NEW: Parcel Panel Data Sync */}
+        <ParcelPanelSync />
 
         {/* Interakt Configuration */}
         <Card>
