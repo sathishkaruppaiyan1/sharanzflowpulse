@@ -36,25 +36,25 @@ export const useTrackingSync = () => {
         return true; // No tracking data, needs sync
       }
 
-      // Check if data is older than 30 minutes (reduced from 1 hour for more frequent updates)
+      // Check if data is older than 1 hour
       const lastUpdated = new Date(data.last_updated);
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       
-      return lastUpdated < thirtyMinutesAgo;
+      return lastUpdated < oneHourAgo;
     } catch (error) {
       console.error('Error checking tracking sync status:', error);
       return true;
     }
   };
 
-  // Function to sync tracking details for latest orders
+  // Function to sync tracking details for all orders
   const syncAllTrackingDetails = async () => {
     if (!service || !isConfigured || !orders || orders.length === 0) {
       console.log('Cannot sync: service not configured or no orders');
       return;
     }
 
-    console.log(`🔄 Starting tracking sync for ${orders.length} latest orders`);
+    console.log(`🔄 Starting tracking sync for ${orders.length} orders`);
     setSyncStatus({
       isSync: true,
       processed: 0,
@@ -79,7 +79,7 @@ export const useTrackingSync = () => {
           await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
           
           // Add small delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 300)); // Reduced delay for faster sync
+          await new Promise(resolve => setTimeout(resolve, 500));
         } else {
           console.log(`⏭️ Skipping order ${order.order_number} - recently updated`);
         }
@@ -112,14 +112,14 @@ export const useTrackingSync = () => {
     }
   }, [orders, service, isConfigured, ordersLoading]);
 
-  // Auto-sync every 15 minutes (reduced from 30 minutes for more frequent updates)
+  // Auto-sync every 30 minutes
   useEffect(() => {
     if (!service || !isConfigured) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 Auto-syncing tracking details for latest orders...');
+      console.log('🔄 Auto-syncing tracking details...');
       syncAllTrackingDetails();
-    }, 15 * 60 * 1000); // 15 minutes
+    }, 30 * 60 * 1000); // 30 minutes
 
     return () => clearInterval(interval);
   }, [service, isConfigured]);

@@ -1,9 +1,9 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, MapPin, Calendar, Truck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Package, MapPin, Calendar, Truck, AlertCircle } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
-import { useTrackingSync } from '@/hooks/useTrackingSync';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -15,30 +15,16 @@ interface ShopifyDeliveryListProps {
 
 const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title }) => {
   const { orders, loading: ordersLoading, error: ordersError } = useShopifyOrders();
-  const { syncStatus } = useTrackingSync();
 
-  // Get only the last 5 orders for testing
-  const last5Orders = React.useMemo(() => {
-    if (!orders || orders.length === 0) return [];
-    
-    // Sort by created_at descending and take first 5
-    const sortedOrders = [...orders].sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    
-    console.log(`📋 Testing with last 5 orders out of ${orders.length} total orders`);
-    return sortedOrders.slice(0, 5);
-  }, [orders]);
-
-  // Fetch stored tracking details from database for last 5 orders only
-  const { data: trackingData, isLoading: trackingLoading, refetch: refetchTracking } = useQuery({
-    queryKey: ['stored-tracking-details-test', last5Orders?.length || 0],
+  // Fetch stored tracking details from database
+  const { data: trackingData, isLoading: trackingLoading } = useQuery({
+    queryKey: ['stored-tracking-details', orders?.length || 0],
     queryFn: async () => {
-      if (!last5Orders || last5Orders.length === 0) return [];
+      if (!orders || orders.length === 0) return [];
 
-      console.log(`🔍 Fetching tracking details for last 5 orders:`, last5Orders.map(o => o.order_number));
+      console.log(`Fetching stored tracking details for ${orders.length} orders`);
       
-      const orderIds = last5Orders.map(order => order.id);
+      const orderIds = orders.map(order => order.id);
       
       const { data, error } = await supabase
         .from('order_tracking_details')
@@ -50,32 +36,23 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
         return [];
       }
 
-      console.log(`✅ Found ${data.length} tracking records for last 5 orders`);
+      console.log(`Found ${data.length} stored tracking records`);
       return data || [];
     },
-    enabled: Boolean(last5Orders) && last5Orders.length > 0,
+    enabled: Boolean(orders) && orders.length > 0,
     staleTime: 2 * 60 * 1000, // 2 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 
-  // Auto-refresh tracking data when sync completes
-  React.useEffect(() => {
-    if (!syncStatus.isSync && syncStatus.processed > 0) {
-      // Sync completed, refresh tracking data
-      console.log('🔄 Sync completed, refreshing tracking data for last 5 orders...');
-      refetchTracking();
-    }
-  }, [syncStatus.isSync, syncStatus.processed, refetchTracking]);
-
   // Filter orders based on stored tracking status
   const filteredOrders = React.useMemo(() => {
-    if (!trackingData || !last5Orders) return [];
+    if (!trackingData || !orders) return [];
 
-    return last5Orders.filter(order => {
+    return orders.filter(order => {
       const trackingInfo = trackingData.find(t => t.order_id === order.id);
       const trackingStatus = trackingInfo?.status?.toLowerCase();
       
-      console.log(`🔍 Order ${order.order_number}: Stored status = ${trackingStatus}, Filter = ${status}`);
+      console.log(`Order ${order.order_number}: Stored status = ${trackingStatus}, Filter = ${status}`);
       
       switch (status) {
         case 'in_transit':
@@ -117,53 +94,16 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
         storedTracking: trackingInfo || null
       };
     });
-  }, [last5Orders, trackingData, status]);
+  }, [orders, trackingData, status]);
 
   const loading = ordersLoading || trackingLoading;
   const error = ordersError;
-
-  // Show sync progress if currently syncing
-  if (syncStatus.isSync) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <div className="text-center space-y-4">
-            <RefreshCw className="h-12 w-12 text-blue-500 mx-auto animate-spin" />
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Syncing Tracking Details (Testing Last 5 Orders)
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Processing {syncStatus.processed} of {syncStatus.total} orders
-              </p>
-              {syncStatus.currentOrder && (
-                <div className="text-sm text-gray-500">
-                  Currently processing: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{syncStatus.currentOrder}</span>
-                </div>
-              )}
-              <div className="w-full max-w-xs mx-auto mt-4">
-                <div className="bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(syncStatus.processed / syncStatus.total) * 100}%` }}
-                  />
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {Math.round((syncStatus.processed / syncStatus.total) * 100)}% complete
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <LoadingSpinner text="Loading last 5 orders..." />
+          <LoadingSpinner text="Loading orders and tracking data..." />
         </CardContent>
       </Card>
     );
@@ -185,46 +125,18 @@ const ShopifyDeliveryList: React.FC<ShopifyDeliveryListProps> = ({ status, title
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>{title} (Testing Last 5 Orders)</span>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline">
-              {filteredOrders.length} of {last5Orders.length} orders
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              Total: {orders?.length || 0}
-            </Badge>
-          </div>
+          <span>{title}</span>
+          <Badge variant="outline">
+            {filteredOrders.length} orders
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Debug info */}
-        <div className="mb-4 p-3 bg-gray-50 rounded text-xs text-gray-600">
-          <div><strong>Debug Info:</strong></div>
-          <div>• Total orders fetched: {orders?.length || 0}</div>
-          <div>• Last 5 orders being tested: {last5Orders.length}</div>
-          <div>• Tracking records found: {trackingData?.length || 0}</div>
-          <div>• Orders matching "{status}" status: {filteredOrders.length}</div>
-        </div>
-
         {filteredOrders.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-medium mb-2">No orders found</h3>
-            <p className="text-sm">No orders in the last 5 match the "{status}" status criteria.</p>
-            {last5Orders.length > 0 && (
-              <div className="mt-4 text-xs">
-                <div className="font-medium mb-2">Last 5 orders being tested:</div>
-                {last5Orders.map(order => {
-                  const tracking = trackingData?.find(t => t.order_id === order.id);
-                  return (
-                    <div key={order.id} className="text-left bg-white p-2 rounded border mb-1">
-                      <div className="font-mono">{order.order_number}</div>
-                      <div>Status: {tracking?.status || 'No tracking'}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <p className="text-sm">No orders match the current status criteria.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

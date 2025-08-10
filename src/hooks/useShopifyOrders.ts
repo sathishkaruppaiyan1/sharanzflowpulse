@@ -47,7 +47,7 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
     throw new Error('Shopify API not configured');
   }
 
-  console.log('Fetching latest 300 Shopify orders...');
+  console.log('Fetching Shopify orders...');
   const { data, error: functionError } = await supabase.functions.invoke('fetch-shopify-orders');
 
   if (functionError) {
@@ -59,7 +59,7 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   }
 
   const orders = data.orders || [];
-  console.log(`Fetched ${orders.length} Shopify orders (latest 300)`);
+  console.log(`Fetched ${orders.length} Shopify orders`);
   
   // Enhanced phone number logging and processing
   orders.forEach((order: ShopifyOrder) => {
@@ -100,9 +100,9 @@ export const useShopifyOrders = () => {
     queryKey: ['shopify-orders', apiConfigs?.shopify?.shop_url, apiConfigs?.shopify?.access_token],
     queryFn: () => fetchShopifyOrders(apiConfigs?.shopify),
     enabled: isConfigured,
-    staleTime: 60 * 1000, // Consider data fresh for 1 minute (reduced from 2)
-    gcTime: 5 * 60 * 1000, // Cache for 5 minutes (reduced from 10)
-    refetchInterval: 2 * 60 * 1000, // Auto-refetch every 2 minutes (reduced from 5)
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    gcTime: 10 * 60 * 1000, // Cache for 10 minutes
+    refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
       // Don't retry if it's a configuration error
