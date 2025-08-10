@@ -3,14 +3,13 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, List, Hash, BarChart } from 'lucide-react';
+import { Search, Package, List, Hash, BarChart, Truck, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTrackingDetails } from '@/hooks/useTrackingDetails';
-import DeliveryTabs from '@/components/delivery/DeliveryTabs';
 import TrackingDetailsCard from '@/components/tracking/TrackingDetailsCard';
-import DeliveryAnalytics from '@/components/delivery/DeliveryAnalytics';
+import ShopifyDeliveryList from '@/components/delivery/ShopifyDeliveryList';
+import DeliveryAnalyticsShopify from '@/components/delivery/DeliveryAnalyticsShopify';
 
 const Delivery = () => {
   const [searchedOrderId, setSearchedOrderId] = useState<string>('');
@@ -45,7 +44,7 @@ const Delivery = () => {
           </TabsTrigger>
           <TabsTrigger value="track-order" className="flex items-center space-x-2">
             <Hash className="h-4 w-4" />
-            <span>Webhook Tracking</span>
+            <span>Track Order</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center space-x-2">
             <BarChart className="h-4 w-4" />
@@ -54,7 +53,54 @@ const Delivery = () => {
         </TabsList>
 
         <TabsContent value="orders" className="space-y-4">
-          <DeliveryTabs />
+          <Tabs defaultValue="in-transit" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="in-transit" className="flex items-center space-x-2">
+                <Truck className="h-4 w-4" />
+                <span>In Transit</span>
+              </TabsTrigger>
+              <TabsTrigger value="out-for-delivery" className="flex items-center space-x-2">
+                <Clock className="h-4 w-4" />
+                <span>Out for Delivery</span>
+              </TabsTrigger>
+              <TabsTrigger value="delivered" className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4" />
+                <span>Delivered</span>
+              </TabsTrigger>
+              <TabsTrigger value="undelivered" className="flex items-center space-x-2">
+                <XCircle className="h-4 w-4" />
+                <span>Issues</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="in-transit" className="space-y-4">
+              <ShopifyDeliveryList 
+                status="shipped" 
+                title="In Transit Orders"
+              />
+            </TabsContent>
+
+            <TabsContent value="out-for-delivery" className="space-y-4">
+              <ShopifyDeliveryList 
+                status="out_for_delivery" 
+                title="Out for Delivery Orders"
+              />
+            </TabsContent>
+
+            <TabsContent value="delivered" className="space-y-4">
+              <ShopifyDeliveryList 
+                status="delivered" 
+                title="Delivered Orders"
+              />
+            </TabsContent>
+
+            <TabsContent value="undelivered" className="space-y-4">
+              <ShopifyDeliveryList 
+                status="exception" 
+                title="Orders with Issues"
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="track-order" className="space-y-4">
@@ -63,7 +109,7 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Hash className="mr-2 h-5 w-5" />
-                Track by Order ID (Webhook Data)
+                Track by Order ID
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -103,7 +149,7 @@ const Delivery = () => {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Hash className="h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No webhook tracking data found</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No tracking data found</h3>
                 <p className="text-gray-600 text-center max-w-md">
                   No tracking information found for this order ID. Make sure the webhook is properly configured and tracking data has been received.
                 </p>
@@ -126,7 +172,7 @@ const Delivery = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <DeliveryAnalytics />
+          <DeliveryAnalyticsShopify />
         </TabsContent>
       </Tabs>
     </div>
