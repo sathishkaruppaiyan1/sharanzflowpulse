@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -51,29 +52,33 @@ serve(async (req) => {
 
     console.log('Using shop name:', shopName)
 
-    // Function to fetch all orders using proper REST API pagination
-    const fetchAllOrders = async () => {
+    // Function to fetch the latest 300 orders
+    const fetchLatest300Orders = async () => {
       let allOrders: any[] = []
       const limit = 250 // Maximum allowed by Shopify
+      const maxOrders = 300 // Only fetch last 300 orders
       let hasMoreOrders = true
       let sinceId = null
 
-      console.log('Starting to fetch all orders from Shopify...')
+      console.log('Starting to fetch latest 300 orders from Shopify...')
 
-      while (hasMoreOrders && allOrders.length < 10000) {
-        // Build URL with proper pagination
-        // Note: Cannot use 'order' parameter with 'since_id' - Shopify API restriction
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+      while (hasMoreOrders && allOrders.length < maxOrders) {
+        // Calculate remaining orders to fetch
+        const remainingOrders = maxOrders - allOrders.length
+        const currentLimit = Math.min(limit, remainingOrders)
+
+        // Build URL with proper pagination - fetch recent orders first
+        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${currentLimit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
         
-        // Add since_id for pagination if we have it
         if (sinceId) {
-          url += `&since_id=${sinceId}`
+          // For pagination, we need to use since_id but in reverse order
+          url += `&since_id=${sinceId}&order=created_at+desc`
         } else {
-          // Only add order parameter for the first request (when no since_id)
-          url += `&order=created_at+asc`
+          // First request - get most recent orders
+          url += `&order=created_at+desc`
         }
         
-        console.log(`Fetching batch with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}`)
+        console.log(`Fetching batch with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}, requesting: ${currentLimit}`)
 
         try {
           const shopifyResponse = await fetch(url, {
@@ -108,12 +113,13 @@ serve(async (req) => {
             console.log('No more orders to fetch')
             hasMoreOrders = false
           } else {
-            // Add orders to our collection
-            allOrders = allOrders.concat(orders)
+            // Add orders to our collection, but don't exceed 300
+            const ordersToAdd = orders.slice(0, remainingOrders)
+            allOrders = allOrders.concat(ordersToAdd)
             
-            // If we got fewer than the limit, we're done
-            if (orders.length < limit) {
-              console.log('Last batch - got fewer orders than limit')
+            // Check if we've reached our limit or got fewer than requested
+            if (allOrders.length >= maxOrders || orders.length < currentLimit) {
+              console.log(`Reached limit or last batch - total orders: ${allOrders.length}`)
               hasMoreOrders = false
             } else {
               // Set the since_id to the last order's ID for next iteration
@@ -132,16 +138,16 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Finished fetching. Total orders collected: ${allOrders.length}`)
+      console.log(`Finished fetching. Total orders collected: ${allOrders.length} (limited to ${maxOrders})`)
       return allOrders
     }
 
-    // Fetch all orders with pagination
-    const allOrders = await fetchAllOrders()
-    console.log(`Final count - Total orders fetched: ${allOrders.length}`)
+    // Fetch latest 300 orders
+    const latestOrders = await fetchLatest300Orders()
+    console.log(`Final count - Total orders fetched: ${latestOrders.length}`)
     
     // Transform Shopify orders to include detailed information
-    const transformedOrders = allOrders.map((order: any) => {
+    const transformedOrders = latestOrders.map((order: any) => {
       // Extract phone number from multiple sources
       const customerPhone = order.customer?.phone;
       const shippingPhone = order.shipping_address?.phone;
@@ -167,7 +173,7 @@ serve(async (req) => {
       }
     })
 
-    console.log(`Returning ${transformedOrders.length} transformed orders with phone numbers`)
+    console.log(`Returning ${transformedOrders.length} transformed orders (latest 300)`)
 
     return new Response(
       JSON.stringify({ orders: transformedOrders }),
