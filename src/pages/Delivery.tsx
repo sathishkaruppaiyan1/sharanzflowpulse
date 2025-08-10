@@ -2,17 +2,24 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, MapPin, Clock, Truck, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, MapPin, Clock, Truck, CheckCircle, AlertCircle, Settings } from 'lucide-react';
 import { useTrackingByOrderNumber } from '@/hooks/useTrackingByOrderNumber';
+import { useTrackingDetails } from '@/hooks/useTrackingDetails';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
+import TrackingDetailsCard from '@/components/tracking/TrackingDetailsCard';
+import { Link } from 'react-router-dom';
 
 const Delivery = () => {
   const orderNumber = 'BS2568';
-  const { data: trackingData, isLoading, error } = useTrackingByOrderNumber(orderNumber);
+  const orderId = 'mock-order-id-bs2568'; // In a real app, this would come from your orders
+  
+  const { data: apiTrackingData, isLoading: apiLoading, error: apiError } = useTrackingByOrderNumber(orderNumber);
+  const { data: dbTrackingData, isLoading: dbLoading, error: dbError } = useTrackingDetails(orderId);
 
-  console.log('Delivery page - tracking data:', trackingData);
-  console.log('Delivery page - error:', error);
-  console.log('Delivery page - isLoading:', isLoading);
+  console.log('API tracking data:', apiTrackingData);
+  console.log('DB tracking data:', dbTrackingData);
+  console.log('API error:', apiError);
+  console.log('DB error:', dbError);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -44,6 +51,23 @@ const Delivery = () => {
     }
   };
 
+  // Show loading state
+  if (apiLoading || dbLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Delivery Tracking</h1>
+          <p className="text-gray-600 mt-2">Tracking details for order {orderNumber}</p>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <LoadingSpinner text="Loading tracking details..." />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
@@ -51,41 +75,55 @@ const Delivery = () => {
         <p className="text-gray-600 mt-2">Tracking details for order {orderNumber}</p>
       </div>
 
-      {isLoading && (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <LoadingSpinner text="Fetching tracking details..." />
+      {/* Show API configuration warning if there's an API error */}
+      {apiError && apiError.message.includes('not configured') && (
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
+                <div>
+                  <h3 className="font-medium text-gray-900">API Configuration Required</h3>
+                  <p className="text-sm text-gray-600">
+                    Parcel Panel API is not configured. Configure it in Settings to get live tracking updates.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/settings"
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                Configure API
+              </Link>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {error && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-red-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading tracking</h3>
-            <p className="text-gray-600 text-center mb-4">{error.message}</p>
-            {error.message.includes('not configured') && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-yellow-800">
-                  Please configure your Parcel Panel API in the Settings page to enable tracking functionality.
-                </p>
-              </div>
-            )}
-            {error.message.includes('Failed to fetch') && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800">
-                  No tracking information found for order {orderNumber}. The order may not exist in Parcel Panel or tracking hasn't been set up yet.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {trackingData && trackingData.trackings && trackingData.trackings.length > 0 && (
+      {/* Show stored tracking data if available */}
+      {dbTrackingData && (
         <div className="space-y-6">
-          {trackingData.trackings.map((tracking, index) => (
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Stored Tracking Details</h2>
+            <Badge variant="outline" className="text-xs">
+              From Database
+            </Badge>
+          </div>
+          <TrackingDetailsCard orderId={orderId} orderNumber={orderNumber} />
+        </div>
+      )}
+
+      {/* Show API tracking data if available and different from DB */}
+      {apiTrackingData && apiTrackingData.trackings && apiTrackingData.trackings.length > 0 && (
+        <div className="space-y-6 mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Live API Data</h2>
+            <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+              Live from API
+            </Badge>
+          </div>
+          {apiTrackingData.trackings.map((tracking, index) => (
             <div key={index} className="space-y-4">
               {/* Status Overview */}
               <Card>
@@ -186,7 +224,8 @@ const Delivery = () => {
         </div>
       )}
 
-      {trackingData && (!trackingData.trackings || trackingData.trackings.length === 0) && (
+      {/* Show no data message if neither API nor DB has data */}
+      {!dbTrackingData && (!apiTrackingData || !apiTrackingData.trackings || apiTrackingData.trackings.length === 0) && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -194,8 +233,17 @@ const Delivery = () => {
               <h3 className="text-lg font-medium mb-2">No tracking data found</h3>
               <p className="text-sm">No tracking information available for order {orderNumber}</p>
               <p className="text-xs mt-2 text-gray-400">
-                This may be because the order hasn't shipped yet or tracking hasn't been set up in Parcel Panel.
+                This may be because the order hasn't shipped yet or tracking hasn't been set up.
               </p>
+              {apiError && (
+                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-yellow-800 text-sm">
+                    {apiError.message.includes('Invalid API key') 
+                      ? 'Please check your Parcel Panel API configuration in Settings.' 
+                      : apiError.message}
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
