@@ -105,14 +105,17 @@ export const useParcelPanelSync = () => {
         const orders = response.data.orders;
         console.log(`📄 Processing page ${page} with ${orders.length} orders`);
 
-        // Store orders in system_settings for now (you can create a dedicated table later)
+        // Convert orders to JSON format for storage
+        const ordersData = JSON.parse(JSON.stringify(orders));
+
+        // Store orders in system_settings for now
         await supabase
           .from('system_settings')
           .upsert({
             key: `parcel_panel_orders_page_${page}`,
             value: {
               page,
-              orders: orders,
+              orders: ordersData,
               synced_at: new Date().toISOString()
             }
           });
@@ -145,7 +148,7 @@ export const useParcelPanelSync = () => {
             const trackingResponse = await service!.trackPackage(order.tracking_number);
             
             if (trackingResponse.code === 200 && trackingResponse.data) {
-              // Store detailed tracking info
+              // Store detailed tracking info with proper type casting
               await supabase
                 .from('order_tracking_details')
                 .upsert({
@@ -160,7 +163,7 @@ export const useParcelPanelSync = () => {
                   estimated_delivery_date: trackingResponse.data.estimated_delivery_date,
                   delivered_at: trackingResponse.data.delivered_at,
                   shipped_at: trackingResponse.data.shipped_at,
-                  tracking_events: trackingResponse.data.tracking_events,
+                  tracking_events: JSON.parse(JSON.stringify(trackingResponse.data.tracking_events)),
                   last_updated: new Date().toISOString()
                 }, {
                   onConflict: 'order_id'
@@ -180,13 +183,13 @@ export const useParcelPanelSync = () => {
     try {
       const couriersResponse = await service!.getSupportedCouriers();
       
-      // Store courier data
+      // Store courier data with JSON conversion
       await supabase
         .from('system_settings')
         .upsert({
           key: 'parcel_panel_couriers',
           value: {
-            couriers: couriersResponse,
+            couriers: JSON.parse(JSON.stringify(couriersResponse)),
             synced_at: new Date().toISOString()
           }
         });
