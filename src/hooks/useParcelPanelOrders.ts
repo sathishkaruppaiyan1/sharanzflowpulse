@@ -1,6 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { useParcelPanelService, ParcelPanelOrderInfo } from '@/services/parcelPanelService';
+import { useParcelPanelService } from '@/services/parcelPanelService';
+import type { ParcelPanelOrderInfo } from '@/services/parcelPanelService';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
 
@@ -31,7 +32,7 @@ export const useParcelPanelOrders = (params?: {
       }
 
       console.log('useParcelPanelOrders - Orders found:', response.data.orders?.length || 0);
-      return response.data.orders;
+      return response.data.orders || [];
     },
     enabled: isConfigured && Boolean(service),
     staleTime: 2 * 60 * 1000, // 2 minutes

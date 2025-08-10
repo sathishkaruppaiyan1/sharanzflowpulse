@@ -1,11 +1,35 @@
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface ParcelPanelApiConfig {
+  api_key: string;
+}
+
+export interface ParcelPanelOrderInfo {
+  id: string;
+  order_number: string;
+  customer_name?: string;
+  customer_phone?: string;
+  status: string;
+  sub_status?: string;
+  tracking_number?: string;
+  courier_code?: string;
+  courier_name?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  created_at: string;
+  shipping_address?: {
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+  };
+}
+
 export interface ParcelPanelTrackingEvent {
   time: string;
+  location: string;
   description: string;
-  location?: string;
-  status?: string;
 }
 
 export interface ParcelPanelTrackingInfo {
@@ -13,373 +37,123 @@ export interface ParcelPanelTrackingInfo {
   courier_code: string;
   courier_name: string;
   status: string;
-  sub_status?: string;
-  origin_country?: string;
-  destination_country?: string;
+  sub_status: string;
+  origin_country: string;
+  destination_country: string;
+  estimated_delivery_date: string;
+  delivered_at: string;
+  shipped_at: string;
   tracking_events: ParcelPanelTrackingEvent[];
-  estimated_delivery_date?: string;
-  delivered_at?: string;
-  shipped_at?: string;
-  created_at: string;
-  updated_at: string;
-  order_number?: string;
 }
 
-export interface ParcelPanelResponse {
+export interface ParcelPanelApiResponse<T> {
   code: number;
   message: string;
-  data: ParcelPanelTrackingInfo[] | null;
+  data: T;
+}
+
+export interface ParcelPanelOrdersResponse {
+  orders: ParcelPanelOrderInfo[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+}
+
+export interface ParcelPanelAnalyticsResponse {
+  total_orders: number;
+  delivered_orders: number;
+  in_transit_orders: number;
+  out_for_delivery_orders: number;
+  exception_orders: number;
+  delivery_rate: number;
+  avg_delivery_time_days: number;
+  top_carriers: Array<{ name: string; count: number }>;
+  top_destinations: Array<{ country: string; count: number }>;
+  status_breakdown: Record<string, number>;
+}
+
+export interface ParcelPanelCouriersResponse {
+  couriers: Array<{ code: string; name: string }>;
 }
 
 export class ParcelPanelService {
   private apiKey: string;
-  private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl: string = 'https://open.parcelpanel.com') {
+  constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
-    console.log('ParcelPanelService initialized with:', { baseUrl, apiKeyExists: Boolean(apiKey) });
-  }
-
-  private getHeaders() {
-    return {
-      'x-parcelpanel-api-key': this.apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
-  }
-
-  // Fixed method to fetch tracking details by order number
-  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelResponse> {
-    try {
-      console.log(`Fetching tracking details for order: ${orderNumber}`);
-      
-      // Use query parameters instead of request body for GET request
-      const url = `${this.baseUrl}/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      console.log('Fetch tracking response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Fetch tracking error response:', errorText);
-        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
-      }
-
-      const data: ParcelPanelResponse = await response.json();
-      console.log('Parcel Panel tracking response:', data);
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching tracking by order number:', error);
-      throw error;
-    }
-  }
-
-  // Method to fetch and store tracking details for a specific order
-  async fetchAndStoreTrackingDetails(orderNumber: string, orderId: string): Promise<void> {
-    try {
-      console.log(`🔄 Fetching and storing tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
-      
-      const response = await this.fetchTrackingByOrderNumber(orderNumber);
-      
-      if (response.code === 200 && response.data && Array.isArray(response.data) && response.data.length > 0) {
-        const trackingInfo = response.data[0]; // Take the first tracking result
-        console.log('✅ Successfully fetched tracking details from Parcel Panel');
-        
-        // Store tracking details in the database
-        await this.storeTrackingDetails(orderId, trackingInfo);
-        
-        console.log('✅ Tracking details stored in database');
-      } else {
-        console.warn('⚠️ No tracking details found or API error:', response.message);
-        
-        // Store empty tracking details to mark as processed
-        await this.storeEmptyTrackingDetails(orderId, orderNumber);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching and storing tracking details:', error);
-      // Store error state
-      await this.storeErrorTrackingDetails(orderId, orderNumber, error.message);
-    }
-  }
-
-  // Helper method to store tracking details in database
-  private async storeTrackingDetails(orderId: string, trackingInfo: ParcelPanelTrackingInfo): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('order_tracking_details')
-        .upsert({
-          order_id: orderId,
-          tracking_number: trackingInfo.tracking_number,
-          courier_code: trackingInfo.courier_code,
-          courier_name: trackingInfo.courier_name,
-          status: trackingInfo.status,
-          sub_status: trackingInfo.sub_status,
-          origin_country: trackingInfo.origin_country,
-          destination_country: trackingInfo.destination_country,
-          estimated_delivery_date: trackingInfo.estimated_delivery_date,
-          delivered_at: trackingInfo.delivered_at,
-          shipped_at: trackingInfo.shipped_at,
-          tracking_events: trackingInfo.tracking_events as any,
-          last_updated: new Date().toISOString()
-        }, {
-          onConflict: 'order_id'
-        });
-
-      if (error) {
-        console.error('❌ Error storing tracking details:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('❌ Error storing tracking details:', error);
-      throw error;
-    }
-  }
-
-  // Helper method to store empty tracking details (no tracking found)
-  private async storeEmptyTrackingDetails(orderId: string, orderNumber: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('order_tracking_details')
-        .upsert({
-          order_id: orderId,
-          tracking_number: null,
-          courier_code: null,
-          courier_name: null,
-          status: 'no_tracking',
-          sub_status: 'No tracking information available',
-          tracking_events: [],
-          last_updated: new Date().toISOString()
-        }, {
-          onConflict: 'order_id'
-        });
-
-      if (error) {
-        console.error('❌ Error storing empty tracking details:', error);
-      }
-    } catch (error) {
-      console.error('❌ Error storing empty tracking details:', error);
-    }
-  }
-
-  // Helper method to store error tracking details
-  private async storeErrorTrackingDetails(orderId: string, orderNumber: string, errorMessage: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('order_tracking_details')
-        .upsert({
-          order_id: orderId,
-          tracking_number: null,
-          courier_code: null,
-          courier_name: null,
-          status: 'error',
-          sub_status: `Error: ${errorMessage}`,
-          tracking_events: [],
-          last_updated: new Date().toISOString()
-        }, {
-          onConflict: 'order_id'
-        });
-
-      if (error) {
-        console.error('❌ Error storing error tracking details:', error);
-      }
-    } catch (error) {
-      console.error('❌ Error storing error tracking details:', error);
-    }
-  }
-
-  // Helper method to determine package status category
-  static getStatusCategory(status: string): 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' {
-    const normalizedStatus = status.toLowerCase();
-    
-    if (normalizedStatus.includes('delivered')) {
-      return 'delivered';
-    } else if (normalizedStatus.includes('out_for_delivery') || normalizedStatus.includes('out for delivery')) {
-      return 'out_for_delivery';
-    } else if (normalizedStatus.includes('exception') || normalizedStatus.includes('returned') || normalizedStatus.includes('failed') || normalizedStatus.includes('error')) {
-      return 'exception';
-    } else {
-      return 'in_transit';
-    }
-  }
-
-  async testConnection(): Promise<{ success: boolean; message: string }> {
-    try {
-      console.log('Testing Parcel Panel API connection...');
-      console.log('API Key exists:', Boolean(this.apiKey));
-      console.log('Base URL:', this.baseUrl);
-      
-      if (!this.apiKey) {
-        return {
-          success: false,
-          message: 'API key is missing'
-        };
-      }
-
-      // Test with the tracking order endpoint using GET method
-      const response = await fetch(`${this.baseUrl}/api/v2/tracking/order`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      console.log('API Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error response:', errorText);
-        return {
-          success: false,
-          message: `API Error: ${response.status} - ${response.statusText}`
-        };
-      }
-
-      console.log('Parcel Panel API connection successful');
-      
-      return {
-        success: true,
-        message: 'API connection successful'
-      };
-    } catch (error) {
-      console.error('Error testing Parcel Panel API connection:', error);
-      return {
-        success: false,
-        message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
   }
 
   async fetchOrders(params?: {
     page?: number;
     limit?: number;
     status?: string;
-  }): Promise<any> {
+  }): Promise<ParcelPanelApiResponse<ParcelPanelOrdersResponse>> {
     try {
-      console.log('Fetching orders from Parcel Panel API...');
-      
-      const queryParams = new URLSearchParams();
-      if (params?.page) queryParams.append('page', params.page.toString());
-      if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.status) queryParams.append('status', params.status);
+      const url = new URL('https://api.parcelpanel.com/api/v1/orders');
+      if (params?.page) url.searchParams.append('page', params.page.toString());
+      if (params?.limit) url.searchParams.append('limit', params.limit.toString());
+      if (params?.status) url.searchParams.append('status', params.status);
 
-      // Use the orders endpoint for fetching orders (not tracking list)
-      const url = `${this.baseUrl}/api/v2/orders${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      
-      console.log('Full URL being called:', url);
-      console.log('Query parameters:', queryParams.toString());
-      
-      console.log('Fetching from URL:', url);
-      
       const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
       });
 
-      console.log('Fetch orders response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Fetch orders error response:', errorText);
-        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Parcel Panel orders response:', data);
-      console.log('Response structure check:', {
-        hasCode: 'code' in data,
-        hasMessage: 'message' in data,
-        hasData: 'data' in data,
-        dataType: typeof data.data,
-        hasOrders: data.data && 'orders' in data.data,
-        ordersLength: data.data?.orders?.length
-      });
-
+      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelOrdersResponse>;
       return data;
     } catch (error) {
-      console.error('Error fetching orders from Parcel Panel:', error);
+      console.error('Error fetching orders:', error);
       throw error;
     }
   }
 
-  async trackPackage(trackingNumber: string, courierCode?: string): Promise<ParcelPanelResponse> {
+  async trackPackage(trackingNumber: string): Promise<ParcelPanelApiResponse<ParcelPanelTrackingInfo[]>> {
     try {
-      console.log(`Tracking package: ${trackingNumber} with courier: ${courierCode || 'auto-detect'}`);
-      
-      const requestBody: any = {
-        tracking_number: trackingNumber.trim(),
-      };
-
-      if (courierCode) {
-        requestBody.courier_code = courierCode;
-      }
-
-      const response = await fetch(`${this.baseUrl}/api/v2/tracking/track`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(requestBody),
+      const url = `https://api.parcelpanel.com/api/v1/trackings/${trackingNumber}`;
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
       });
-
+      
       if (!response.ok) {
-        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Error tracking package:', errorData);
+        throw new Error(errorData.message || 'Failed to track package');
       }
 
-      const data: ParcelPanelResponse = await response.json();
-      console.log('Parcel Panel response:', data);
-
+      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelTrackingInfo[]>;
       return data;
     } catch (error) {
-      console.error('Error tracking package with Parcel Panel:', error);
+      console.error('Error tracking package:', error);
       throw error;
     }
   }
 
-  async trackMultiplePackages(trackingNumbers: string[]): Promise<ParcelPanelResponse[]> {
+  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelTrackingInfo[]> {
     try {
-      console.log(`Tracking multiple packages: ${trackingNumbers.join(', ')}`);
-      
-      const requests = trackingNumbers.map(trackingNumber => 
-        this.trackPackage(trackingNumber)
-      );
-
-      const results = await Promise.allSettled(requests);
-      
-      return results.map((result, index) => {
-        if (result.status === 'fulfilled') {
-          return result.value;
-        } else {
-          console.error(`Failed to track ${trackingNumbers[index]}:`, result.reason);
-          return {
-            code: 500,
-            message: `Failed to track ${trackingNumbers[index]}: ${result.reason.message}`,
-            data: null
-          };
-        }
+      const url = `https://api.parcelpanel.com/api/v1/trackings?order_number=${orderNumber}`;
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
       });
-    } catch (error) {
-      console.error('Error tracking multiple packages:', error);
-      throw error;
-    }
-  }
-
-  async getSupportedCouriers(): Promise<any> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/v2/couriers`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
+      
       if (!response.ok) {
-        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Error fetching tracking by order number:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch tracking by order number');
       }
 
-      const data = await response.json();
-      return data;
+      const data = await response.json() as ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>;
+      return data.data?.trackings || [];
     } catch (error) {
-      console.error('Error fetching supported couriers:', error);
+      console.error('Error fetching tracking by order number:', error);
       throw error;
     }
   }
@@ -387,98 +161,158 @@ export class ParcelPanelService {
   async getAnalytics(params?: {
     start_date?: string;
     end_date?: string;
-  }): Promise<any> {
+  }): Promise<ParcelPanelApiResponse<ParcelPanelAnalyticsResponse>> {
     try {
-      console.log('Fetching analytics from Parcel Panel API...');
-      
-      const queryParams = new URLSearchParams();
-      if (params?.start_date) queryParams.append('start_date', params.start_date);
-      if (params?.end_date) queryParams.append('end_date', params.end_date);
+      const url = new URL('https://api.parcelpanel.com/api/v1/analytics/orders');
+      if (params?.start_date) url.searchParams.append('start_date', params.start_date);
+      if (params?.end_date) url.searchParams.append('end_date', params.end_date);
 
-      const url = `${this.baseUrl}/api/v2/analytics${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      
-      console.log('Fetching analytics from URL:', url);
-      
       const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
       });
 
-      console.log('Analytics response status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Analytics error response:', errorText);
-        throw new Error(`Parcel Panel API Error: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Error fetching analytics:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch analytics');
       }
 
-      const data = await response.json();
-      console.log('Parcel Panel analytics response:', data);
-
+      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelAnalyticsResponse>;
       return data;
     } catch (error) {
-      console.error('Error fetching analytics from Parcel Panel:', error);
+      console.error('Error fetching analytics:', error);
       throw error;
     }
   }
 
-  // Method to fetch and store tracking details by order number
-  async fetchAndStoreTrackingDetailsByOrderNumber(orderNumber: string, orderId: string): Promise<void> {
+  async getSupportedCouriers(): Promise<ParcelPanelApiResponse<ParcelPanelCouriersResponse>> {
     try {
-      console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
-      
-      if (!this.baseUrl) {
-        console.warn('⚠️ Parcel Panel base URL not configured, skipping auto-fetch');
-        return;
+      const url = 'https://api.parcelpanel.com/api/v1/couriers';
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error fetching couriers:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch couriers');
       }
 
-      const response = await this.fetchTrackingByOrderNumber(orderNumber);
-      
-      if (response.code === 200 && response.data) {
-        console.log('✅ Successfully fetched tracking details from Parcel Panel');
-        
-        // Store tracking details in the database
-        await this.storeTrackingDetails(orderId, response.data[0]);
-        
-        console.log('✅ Tracking details stored in database');
-      } else {
-        console.warn('⚠️ No tracking details found or API error:', response.message);
-      }
+      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelCouriersResponse>;
+      return data;
     } catch (error) {
-      console.error('❌ Error auto-fetching tracking details:', error);
-      // Don't throw - this should not block the main tracking update process
+      console.error('Error fetching couriers:', error);
+      throw error;
     }
   }
 
-  // Method for webhook-triggered updates
+  static getStatusCategory(status: string): string {
+    status = status.toLowerCase();
+
+    if (status.includes('delivered')) {
+      return 'delivered';
+    } else if (status.includes('out_for_delivery')) {
+      return 'out_for_delivery';
+    } else if (status.includes('transit') || status.includes('shipped')) {
+      return 'in_transit';
+    } else if (status.includes('exception') || status.includes('undelivered') || status.includes('alert')) {
+      return 'exception';
+    } else {
+      return 'unknown';
+    }
+  }
+
   async fetchAndStoreTrackingDetails(orderNumber: string, orderId: string): Promise<void> {
-    return this.fetchAndStoreTrackingDetailsByOrderNumber(orderNumber, orderId);
+    try {
+      console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
+      
+      const trackingInfo = await this.fetchTrackingByOrderNumber(orderNumber);
+      
+      if (trackingInfo && trackingInfo.length > 0) {
+        const tracking = trackingInfo[0]; // Get the first tracking result
+        
+        console.log(`📦 Storing tracking details for order ${orderNumber}:`, {
+          tracking_number: tracking.tracking_number,
+          status: tracking.status,
+          courier: tracking.courier_name
+        });
+
+        // Store in database
+        const { error } = await supabase
+          .from('order_tracking_details')
+          .upsert({
+            order_id: orderId,
+            tracking_number: tracking.tracking_number,
+            courier_code: tracking.courier_code,
+            courier_name: tracking.courier_name,
+            status: tracking.status,
+            sub_status: tracking.sub_status,
+            origin_country: tracking.origin_country,
+            destination_country: tracking.destination_country,
+            estimated_delivery_date: tracking.estimated_delivery_date,
+            delivered_at: tracking.delivered_at,
+            shipped_at: tracking.shipped_at,
+            tracking_events: JSON.parse(JSON.stringify(tracking.tracking_events || [])),
+            last_updated: new Date().toISOString()
+          }, {
+            onConflict: 'order_id'
+          });
+
+        if (error) {
+          console.error('❌ Error storing tracking details:', error);
+          throw error;
+        }
+
+        console.log(`✅ Successfully stored tracking details for order ${orderNumber}`);
+      } else {
+        console.log(`⚠️ No tracking information found for order ${orderNumber}`);
+        
+        // Store a "no tracking" status
+        await supabase
+          .from('order_tracking_details')
+          .upsert({
+            order_id: orderId,
+            status: 'no_tracking',
+            sub_status: 'No tracking information available',
+            last_updated: new Date().toISOString()
+          }, {
+            onConflict: 'order_id'
+          });
+      }
+    } catch (error) {
+      console.error('❌ Error auto-fetching tracking details:', error);
+      
+      // Store error status
+      await supabase
+        .from('order_tracking_details')
+        .upsert({
+          order_id: orderId,
+          status: 'error',
+          sub_status: 'Failed to fetch tracking information',
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'order_id'
+        });
+      
+      throw error;
+    }
   }
 }
 
-// Hook to use Parcel Panel service with API configs
 export const useParcelPanelService = () => {
-  const { apiConfigs, loading } = useApiConfigs();
-  
-  console.log('useParcelPanelService - API configs:', apiConfigs);
-  console.log('useParcelPanelService - Loading:', loading);
-  
-  const isConfigured = Boolean(
-    apiConfigs?.parcel_panel?.enabled && 
-    apiConfigs?.parcel_panel?.api_key?.trim()
-  );
-
-  console.log('useParcelPanelService - Is configured:', isConfigured);
-  console.log('useParcelPanelService - Parcel panel config:', apiConfigs?.parcel_panel);
-
-  const service = isConfigured ? new ParcelPanelService(
-    apiConfigs.parcel_panel.api_key,
-    apiConfigs.parcel_panel.base_url || 'https://open.parcelpanel.com'
-  ) : null;
+  const { apiConfigs } = useApiConfigs();
+  const apiKey = apiConfigs?.parcel_panel?.api_key || '';
+  const isConfigured = Boolean(apiKey);
+  const service = apiKey ? new ParcelPanelService(apiKey) : null;
 
   return {
     service,
     isConfigured,
-    loading
   };
 };

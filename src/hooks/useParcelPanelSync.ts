@@ -60,7 +60,7 @@ export const useParcelPanelSync = () => {
 
       await syncCouriers();
 
-      // Stage 4: Complete (removed analytics sync as it's handled separately)
+      // Stage 4: Complete
       setSyncProgress({
         stage: 'complete',
         progress: 100,
@@ -147,22 +147,24 @@ export const useParcelPanelSync = () => {
             const trackingResponse = await service!.trackPackage(order.tracking_number);
             
             if (trackingResponse.code === 200 && trackingResponse.data) {
-              // Store detailed tracking info with proper type casting
+              const trackingData = trackingResponse.data;
+              
+              // Store detailed tracking info with proper type handling
               await supabase
                 .from('order_tracking_details')
                 .upsert({
                   order_id: order.id,
-                  tracking_number: trackingResponse.data.tracking_number,
-                  courier_code: trackingResponse.data.courier_code,
-                  courier_name: trackingResponse.data.courier_name,
-                  status: trackingResponse.data.status,
-                  sub_status: trackingResponse.data.sub_status,
-                  origin_country: trackingResponse.data.origin_country,
-                  destination_country: trackingResponse.data.destination_country,
-                  estimated_delivery_date: trackingResponse.data.estimated_delivery_date,
-                  delivered_at: trackingResponse.data.delivered_at,
-                  shipped_at: trackingResponse.data.shipped_at,
-                  tracking_events: JSON.parse(JSON.stringify(trackingResponse.data.tracking_events)),
+                  tracking_number: trackingData.tracking_number,
+                  courier_code: trackingData.courier_code,
+                  courier_name: trackingData.courier_name,
+                  status: trackingData.status,
+                  sub_status: trackingData.sub_status,
+                  origin_country: trackingData.origin_country,
+                  destination_country: trackingData.destination_country,
+                  estimated_delivery_date: trackingData.estimated_delivery_date,
+                  delivered_at: trackingData.delivered_at,
+                  shipped_at: trackingData.shipped_at,
+                  tracking_events: JSON.parse(JSON.stringify(trackingData.tracking_events || [])),
                   last_updated: new Date().toISOString()
                 }, {
                   onConflict: 'order_id'
