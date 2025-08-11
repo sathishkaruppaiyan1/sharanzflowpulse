@@ -75,7 +75,7 @@ serve(async (req) => {
         response = await fetch(ordersUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'x-parcelpanel-api-key': apiKey,
           },
         })
         result = await response.json()
@@ -87,7 +87,7 @@ serve(async (req) => {
         response = await fetch(trackUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'x-parcelpanel-api-key': apiKey,
           },
         })
         result = await response.json()
@@ -100,7 +100,7 @@ serve(async (req) => {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'x-parcelpanel-api-key': apiKey,
           }
         })
         result = await response.json()
@@ -115,7 +115,7 @@ serve(async (req) => {
         response = await fetch(analyticsUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'x-parcelpanel-api-key': apiKey,
           },
         })
         result = await response.json()
@@ -126,7 +126,7 @@ serve(async (req) => {
         response = await fetch('https://api.parcelpanel.com/api/v1/couriers', {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'x-parcelpanel-api-key': apiKey,
           },
         })
         result = await response.json()
