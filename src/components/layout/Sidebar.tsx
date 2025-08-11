@@ -2,140 +2,96 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { 
+  LayoutDashboard, 
   Package, 
   Printer, 
-  PackageCheck, 
-  Truck, 
-  MapPin,
-  BarChart3,
+  Package2, 
+  Search, 
+  BarChart3, 
+  Users, 
   Settings,
-  Home,
   LogOut
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 
 interface SidebarProps {
-  user: { email: string; role: string; name: string };
+  user: {
+    email: string;
+    role: string;
+    name: string;
+  };
   onLogout: () => void;
 }
 
-const Sidebar = ({ user, onLogout }: SidebarProps) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const location = useLocation();
 
-  const navigationItems = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Orders', href: '/orders', icon: Package },
-    { name: 'Printing', href: '/printing', icon: Printer },
-    { name: 'Packing', href: '/packing', icon: PackageCheck },
-    { name: 'Tracking', href: '/tracking', icon: Truck },
-    { name: 'Delivery', href: '/delivery', icon: MapPin },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  const menuItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+    { icon: Package, label: 'Orders', path: '/orders' },
+    { icon: Printer, label: 'Printing', path: '/printing' },
+    { icon: Package2, label: 'Packing', path: '/packing' },
+    { icon: Search, label: 'Tracking', path: '/tracking' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+    { icon: Users, label: 'Users', path: '/users' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
   ];
-
-  const adminItems = [
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
-
-  const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
-    }
-    return location.pathname.startsWith(href);
-  };
 
   return (
-    <div className="flex h-full w-64 flex-col bg-white border-r border-gray-200">
-      {/* Logo */}
-      <div className="flex items-center h-16 px-6 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-2 rounded-lg">
-            <Package className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Flow Pulse OFS
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* User Info */}
-      <div className="px-6 py-4 bg-gray-50">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-            <span className="text-sm font-medium text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900">{user.name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user.role.replace('_', ' ')}</p>
-          </div>
-        </div>
+    <div className="flex flex-col w-64 bg-white border-r border-gray-200">
+      {/* Header */}
+      <div className="p-6 border-b border-gray-200">
+        <h1 className="text-xl font-bold text-gray-900">Blaze Shipper</h1>
+        <p className="text-sm text-gray-600">Order Management</p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
+      <nav className="flex-1 p-4 space-y-2">
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path;
           return (
             <Link
-              key={item.name}
-              to={item.href}
+              key={item.path}
+              to={item.path}
               className={cn(
-                'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                isActive(item.href)
-                  ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "text-gray-700 hover:bg-gray-100"
               )}
             >
-              <Icon className="mr-3 h-5 w-5" />
-              {item.name}
+              <item.icon className="h-5 w-5" />
+              <span>{item.label}</span>
             </Link>
           );
         })}
-
-        {(user.role === 'admin' || user.role === 'manager') && (
-          <>
-            <Separator className="my-4" />
-            <div className="px-3 py-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Administration
-              </p>
-            </div>
-            {adminItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                    isActive(item.href)
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  )}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </>
-        )}
       </nav>
 
-      {/* Logout */}
-      <div className="px-4 py-4 border-t border-gray-200">
-        <Button
+      {/* User Section */}
+      <div className="p-4 border-t border-gray-200">
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-sm font-medium">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {user.name}
+            </p>
+            <p className="text-xs text-gray-500 truncate">{user.role}</p>
+          </div>
+        </div>
+        
+        <Button 
           onClick={onLogout}
-          variant="ghost"
-          className="w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+          variant="outline" 
+          size="sm" 
+          className="w-full flex items-center space-x-2"
         >
-          <LogOut className="mr-3 h-5 w-5" />
-          Sign Out
+          <LogOut className="h-4 w-4" />
+          <span>Logout</span>
         </Button>
       </div>
     </div>
