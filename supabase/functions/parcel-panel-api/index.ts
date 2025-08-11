@@ -53,7 +53,7 @@ serve(async (req) => {
     }
 
     const apiKey = configData.value.parcel_panel.api_key
-    console.log('API key found, processing request...')
+    console.log('API key found, length:', apiKey.length)
 
     const requestData = await req.json()
     const { action, ...params } = requestData
@@ -75,7 +75,7 @@ serve(async (req) => {
         response = await fetch(ordersUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
           },
         })
         result = await response.json()
@@ -87,7 +87,7 @@ serve(async (req) => {
         response = await fetch(trackUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
           },
         })
         result = await response.json()
@@ -95,12 +95,12 @@ serve(async (req) => {
 
       case 'fetchTrackingByOrderNumber':
         console.log('Fetching tracking by order number:', params.orderNumber)
-        const orderTrackUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${params.orderNumber}`
+        const orderTrackUrl = `https://api.parcelpanel.com/api/v1/trackings/order/${params.orderNumber}`
         response = await fetch(orderTrackUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
           }
         })
         result = await response.json()
@@ -115,7 +115,7 @@ serve(async (req) => {
         response = await fetch(analyticsUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
           },
         })
         result = await response.json()
@@ -126,7 +126,7 @@ serve(async (req) => {
         response = await fetch('https://api.parcelpanel.com/api/v1/couriers', {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
           },
         })
         result = await response.json()
@@ -156,9 +156,9 @@ serve(async (req) => {
     }
 
     // Store tracking details if it's a tracking request and order ID is provided
-    if (action === 'fetchTrackingByOrderNumber' && params.orderId && result.code === 200 && result.data?.trackings?.length > 0) {
+    if (action === 'fetchTrackingByOrderNumber' && params.orderId && result.code === 200 && result.data?.length > 0) {
       console.log('Storing tracking details in database...')
-      const tracking = result.data.trackings[0]
+      const tracking = result.data[0]
       
       const { error: upsertError } = await supabase
         .from('order_tracking_details')
