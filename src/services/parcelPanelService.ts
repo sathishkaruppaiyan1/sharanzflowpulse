@@ -1,3 +1,4 @@
+
 import { useApiConfigs } from '@/hooks/useApiConfigs';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -78,11 +79,7 @@ export interface ParcelPanelCouriersResponse {
 }
 
 export class ParcelPanelService {
-  private apiKey: string;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
+  constructor() {}
 
   async fetchOrders(params?: {
     page?: number;
@@ -90,19 +87,18 @@ export class ParcelPanelService {
     status?: string;
   }): Promise<ParcelPanelApiResponse<ParcelPanelOrdersResponse>> {
     try {
-      const url = new URL('https://api.parcelpanel.com/api/v1/orders');
-      if (params?.page) url.searchParams.append('page', params.page.toString());
-      if (params?.limit) url.searchParams.append('limit', params.limit.toString());
-      if (params?.status) url.searchParams.append('status', params.status);
-
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.apiKey,
-        },
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'fetchOrders',
+          ...params
+        }
       });
 
-      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelOrdersResponse>;
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
+      }
+
       return data;
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -112,21 +108,18 @@ export class ParcelPanelService {
 
   async trackPackage(trackingNumber: string): Promise<ParcelPanelApiResponse<ParcelPanelTrackingInfo[]>> {
     try {
-      const url = `https://api.parcelpanel.com/api/v1/trackings/${trackingNumber}`;
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.apiKey,
-        },
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'trackPackage',
+          trackingNumber
+        }
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error tracking package:', errorData);
-        throw new Error(errorData.message || 'Failed to track package');
+
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
       }
 
-      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelTrackingInfo[]>;
       return data;
     } catch (error) {
       console.error('Error tracking package:', error);
@@ -136,22 +129,18 @@ export class ParcelPanelService {
 
   async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
     try {
-      const url = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${orderNumber}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.apiKey,
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'fetchTrackingByOrderNumber',
+          orderNumber
         }
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error fetching tracking by order number:', errorData);
-        throw new Error(errorData.message || 'Failed to fetch tracking by order number');
+
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
       }
 
-      const data = await response.json() as ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>;
       return data;
     } catch (error) {
       console.error('Error fetching tracking by order number:', error);
@@ -164,24 +153,18 @@ export class ParcelPanelService {
     end_date?: string;
   }): Promise<ParcelPanelApiResponse<ParcelPanelAnalyticsResponse>> {
     try {
-      const url = new URL('https://api.parcelpanel.com/api/v1/analytics/orders');
-      if (params?.start_date) url.searchParams.append('start_date', params.start_date);
-      if (params?.end_date) url.searchParams.append('end_date', params.end_date);
-
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.apiKey,
-        },
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'getAnalytics',
+          ...params
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error fetching analytics:', errorData);
-        throw new Error(errorData.message || 'Failed to fetch analytics');
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
       }
 
-      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelAnalyticsResponse>;
       return data;
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -191,21 +174,17 @@ export class ParcelPanelService {
 
   async getSupportedCouriers(): Promise<ParcelPanelApiResponse<ParcelPanelCouriersResponse>> {
     try {
-      const url = 'https://api.parcelpanel.com/api/v1/couriers';
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY': this.apiKey,
-        },
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'getSupportedCouriers'
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error fetching couriers:', errorData);
-        throw new Error(errorData.message || 'Failed to fetch couriers');
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
       }
 
-      const data = await response.json() as ParcelPanelApiResponse<ParcelPanelCouriersResponse>;
       return data;
     } catch (error) {
       console.error('Error fetching couriers:', error);
@@ -233,44 +212,21 @@ export class ParcelPanelService {
     try {
       console.log(`🔄 Auto-fetching tracking details for order: ${orderNumber} (Order ID: ${orderId})`);
       
-      const response = await this.fetchTrackingByOrderNumber(orderNumber);
-      
-      if (response.code === 200 && response.data?.trackings && response.data.trackings.length > 0) {
-        const tracking = response.data.trackings[0]; // Get the first tracking result
-        
-        console.log(`📦 Storing tracking details for order ${orderNumber}:`, {
-          tracking_number: tracking.tracking_number,
-          status: tracking.status,
-          courier: tracking.courier_name
-        });
-
-        // Store in database
-        const { error } = await supabase
-          .from('order_tracking_details')
-          .upsert({
-            order_id: orderId,
-            tracking_number: tracking.tracking_number,
-            courier_code: tracking.courier_code,
-            courier_name: tracking.courier_name,
-            status: tracking.status,
-            sub_status: tracking.sub_status,
-            origin_country: tracking.origin_country,
-            destination_country: tracking.destination_country,
-            estimated_delivery_date: tracking.estimated_delivery_date,
-            delivered_at: tracking.delivered_at,
-            shipped_at: tracking.shipped_at,
-            tracking_events: JSON.parse(JSON.stringify(tracking.tracking_events || [])),
-            last_updated: new Date().toISOString()
-          }, {
-            onConflict: 'order_id'
-          });
-
-        if (error) {
-          console.error('❌ Error storing tracking details:', error);
-          throw error;
+      const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
+        body: {
+          action: 'fetchTrackingByOrderNumber',
+          orderNumber,
+          orderId // Pass order ID so the edge function can store the data
         }
+      });
 
-        console.log(`✅ Successfully stored tracking details for order ${orderNumber}`);
+      if (error) {
+        console.error('❌ Error calling edge function:', error);
+        throw error;
+      }
+
+      if (data.code === 200 && data.data?.trackings && data.data.trackings.length > 0) {
+        console.log(`✅ Successfully fetched and stored tracking details for order ${orderNumber}`);
       } else {
         console.log(`⚠️ No tracking information found for order ${orderNumber}`);
         
@@ -308,9 +264,8 @@ export class ParcelPanelService {
 
 export const useParcelPanelService = () => {
   const { apiConfigs } = useApiConfigs();
-  const apiKey = apiConfigs?.parcel_panel?.api_key || '';
-  const isConfigured = Boolean(apiKey);
-  const service = apiKey ? new ParcelPanelService(apiKey) : null;
+  const isConfigured = Boolean(apiConfigs?.parcel_panel?.api_key);
+  const service = new ParcelPanelService(); // No longer needs API key as it's handled by edge function
 
   return {
     service,
