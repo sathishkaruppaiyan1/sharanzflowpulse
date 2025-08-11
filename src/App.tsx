@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import Dashboard from '@/pages/Dashboard';
 import Header from '@/components/layout/Header';
-import Sidebar from '@/components/layout/Sidebar';
+import { Sidebar } from '@/components/layout/Sidebar';
 import Orders from '@/pages/Orders';
 import Printing from '@/pages/Printing';
 import Packing from '@/pages/Packing';
@@ -26,7 +26,7 @@ function App() {
         <div className="min-h-screen bg-gray-50 flex">
           <Sidebar />
           <div className="flex-1 ml-64">
-            <Header />
+            <Header title="Fulfillment System" />
             <main className="pt-16">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
