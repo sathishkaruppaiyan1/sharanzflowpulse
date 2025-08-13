@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -18,6 +17,7 @@ import Analytics from './pages/Analytics';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+import Shipping from './pages/Shipping';
 
 const queryClient = new QueryClient();
 
@@ -100,6 +100,7 @@ const App = () => {
                 <Route path="/printing" element={<Printing />} />
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/tracking" element={<Tracking />} />
+                <Route path="/shipping" element={<Shipping />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />

@@ -7,6 +7,7 @@ import {
   Printer, 
   PackageCheck, 
   Truck, 
+  Ship,
   BarChart3,
   Settings,
   Home,
@@ -29,6 +30,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
     { name: 'Printing', href: '/printing', icon: Printer },
     { name: 'Packing', href: '/packing', icon: PackageCheck },
     { name: 'Tracking', href: '/tracking', icon: Truck },
+    { name: 'Shipping', href: '/shipping', icon: Ship },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 
