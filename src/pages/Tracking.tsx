@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -16,10 +17,12 @@ import { detectCourierPartner } from '@/services/interaktService';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
+import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 
 const Tracking = () => {
   const { data: trackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
   const updateTrackingMutation = useUpdateTracking();
+  const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
   
   const [orderIdInput, setOrderIdInput] = useState('');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
@@ -180,6 +183,7 @@ const Tracking = () => {
     
     // Check if input looks like a tracking number instead of order ID
     if (looksLikeTrackingNumber(cleanInput)) {
+      playErrorSound();
       toast.error('This looks like a tracking number, not an order ID. Please scan the order barcode first.');
       setOrderIdInput('');
       return;
@@ -194,6 +198,7 @@ const Tracking = () => {
     );
     
     if (order) {
+      playSuccessSound();
       setCurrentOrder(order);
       setIsOrderLocked(true);
       setWhatsappStatus(null);
@@ -203,6 +208,7 @@ const Tracking = () => {
       console.log('Customer phone:', order.customer?.phone);
       console.log('Final phone:', getPhoneNumber(order));
     } else {
+      playErrorSound();
       toast.error('Order not found in tracking queue');
       setCurrentOrder(null);
       setIsOrderLocked(false);
@@ -216,6 +222,7 @@ const Tracking = () => {
     
     // Check if input looks like an order ID instead of tracking number
     if (looksLikeOrderId(trackingNumber)) {
+      playErrorSound();
       toast.error('This looks like an order ID, not a tracking number. Please scan the tracking barcode.');
       setTrackingNumberInput('');
       return;
@@ -249,6 +256,9 @@ const Tracking = () => {
         trackingNumber: trackingNumber,
         carrier: carrier
       });
+      
+      // Play success sound for successful tracking update
+      playCompleteSound();
       
       // The mutation already handles WhatsApp notification and Shopify sync
       // So we just need to update the status indicators based on the order
@@ -286,6 +296,7 @@ const Tracking = () => {
       
     } catch (error) {
       console.error('❌ Error updating tracking:', error);
+      playErrorSound();
       setWhatsappStatus('failed');
       setShopifyStatus('failed');
       toast.error('Failed to update tracking information');
@@ -330,6 +341,7 @@ const Tracking = () => {
 
   // Handle bulk operation success
   const handleBulkOperationSuccess = () => {
+    playSuccessSound();
     setSelectedOrderIds(new Set());
     setSelectAll(false);
   };
@@ -381,6 +393,14 @@ const Tracking = () => {
               orders={trackingOrders}
               currentStage="tracking"
               targetStage="packing"
+              selectedOrderIds={selectedOrderIds}
+              onSuccess={handleBulkOperationSuccess}
+              variant="header"
+            />
+            <BulkStageChangeButton
+              orders={trackingOrders}
+              currentStage="tracking"
+              targetStage="shipped"
               selectedOrderIds={selectedOrderIds}
               onSuccess={handleBulkOperationSuccess}
               variant="header"
@@ -772,6 +792,14 @@ const Tracking = () => {
                             orders={trackingOrders}
                             currentStage="tracking"
                             targetStage="packing"
+                            selectedOrderIds={selectedOrderIds}
+                            onSuccess={handleBulkOperationSuccess}
+                            variant="list"
+                          />
+                          <BulkStageChangeButton
+                            orders={trackingOrders}
+                            currentStage="tracking"
+                            targetStage="shipped"
                             selectedOrderIds={selectedOrderIds}
                             onSuccess={handleBulkOperationSuccess}
                             variant="list"
