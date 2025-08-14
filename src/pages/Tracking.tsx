@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -20,9 +19,12 @@ import { getPhoneNumber } from '@/lib/utils';
 import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 
 const Tracking = () => {
-  const { data: trackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
+  const { data: allTrackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
   const updateTrackingMutation = useUpdateTracking();
   const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
+  
+  // Filter orders to only show those without tracking numbers (waiting for tracking assignment)
+  const trackingOrders = allTrackingOrders.filter(order => !order.tracking_number);
   
   const [orderIdInput, setOrderIdInput] = useState('');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
@@ -189,7 +191,7 @@ const Tracking = () => {
       return;
     }
     
-    // Find order by order number or ID
+    // Find order by order number or ID - only from orders waiting for tracking
     const order = trackingOrders.find(o => 
       o.order_number === cleanInput || 
       o.id === cleanInput ||
@@ -203,13 +205,13 @@ const Tracking = () => {
       setIsOrderLocked(true);
       setWhatsappStatus(null);
       setShopifyStatus(null);
-      toast.success(`Order ${order.order_number} loaded`);
+      toast.success(`Order ${order.order_number} loaded - ready for tracking assignment`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
       console.log('Final phone:', getPhoneNumber(order));
     } else {
       playErrorSound();
-      toast.error('Order not found in tracking queue');
+      toast.error('Order not found in tracking queue or already has tracking assigned');
       setCurrentOrder(null);
       setIsOrderLocked(false);
     }
@@ -250,7 +252,7 @@ const Tracking = () => {
     try {
       console.log('🚀 Starting tracking update process...');
       
-      // Update tracking information (this handles database, WhatsApp, and Shopify sync)
+      // Update tracking information (this automatically moves order to shipped stage)
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
@@ -280,6 +282,8 @@ const Tracking = () => {
         setShopifyStatus('failed');
         console.log('⚠️ No Shopify order ID found, skipping Shopify update');
       }
+      
+      toast.success(`Order ${currentOrder.order_number} tracking assigned and moved to shipped!`);
       
       // Reset form after successful update
       setOrderIdInput('');
@@ -349,12 +353,12 @@ const Tracking = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Tracking Stage" showSearch={false} />
+        <Header title="Tracking Assignment" showSearch={false} />
         <div className="flex-1 p-6 bg-gray-50">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <Truck className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading tracking queue...</p>
+              <p className="text-gray-500">Loading orders waiting for tracking...</p>
             </div>
           </div>
         </div>
@@ -365,7 +369,7 @@ const Tracking = () => {
   if (error) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Tracking Stage" showSearch={false} />
+        <Header title="Tracking Assignment" showSearch={false} />
         <div className="flex-1 p-6 bg-gray-50">
           <Card className="max-w-md mx-auto mt-8">
             <CardHeader>
@@ -383,20 +387,12 @@ const Tracking = () => {
   return (
     <div className="flex flex-col h-full">
       <Header 
-        title="Tracking Stage" 
+        title="Tracking Assignment" 
         showSearch={false}
       >
-        {/* Header Bulk Action Buttons */}
+        {/* Header Bulk Action Button - Move to Shipped for orders without tracking */}
         {trackingOrders.length > 0 && (
           <div className="flex items-center space-x-2">
-            <BulkStageChangeButton
-              orders={trackingOrders}
-              currentStage="tracking"
-              targetStage="packing"
-              selectedOrderIds={selectedOrderIds}
-              onSuccess={handleBulkOperationSuccess}
-              variant="header"
-            />
             <BulkStageChangeButton
               orders={trackingOrders}
               currentStage="tracking"
@@ -537,7 +533,7 @@ const Tracking = () => {
                   )}
                 </div>
                 <p className="text-sm text-gray-600">
-                  Scan order ID first, then scan tracking number barcode (auto-sends WhatsApp & syncs Shopify)
+                  Scan order ID first, then assign tracking number (automatically moves to shipped & sends notifications)
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -572,7 +568,7 @@ const Tracking = () => {
                   </div>
                   {isOrderLocked && currentOrder && (
                     <p className="text-sm text-green-600 font-medium">
-                      ✓ Order {currentOrder.order_number} locked and ready
+                      ✓ Order {currentOrder.order_number} ready for tracking assignment
                     </p>
                   )}
                 </div>
@@ -629,7 +625,7 @@ const Tracking = () => {
                     )}
                     {updateTrackingMutation.isPending && (
                       <p className="text-sm text-blue-600">
-                        Adding tracking, sending WhatsApp & syncing Shopify...
+                        Assigning tracking & moving to shipped...
                       </p>
                     )}
                   </div>
@@ -755,7 +751,7 @@ const Tracking = () => {
                     <Scan className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-600 font-medium">No order selected</p>
                     <p className="text-sm text-gray-500 mt-1">
-                      Scan an order ID to view details
+                      Scan an order ID to assign tracking
                     </p>
                   </div>
                 )}
@@ -763,12 +759,12 @@ const Tracking = () => {
             </Card>
           </div>
 
-          {/* Orders Ready for Tracking - Full Width List */}
+          {/* Orders Waiting for Tracking Assignment */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <CardTitle className="text-lg">Orders Ready for Tracking</CardTitle>
+                  <CardTitle className="text-lg">Orders Waiting for Tracking Assignment</CardTitle>
                 </div>
                 <div className="flex items-center space-x-2">
                   {/* Bulk Selection Controls */}
@@ -785,17 +781,9 @@ const Tracking = () => {
                         </span>
                       </div>
                       
-                      {/* List Bulk Action Buttons */}
+                      {/* List Bulk Action Button */}
                       {selectedOrderIds.size > 0 && (
                         <div className="flex items-center space-x-2">
-                          <BulkStageChangeButton
-                            orders={trackingOrders}
-                            currentStage="tracking"
-                            targetStage="packing"
-                            selectedOrderIds={selectedOrderIds}
-                            onSuccess={handleBulkOperationSuccess}
-                            variant="list"
-                          />
                           <BulkStageChangeButton
                             orders={trackingOrders}
                             currentStage="tracking"
@@ -811,7 +799,7 @@ const Tracking = () => {
                 </div>
               </div>
               <p className="text-sm text-gray-600">
-                {trackingOrders.length} orders waiting for tracking numbers
+                {trackingOrders.length} orders completed packing and waiting for tracking assignment
               </p>
             </CardHeader>
             <CardContent>
