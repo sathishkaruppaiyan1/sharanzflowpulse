@@ -36,6 +36,11 @@ const Tracking = () => {
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [focusLocked, setFocusLocked] = useState(false);
   const [autoFocusEnabled, setAutoFocusEnabled] = useState(true);
+  
+  // Add state for duplicate prevention
+  const [lastProcessedTrackingNumber, setLastProcessedTrackingNumber] = useState<string>('');
+  const [isProcessingTracking, setIsProcessingTracking] = useState(false);
+  const lastScanTimeRef = useRef<number>(0);
 
   // Bulk selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
@@ -205,6 +210,9 @@ const Tracking = () => {
       setIsOrderLocked(true);
       setWhatsappStatus(null);
       setShopifyStatus(null);
+      // Reset duplicate prevention when new order is selected
+      setLastProcessedTrackingNumber('');
+      setIsProcessingTracking(false);
       toast.success(`Order ${order.order_number} loaded - ready for tracking assignment`);
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
@@ -221,6 +229,23 @@ const Tracking = () => {
     if (!trackingNumberInput.trim() || !currentOrder) return;
     
     const trackingNumber = trackingNumberInput.trim();
+    const currentTime = Date.now();
+    
+    // Prevent duplicate scans - check if same tracking number was processed recently
+    if (trackingNumber === lastProcessedTrackingNumber && (currentTime - lastScanTimeRef.current) < 2000) {
+      playWarningSound();
+      toast.warning('This tracking number was just processed. Please wait before scanning again.');
+      console.log('🔄 Duplicate tracking number scan prevented:', trackingNumber);
+      return;
+    }
+    
+    // Prevent processing if already in progress
+    if (isProcessingTracking) {
+      playWarningSound();
+      toast.warning('Tracking assignment already in progress. Please wait...');
+      console.log('⏳ Tracking assignment already in progress');
+      return;
+    }
     
     // Check if input looks like an order ID instead of tracking number
     if (looksLikeOrderId(trackingNumber)) {
@@ -248,6 +273,9 @@ const Tracking = () => {
     setDetectedCarrier(carrierDisplayName);
     setWhatsappStatus('pending');
     setShopifyStatus('pending');
+    setIsProcessingTracking(true);
+    setLastProcessedTrackingNumber(trackingNumber);
+    lastScanTimeRef.current = currentTime;
     
     try {
       console.log('🚀 Starting tracking update process...');
@@ -291,6 +319,8 @@ const Tracking = () => {
       setCurrentOrder(null);
       setDetectedCarrier('');
       setIsOrderLocked(false);
+      setIsProcessingTracking(false);
+      setLastProcessedTrackingNumber('');
       
       // Reset status indicators after a delay
       setTimeout(() => {
@@ -303,6 +333,7 @@ const Tracking = () => {
       playErrorSound();
       setWhatsappStatus('failed');
       setShopifyStatus('failed');
+      setIsProcessingTracking(false);
       toast.error('Failed to update tracking information');
     }
   };
@@ -317,6 +348,8 @@ const Tracking = () => {
     setShopifyStatus(null);
     setFocusLocked(false);
     setAutoFocusEnabled(true);
+    setIsProcessingTracking(false);
+    setLastProcessedTrackingNumber('');
   };
 
   // Handle individual order selection
@@ -606,6 +639,7 @@ const Tracking = () => {
                           setAutoFocusEnabled(true);
                         }}
                         className="flex-1"
+                        disabled={isProcessingTracking}
                         autoFocus
                       />
                       <Button 
@@ -613,7 +647,7 @@ const Tracking = () => {
                         size="sm"
                         variant="default"
                         className="px-3 scanner-input"
-                        disabled={!trackingNumberInput.trim() || updateTrackingMutation.isPending}
+                        disabled={!trackingNumberInput.trim() || updateTrackingMutation.isPending || isProcessingTracking}
                       >
                         <Package className="h-4 w-4" />
                       </Button>
@@ -623,7 +657,7 @@ const Tracking = () => {
                         Detected carrier: {detectedCarrier}
                       </p>
                     )}
-                    {updateTrackingMutation.isPending && (
+                    {(updateTrackingMutation.isPending || isProcessingTracking) && (
                       <p className="text-sm text-blue-600">
                         Assigning tracking & moving to shipped...
                       </p>
