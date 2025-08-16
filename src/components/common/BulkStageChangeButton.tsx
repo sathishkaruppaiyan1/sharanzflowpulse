@@ -65,6 +65,12 @@ const BulkStageChangeButton = ({
   const selectedReadyOrders = readyOrders.filter(order => selectedOrderIds.has(order.id));
   const selectedReadyCount = selectedReadyOrders.length;
 
+  // Define the stage order to determine direction
+  const stageOrder = ['pending', 'printing', 'packing', 'tracking', 'shipped', 'delivered'];
+  const currentStageIndex = stageOrder.indexOf(currentStage);
+  const targetStageIndex = stageOrder.indexOf(targetStage);
+  const isForwardMovement = targetStageIndex > currentStageIndex;
+
   const stageInfo = {
     printing: { label: 'Printing', icon: <Package className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
     packing: { label: 'Packing', icon: <Package className="h-4 w-4" />, color: 'bg-purple-100 text-purple-800' },
@@ -102,8 +108,8 @@ const BulkStageChangeButton = ({
       );
     }
 
-    // Arrow direction logic
-    const ArrowIcon = direction === 'next' ? ArrowRight : ArrowLeft;
+    // Arrow direction based on actual stage movement
+    const ArrowIcon = isForwardMovement ? ArrowRight : ArrowLeft;
 
     return (
       <>
