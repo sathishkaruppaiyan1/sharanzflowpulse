@@ -433,6 +433,7 @@ const Tracking = () => {
               selectedOrderIds={selectedOrderIds}
               onSuccess={handleBulkOperationSuccess}
               variant="header"
+              direction="previous"
             />
           </div>
         )}
@@ -825,6 +826,7 @@ const Tracking = () => {
                             selectedOrderIds={selectedOrderIds}
                             onSuccess={handleBulkOperationSuccess}
                             variant="list"
+                            direction="previous"
                           />
                         </div>
                       )}
