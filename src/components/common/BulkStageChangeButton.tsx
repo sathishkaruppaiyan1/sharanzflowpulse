@@ -102,7 +102,8 @@ const BulkStageChangeButton = ({
       );
     }
 
-    const ArrowIcon = direction === 'previous' ? ArrowLeft : ArrowRight;
+    // Reverse the arrow direction logic
+    const ArrowIcon = direction === 'next' ? ArrowLeft : ArrowRight;
 
     return (
       <>
