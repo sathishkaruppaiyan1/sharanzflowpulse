@@ -423,13 +423,13 @@ const Tracking = () => {
         title="Tracking Assignment" 
         showSearch={false}
       >
-        {/* Header Bulk Action Button - Move to Shipped for orders without tracking */}
+        {/* Header Bulk Action Button - Move back to Packing for orders without tracking */}
         {trackingOrders.length > 0 && (
           <div className="flex items-center space-x-2">
             <BulkStageChangeButton
               orders={trackingOrders}
               currentStage="tracking"
-              targetStage="shipped"
+              targetStage="packing"
               selectedOrderIds={selectedOrderIds}
               onSuccess={handleBulkOperationSuccess}
               variant="header"
@@ -815,13 +815,13 @@ const Tracking = () => {
                         </span>
                       </div>
                       
-                      {/* List Bulk Action Button */}
+                      {/* List Bulk Action Button - Move back to Packing */}
                       {selectedOrderIds.size > 0 && (
                         <div className="flex items-center space-x-2">
                           <BulkStageChangeButton
                             orders={trackingOrders}
                             currentStage="tracking"
-                            targetStage="shipped"
+                            targetStage="packing"
                             selectedOrderIds={selectedOrderIds}
                             onSuccess={handleBulkOperationSuccess}
                             variant="list"
