@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, CheckCircle, Package, ArrowRight, Loader2 } from 'lucide-react';
+import { Truck, CheckCircle, Package, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,6 +15,7 @@ interface BulkStageChangeButtonProps {
   onSuccess?: () => void;
   variant?: 'header' | 'stats' | 'list';
   disabled?: boolean;
+  direction?: 'next' | 'previous';
 }
 
 const BulkStageChangeButton = ({ 
@@ -24,12 +25,12 @@ const BulkStageChangeButton = ({
   selectedOrderIds, 
   onSuccess,
   variant = 'header',
-  disabled = false
+  disabled = false,
+  direction = 'next'
 }: BulkStageChangeButtonProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const bulkUpdateStage = useBulkUpdateOrderStage();
 
-  // Get orders that are ready for the target stage
   const getReadyOrders = () => {
     if (targetStage === 'tracking') {
       // For tracking, only include orders where all items are packed
@@ -101,6 +102,8 @@ const BulkStageChangeButton = ({
       );
     }
 
+    const ArrowIcon = direction === 'previous' ? ArrowLeft : ArrowRight;
+
     return (
       <>
         {stageInfo?.icon}
@@ -110,7 +113,7 @@ const BulkStageChangeButton = ({
             : `Move ${count} Ready to ${stageInfo?.label}`
           }
         </span>
-        <ArrowRight className="h-4 w-4 ml-2" />
+        <ArrowIcon className="h-4 w-4 ml-2" />
       </>
     );
   };
@@ -258,4 +261,4 @@ const BulkStageChangeButton = ({
   );
 };
 
-export default BulkStageChangeButton; 
+export default BulkStageChangeButton;
