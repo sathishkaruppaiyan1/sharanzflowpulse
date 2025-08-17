@@ -22,7 +22,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
   const getCourierDisplayName = (carrier: string | null) => {
     switch (carrier) {
       case 'frenchexpress':
-        return 'French Express';
+        return 'Franch express';
       case 'delhivery':
         return 'Delhivery';
       default:
@@ -169,7 +169,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'Franch express' : 
                         order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
         order.tracking_number || 'N/A'
       ].join(','))
@@ -197,7 +197,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'Franch express' : 
                         order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
         order.tracking_number || 'N/A'
       ].join('\t'))

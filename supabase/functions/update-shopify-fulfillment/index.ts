@@ -107,7 +107,7 @@ serve(async (req) => {
       switch (carrier.toLowerCase()) {
         case 'frenchexpress':
           return {
-            company: 'Franch Express',
+            company: 'Franch express',
             url: `https://franchexpress.com/courier-tracking/${trackingNumber}`
           }
         case 'delhivery':

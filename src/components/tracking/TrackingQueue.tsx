@@ -65,7 +65,7 @@ const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: 
   const getCourierDisplayName = (carrier: CarrierType) => {
     switch (carrier) {
       case 'frenchexpress':
-        return 'Franch Express';
+        return 'Franch express';
       case 'delhivery':
         return 'Delhivery';
       default:
