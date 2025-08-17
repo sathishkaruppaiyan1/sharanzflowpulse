@@ -24,7 +24,7 @@ const ExportReports = ({ orders }: ExportReportsProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'Franch express' : 
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
                         order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
         order.tracking_number || 'N/A'
       ].join(','))
@@ -54,7 +54,7 @@ const ExportReports = ({ orders }: ExportReportsProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'Franch express' : 
+        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
                         order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
         order.tracking_number || 'N/A'
       ].join('\t'))

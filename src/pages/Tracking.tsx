@@ -54,7 +54,7 @@ const Tracking = () => {
     const cleanInput = input.trim();
     // Common tracking number patterns
     const trackingPatterns = [
-      /^48\d{13}$/,        // Franch express pattern
+      /^48\d{13}$/,        // French Express pattern
       /^2158\d{10}$/,      // Delhivery pattern
       /^[A-Z]{2}\d{9}[A-Z]{2}$/, // International tracking
       /^\d{10,22}$/,       // Generic numeric tracking (10-22 digits)
@@ -261,7 +261,7 @@ const Tracking = () => {
     let carrierDisplayName = '';
     switch (carrier) {
       case 'frenchexpress':
-        carrierDisplayName = 'Franch express';
+        carrierDisplayName = 'Franch Express';
         break;
       case 'delhivery':
         carrierDisplayName = 'Delhivery';
@@ -623,7 +623,7 @@ const Tracking = () => {
                             let carrierDisplayName = '';
                             switch (carrier) {
                               case 'frenchexpress':
-                                carrierDisplayName = 'Franch express';
+                                carrierDisplayName = 'Franch Express';
                                 break;
                               case 'delhivery':
                                 carrierDisplayName = 'Delhivery';
