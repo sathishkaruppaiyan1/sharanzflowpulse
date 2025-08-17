@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Order } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { woocommerceService } from '@/services/woocommerceService';
 import { useToast } from '@/hooks/use-toast';
 
 interface CompletedOrdersListProps {
@@ -91,69 +92,82 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
     }
   };
 
-  const handleUpdateShopifyStatus = async (order: Order) => {
-    if (!order.shopify_order_id) {
-      toast({
-        title: "No Shopify Order ID",
-        description: "This order doesn't have a Shopify order ID.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleUpdateStatus = async (order: Order) => {
     if (!order.tracking_number || !order.carrier) {
       toast({
         title: "Missing Information",
-        description: "Order must have tracking number and carrier to update Shopify status.",
+        description: "Order must have tracking number and carrier to update status.",
         variant: "destructive"
       });
       return;
     }
 
-    try {
-      console.log(`Updating Shopify status for order ${order.order_number}...`);
-      
-      await supabaseOrderService.updateShopifyOrderFulfillment(
-        order.shopify_order_id.toString(),
-        order.tracking_number,
-        order.carrier as any
-      );
+    // Try both Shopify and WooCommerce updates
+    let shopifySuccess = false;
+    let woocommerceSuccess = false;
+    let shopifyError = '';
+    let woocommerceError = '';
 
+    // Try Shopify update if shopify_order_id exists
+    if (order.shopify_order_id) {
+      try {
+        console.log(`Updating Shopify status for order ${order.order_number}...`);
+        
+        await supabaseOrderService.updateShopifyOrderFulfillment(
+          order.shopify_order_id.toString(),
+          order.tracking_number,
+          order.carrier as any
+        );
+        
+        shopifySuccess = true;
+        console.log('Shopify update successful');
+      } catch (error) {
+        console.error('Error updating Shopify status:', error);
+        shopifyError = error.message || 'Unknown Shopify error';
+      }
+    }
+
+    // Try WooCommerce update (assuming order_number can be used as WooCommerce order ID)
+    try {
+      console.log(`Updating WooCommerce status for order ${order.order_number}...`);
+      
+      await woocommerceService.updateOrderStatus({
+        woocommerce_order_id: order.order_number,
+        tracking_number: order.tracking_number,
+        carrier: order.carrier as any
+      });
+      
+      woocommerceSuccess = true;
+      console.log('WooCommerce update successful');
+    } catch (error) {
+      console.error('Error updating WooCommerce status:', error);
+      woocommerceError = error.message || 'Unknown WooCommerce error';
+    }
+
+    // Show appropriate toast based on results
+    if (shopifySuccess && woocommerceSuccess) {
+      toast({
+        title: "Status Updated",
+        description: `Order ${order.order_number} updated successfully in both Shopify and WooCommerce.`,
+      });
+    } else if (shopifySuccess) {
       toast({
         title: "Shopify Updated",
-        description: `Order ${order.order_number} fulfillment status updated in Shopify successfully.`,
+        description: `Order ${order.order_number} updated successfully in Shopify.` + 
+                     (woocommerceError ? ` WooCommerce update failed: ${woocommerceError}` : ''),
       });
-    } catch (error) {
-      console.error('Error updating Shopify status:', error);
-      
-      // Handle specific Shopify fulfillment errors
-      const errorMessage = error.message || '';
-      
-      if (errorMessage.includes('Failed to update fulfillment tracking information')) {
-        toast({
-          title: "Update Failed",
-          description: `Order ${order.order_number} is already fulfilled but tracking information could not be updated. Please check Shopify manually.`,
-          variant: "destructive"
-        });
-      } else if (errorMessage.includes('Order cannot be fulfilled') || errorMessage.includes('already be fulfilled')) {
-        toast({
-          title: "Already Fulfilled",
-          description: `Order ${order.order_number} is already fulfilled in Shopify. Tracking information may need manual update.`,
-          variant: "destructive"
-        });
-      } else if (errorMessage.includes('Invalid JWT') || errorMessage.includes('Unauthorized')) {
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page and try again.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Shopify Update Failed",
-          description: `Failed to update order ${order.order_number} status in Shopify. Please try again or check manually.`,
-          variant: "destructive"
-        });
-      }
+    } else if (woocommerceSuccess) {
+      toast({
+        title: "WooCommerce Updated",
+        description: `Order ${order.order_number} updated successfully in WooCommerce.` + 
+                     (shopifyError ? ` Shopify update failed: ${shopifyError}` : ''),
+      });
+    } else {
+      toast({
+        title: "Update Failed",
+        description: `Failed to update order ${order.order_number}. Shopify: ${shopifyError}. WooCommerce: ${woocommerceError}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -344,10 +358,10 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
                         <span>WhatsApp</span>
                       </Button>
                       <Button
-                        onClick={() => handleUpdateShopifyStatus(order)}
+                        onClick={() => handleUpdateStatus(order)}
                         variant="outline"
                         size="sm"
-                        disabled={!order.shopify_order_id || !order.tracking_number || !order.carrier}
+                        disabled={!order.tracking_number || !order.carrier}
                         className="flex items-center space-x-1"
                       >
                         <RefreshCw className="h-4 w-4" />
