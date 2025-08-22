@@ -35,7 +35,7 @@ export interface ParcelPanelApiResponse<T> {
 export class ParcelPanelService {
   constructor() {}
 
-  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
+  async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<any>> {
     try {
       const { data, error } = await supabase.functions.invoke('parcel-panel-api', {
         body: {
@@ -89,7 +89,7 @@ export class ParcelPanelService {
         throw error;
       }
 
-      if (data.code === 200 && data.data?.trackings && data.data.trackings.length > 0) {
+      if (data.code === 200 && data.data?.order?.shipments && data.data.order.shipments.length > 0) {
         console.log(`✅ Successfully fetched and stored tracking details for order ${orderNumber}`);
       } else {
         console.log(`⚠️ No tracking information found for order ${orderNumber}`);

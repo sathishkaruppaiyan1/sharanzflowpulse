@@ -1,40 +1,61 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useParcelPanelService } from '@/services/parcelPanelService';
-import type { ParcelPanelOrderInfo } from '@/services/parcelPanelService';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+// Define a basic order info interface for stored data
+export interface ParcelPanelOrderInfo {
+  order_number: string;
+  status: string;
+  tracking_number?: string;
+  courier_name?: string;
+  last_updated: string;
+}
 
 export const useParcelPanelOrders = (params?: {
   page?: number;
   limit?: number;
   status?: string;
 }) => {
-  const { service, isConfigured } = useParcelPanelService();
+  const { isConfigured } = useParcelPanelService();
   const { toast } = useToast();
 
   const query = useQuery({
     queryKey: ['parcel-panel-orders', params?.page, params?.limit, params?.status],
     queryFn: async (): Promise<ParcelPanelOrderInfo[]> => {
       console.log('useParcelPanelOrders - Starting query with params:', params);
-      console.log('useParcelPanelOrders - Service exists:', Boolean(service));
       console.log('useParcelPanelOrders - Is configured:', isConfigured);
       
-      if (!service || !isConfigured) {
+      if (!isConfigured) {
         throw new Error('Parcel Panel API is not configured');
       }
 
-      const response = await service.fetchOrders(params);
-      console.log('useParcelPanelOrders - Response received:', response);
-      
-      if (response.code !== 200 || !response.data) {
-        throw new Error(response.message || 'Failed to fetch orders');
+      // Since we don't have a fetchOrders method, we'll fetch from stored tracking data
+      let query = supabase
+        .from('delivery_tracking_details')
+        .select('order_number, status, tracking_number, courier_name, last_updated')
+        .order('last_updated', { ascending: false });
+
+      if (params?.status) {
+        query = query.eq('status', params.status);
       }
 
-      console.log('useParcelPanelOrders - Orders found:', response.data.orders?.length || 0);
-      return response.data.orders || [];
+      if (params?.limit) {
+        query = query.limit(params.limit);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch orders');
+      }
+
+      console.log('useParcelPanelOrders - Orders found:', data?.length || 0);
+      return data || [];
     },
-    enabled: isConfigured && Boolean(service),
+    enabled: isConfigured,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
