@@ -123,6 +123,7 @@ export const useDeliveryTracking = () => {
       console.log(`🔄 Fetching delivery details from API for order: ${orderNumber}`);
       
       const response = await service.fetchTrackingByOrderNumber(orderNumber);
+      console.log('📥 API Response received:', JSON.stringify(response, null, 2));
       
       if (response.code !== 200 || !response.data) {
         // Handle specific API errors

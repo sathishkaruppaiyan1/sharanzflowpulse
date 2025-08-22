@@ -97,6 +97,7 @@ serve(async (req) => {
 
     console.log('Parcel Panel API response status:', response.status)
     console.log('Parcel Panel API response:', JSON.stringify(responseData, null, 2))
+    console.log('responseData.data structure:', JSON.stringify(responseData.data, null, 2))
 
     // Handle API errors
     if (!response.ok) {
@@ -125,9 +126,21 @@ serve(async (req) => {
     }
 
     // Store tracking data in database if this is a successful tracking fetch
-    if (action === 'fetchTrackingByOrderNumber' && responseData.data?.trackings) {
+    if (action === 'fetchTrackingByOrderNumber' && responseData.data) {
       try {
-        const tracking = responseData.data.trackings[0]
+        let tracking = null;
+        
+        // Handle different response structures
+        if (responseData.data.trackings && responseData.data.trackings.length > 0) {
+          tracking = responseData.data.trackings[0];
+        } else if (responseData.data.tracking_number || responseData.data.status) {
+          // Direct tracking object
+          tracking = responseData.data;
+        } else if (Array.isArray(responseData.data) && responseData.data.length > 0) {
+          tracking = responseData.data[0];
+        }
+        
+        if (tracking) {
         
         const deliveryData = {
           order_number: orderNumber,
@@ -151,22 +164,45 @@ serve(async (req) => {
             onConflict: 'order_number'
           })
 
-        if (insertError) {
-          console.error('Error storing delivery tracking data:', insertError)
+          if (insertError) {
+            console.error('Error storing delivery tracking data:', insertError)
+          } else {
+            console.log('✅ Delivery tracking data stored successfully')
+          }
         } else {
-          console.log('✅ Delivery tracking data stored successfully')
+          console.log('⚠️ No tracking data found in response to store')
         }
       } catch (storeError) {
         console.error('Error processing tracking data for storage:', storeError)
       }
     }
 
-    // Return successful response
+    // Return successful response with proper structure for the hook
+    // Ensure the response has the expected structure with trackings array
+    let responseDataForClient = responseData.data || responseData;
+    
+    // If the API returns tracking data directly, wrap it in a trackings array
+    if (responseDataForClient && !responseDataForClient.trackings) {
+      if (responseDataForClient.tracking_number || responseDataForClient.status) {
+        // This looks like a single tracking object, wrap it in trackings array
+        responseDataForClient = {
+          trackings: [responseDataForClient]
+        };
+      } else if (Array.isArray(responseDataForClient)) {
+        // This is already an array, wrap it
+        responseDataForClient = {
+          trackings: responseDataForClient
+        };
+      }
+    }
+    
+    console.log('Final response structure for client:', JSON.stringify(responseDataForClient, null, 2));
+    
     return new Response(
       JSON.stringify({
         code: 200,
         message: 'Success',
-        data: responseData.data || responseData
+        data: responseDataForClient
       }),
       { 
         status: 200, 
