@@ -126,29 +126,35 @@ serve(async (req) => {
     }
 
     // Store tracking data in database if this is a successful tracking fetch
-    if (action === 'fetchTrackingByOrderNumber' && responseData.data?.order?.shipments?.length > 0) {
+    if (action === 'fetchTrackingByOrderNumber' && responseData.data) {
       try {
-        // Use the first shipment for storage
-        const shipment = responseData.data.order.shipments[0];
+        let tracking = null;
+        
+        // Handle different response structures
+        if (responseData.data.trackings && responseData.data.trackings.length > 0) {
+          tracking = responseData.data.trackings[0];
+        } else if (responseData.data.tracking_number || responseData.data.status) {
+          // Direct tracking object
+          tracking = responseData.data;
+        } else if (Array.isArray(responseData.data) && responseData.data.length > 0) {
+          tracking = responseData.data[0];
+        }
+        
+        if (tracking) {
         
         const deliveryData = {
           order_number: orderNumber,
-          tracking_number: shipment.tracking_number,
-          courier_code: shipment.carrier?.code,
-          courier_name: shipment.carrier?.name,
-          status: shipment.status,
-          sub_status: shipment.substatus_label || shipment.status_label,
-          origin_country: 'IN',
-          destination_country: responseData.data.order?.shipping_address?.country || 'IN',
-          estimated_delivery_date: shipment.estimated_delivery_date,
-          delivered_at: shipment.delivery_date,
-          shipped_at: shipment.fulfillment_date,
-          tracking_events: shipment.checkpoints?.map(checkpoint => ({
-            time: checkpoint.checkpoint_time,
-            description: checkpoint.detail,
-            location: checkpoint.detail.split(',').slice(-2).join(',').trim(),
-            status: checkpoint.status_label
-          })) || [],
+          tracking_number: tracking?.tracking_number,
+          courier_code: tracking?.courier_code,
+          courier_name: tracking?.courier_name,
+          status: tracking?.status,
+          sub_status: tracking?.sub_status,
+          origin_country: tracking?.origin_country,
+          destination_country: tracking?.destination_country,
+          estimated_delivery_date: tracking?.estimated_delivery_date,
+          delivered_at: tracking?.delivered_at,
+          shipped_at: tracking?.shipped_at,
+          tracking_events: tracking?.tracking_events || [],
           last_updated: new Date().toISOString()
         }
 
@@ -158,39 +164,36 @@ serve(async (req) => {
             onConflict: 'order_number'
           })
 
-        if (insertError) {
-          console.error('Error storing delivery tracking data:', insertError)
+          if (insertError) {
+            console.error('Error storing delivery tracking data:', insertError)
+          } else {
+            console.log('✅ Delivery tracking data stored successfully')
+          }
         } else {
-          console.log('✅ Delivery tracking data stored successfully')
+          console.log('⚠️ No tracking data found in response to store')
         }
       } catch (storeError) {
         console.error('Error processing tracking data for storage:', storeError)
       }
     }
 
-    // Transform Parcel Panel API response to expected format
-    let responseDataForClient = { trackings: [] };
+    // Return successful response with proper structure for the hook
+    // Ensure the response has the expected structure with trackings array
+    let responseDataForClient = responseData.data || responseData;
     
-    if (responseData.data?.order?.shipments && Array.isArray(responseData.data.order.shipments)) {
-      // Transform shipments to trackings format
-      responseDataForClient.trackings = responseData.data.order.shipments.map(shipment => ({
-        tracking_number: shipment.tracking_number,
-        courier_code: shipment.carrier?.code,
-        courier_name: shipment.carrier?.name,
-        status: shipment.status,
-        sub_status: shipment.substatus_label || shipment.status_label,
-        origin_country: 'IN', // Default based on the data shown
-        destination_country: responseData.data.order?.shipping_address?.country || 'IN',
-        estimated_delivery_date: shipment.estimated_delivery_date,
-        delivered_at: shipment.delivery_date,
-        shipped_at: shipment.fulfillment_date,
-        tracking_events: shipment.checkpoints?.map(checkpoint => ({
-          time: checkpoint.checkpoint_time,
-          description: checkpoint.detail,
-          location: checkpoint.detail.split(',').slice(-2).join(',').trim(), // Extract location from detail
-          status: checkpoint.status_label
-        })) || []
-      }));
+    // If the API returns tracking data directly, wrap it in a trackings array
+    if (responseDataForClient && !responseDataForClient.trackings) {
+      if (responseDataForClient.tracking_number || responseDataForClient.status) {
+        // This looks like a single tracking object, wrap it in trackings array
+        responseDataForClient = {
+          trackings: [responseDataForClient]
+        };
+      } else if (Array.isArray(responseDataForClient)) {
+        // This is already an array, wrap it
+        responseDataForClient = {
+          trackings: responseDataForClient
+        };
+      }
     }
     
     console.log('Final response structure for client:', JSON.stringify(responseDataForClient, null, 2));
