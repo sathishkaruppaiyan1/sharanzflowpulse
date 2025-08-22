@@ -116,7 +116,7 @@ export const useDeliveryTracking = () => {
 
       // If no existing data, fetch from API
       if (!service || !isConfigured) {
-        setError('Parcel Panel service is not configured');
+        setError('Parcel Panel API is not configured. Please check your API settings.');
         return;
       }
 
@@ -125,7 +125,15 @@ export const useDeliveryTracking = () => {
       const response = await service.fetchTrackingByOrderNumber(orderNumber);
       
       if (response.code !== 200 || !response.data) {
-        throw new Error(response.message || 'Failed to fetch tracking details');
+        // Handle specific API errors
+        if (response.code === 401) {
+          setError('Invalid API key. Please check your Parcel Panel API configuration in settings.');
+        } else if (response.code === 404) {
+          setError('No tracking information found for this order number.');
+        } else {
+          setError(response.message || 'Failed to fetch tracking details from Parcel Panel API.');
+        }
+        return;
       }
 
       if (!response.data.trackings || response.data.trackings.length === 0) {
@@ -163,7 +171,15 @@ export const useDeliveryTracking = () => {
       console.log(`✅ Successfully fetched and stored delivery details for order ${orderNumber}`);
     } catch (err: any) {
       console.error('❌ Error fetching delivery details:', err);
-      setError(err.message || 'Failed to fetch delivery details');
+      
+      // Handle specific error types
+      if (err.message?.includes('Invalid API key') || err.message?.includes('401')) {
+        setError('Invalid API key. Please check your Parcel Panel API configuration in settings.');
+      } else if (err.message?.includes('not configured')) {
+        setError('Parcel Panel API is not configured. Please check your API settings.');
+      } else {
+        setError('Unable to fetch delivery details. Please try again later.');
+      }
     } finally {
       setIsLoading(false);
     }

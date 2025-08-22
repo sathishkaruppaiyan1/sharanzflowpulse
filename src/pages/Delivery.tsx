@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Package, MapPin, Clock, Truck, AlertCircle } from 'lucide-react';
+import { Search, Package, MapPin, Clock, Truck, AlertCircle, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { Link } from 'react-router-dom';
 
 const Delivery = () => {
   const [orderNumber, setOrderNumber] = useState('');
@@ -36,6 +37,8 @@ const Delivery = () => {
     try {
       await fetchDeliveryDetails(orderNumber.trim());
       setSearchedOrderNumber(orderNumber.trim());
+      
+      // Only show success toast if there's no error
       if (!error) {
         toast({
           title: "Success",
@@ -118,19 +121,29 @@ const Delivery = () => {
         </CardContent>
       </Card>
 
-      {/* Error Display */}
+      {/* Error Display with Configuration Link */}
       {error && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-center py-8 text-red-600">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              {error}
+            <div className="flex items-center justify-between py-4">
+              <div className="flex items-center text-red-600">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                <span>{error}</span>
+              </div>
+              {error.includes('API') && (
+                <Link to="/settings">
+                  <Button variant="outline" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configure API
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Current Search Results - Only show if we have delivery details */}
+      {/* Current Search Results - Only show if we have delivery details and no error */}
       {deliveryDetails && searchedOrderNumber && !error && (
         <Card>
           <CardHeader>
