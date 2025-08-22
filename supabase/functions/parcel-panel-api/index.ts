@@ -47,16 +47,7 @@ serve(async (req) => {
     console.log('Using Parcel Panel API key:', apiKey ? 'Present' : 'Missing')
 
     const body = await req.json()
-    const { action, orderNumber, trackingNumber, ...params } = body
-
-    let apiUrl = ''
-    let fetchOptions: RequestInit = {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-parcelpanel-api-key': apiKey
-      }
-    }
+    const { action, orderNumber } = body
 
     // Only support fetchTrackingByOrderNumber action
     if (action !== 'fetchTrackingByOrderNumber') {
@@ -85,8 +76,16 @@ serve(async (req) => {
       )
     }
 
-    // Use only the specified Parcel Panel API endpoint
-    apiUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`
+    // Use the correct Parcel Panel API endpoint
+    const apiUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`
+    
+    const fetchOptions: RequestInit = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-parcelpanel-api-key': apiKey
+      }
+    }
 
     console.log(`Making request to: ${apiUrl}`)
     console.log('Request headers:', fetchOptions.headers)
@@ -97,7 +96,6 @@ serve(async (req) => {
 
     console.log('Parcel Panel API response status:', response.status)
     console.log('Parcel Panel API response:', JSON.stringify(responseData, null, 2))
-    console.log('responseData.data structure:', JSON.stringify(responseData.data, null, 2))
 
     // Handle API errors
     if (!response.ok) {
@@ -125,84 +123,60 @@ serve(async (req) => {
       )
     }
 
-    // Store tracking data in database if this is a successful tracking fetch
-    if (action === 'fetchTrackingByOrderNumber' && responseData.data) {
+    // Store delivery tracking data in database if successful
+    if (responseData && responseData.order && responseData.order.shipments) {
       try {
-        let tracking = null;
+        const order = responseData.order;
+        const shipment = order.shipments[0]; // Take the first shipment
         
-        // Handle different response structures
-        if (responseData.data.trackings && responseData.data.trackings.length > 0) {
-          tracking = responseData.data.trackings[0];
-        } else if (responseData.data.tracking_number || responseData.data.status) {
-          // Direct tracking object
-          tracking = responseData.data;
-        } else if (Array.isArray(responseData.data) && responseData.data.length > 0) {
-          tracking = responseData.data[0];
-        }
-        
-        if (tracking) {
-        
-        const deliveryData = {
-          order_number: orderNumber,
-          tracking_number: tracking?.tracking_number,
-          courier_code: tracking?.courier_code,
-          courier_name: tracking?.courier_name,
-          status: tracking?.status,
-          sub_status: tracking?.sub_status,
-          origin_country: tracking?.origin_country,
-          destination_country: tracking?.destination_country,
-          estimated_delivery_date: tracking?.estimated_delivery_date,
-          delivered_at: tracking?.delivered_at,
-          shipped_at: tracking?.shipped_at,
-          tracking_events: tracking?.tracking_events || [],
-          last_updated: new Date().toISOString()
-        }
+        if (shipment) {
+          // Convert checkpoints to tracking events
+          const tracking_events = shipment.checkpoints?.map((checkpoint: any) => ({
+            time: checkpoint.checkpoint_time,
+            description: checkpoint.detail,
+            location: checkpoint.detail.split(',').slice(-2).join(',').trim(),
+            status: checkpoint.status
+          })) || [];
 
-        const { error: insertError } = await supabaseClient
-          .from('delivery_tracking_details')
-          .upsert(deliveryData, {
-            onConflict: 'order_number'
-          })
+          const deliveryData = {
+            order_number: orderNumber,
+            tracking_number: shipment.tracking_number,
+            courier_code: shipment.carrier?.code,
+            courier_name: shipment.carrier?.name,
+            status: shipment.status,
+            sub_status: shipment.substatus_label || shipment.substatus,
+            origin_country: 'India',
+            destination_country: order.shipping_address?.country,
+            estimated_delivery_date: shipment.estimated_delivery_date,
+            delivered_at: shipment.delivery_date,
+            shipped_at: shipment.pickup_date,
+            tracking_events: tracking_events,
+            last_updated: new Date().toISOString()
+          }
+
+          const { error: insertError } = await supabaseClient
+            .from('delivery_tracking_details')
+            .upsert(deliveryData, {
+              onConflict: 'order_number'
+            })
 
           if (insertError) {
             console.error('Error storing delivery tracking data:', insertError)
           } else {
             console.log('✅ Delivery tracking data stored successfully')
           }
-        } else {
-          console.log('⚠️ No tracking data found in response to store')
         }
       } catch (storeError) {
         console.error('Error processing tracking data for storage:', storeError)
       }
     }
 
-    // Return successful response with proper structure for the hook
-    // Ensure the response has the expected structure with trackings array
-    let responseDataForClient = responseData.data || responseData;
-    
-    // If the API returns tracking data directly, wrap it in a trackings array
-    if (responseDataForClient && !responseDataForClient.trackings) {
-      if (responseDataForClient.tracking_number || responseDataForClient.status) {
-        // This looks like a single tracking object, wrap it in trackings array
-        responseDataForClient = {
-          trackings: [responseDataForClient]
-        };
-      } else if (Array.isArray(responseDataForClient)) {
-        // This is already an array, wrap it
-        responseDataForClient = {
-          trackings: responseDataForClient
-        };
-      }
-    }
-    
-    console.log('Final response structure for client:', JSON.stringify(responseDataForClient, null, 2));
-    
+    // Return the response data as-is since the frontend expects the raw format
     return new Response(
       JSON.stringify({
         code: 200,
         message: 'Success',
-        data: responseDataForClient
+        data: responseData
       }),
       { 
         status: 200, 

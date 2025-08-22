@@ -6,7 +6,6 @@ export interface ParcelPanelApiConfig {
   api_key: string;
 }
 
-
 export interface ParcelPanelTrackingEvent {
   time: string;
   location: string;
@@ -33,10 +32,8 @@ export interface ParcelPanelApiResponse<T> {
   data: T;
 }
 
-
 export class ParcelPanelService {
   constructor() {}
-
 
   async fetchTrackingByOrderNumber(orderNumber: string): Promise<ParcelPanelApiResponse<{ trackings: ParcelPanelTrackingInfo[] }>> {
     try {
@@ -58,7 +55,6 @@ export class ParcelPanelService {
       throw error;
     }
   }
-
 
   static getStatusCategory(status: string): string {
     status = status.toLowerCase();
