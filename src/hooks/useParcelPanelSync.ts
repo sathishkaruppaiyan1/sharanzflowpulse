@@ -76,7 +76,7 @@ export const useParcelPanelSync = () => {
           }));
 
           console.log(`🔄 Syncing tracking for order: ${order.order_number}`);
-          await service.fetchTrackingDetails(order.order_number);
+          await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
           
           processed++;
           
@@ -133,7 +133,7 @@ export const useParcelPanelSync = () => {
         if (recentOrders && recentOrders.length > 0) {
           for (const order of recentOrders) {
             try {
-              await service.fetchTrackingDetails(order.order_number);
+              await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
               // Small delay between requests
               await new Promise(resolve => setTimeout(resolve, 2000));
             } catch (error) {
