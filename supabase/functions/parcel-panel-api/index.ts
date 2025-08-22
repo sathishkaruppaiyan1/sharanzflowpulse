@@ -58,73 +58,35 @@ serve(async (req) => {
       }
     }
 
-    // Handle different API actions
-    switch (action) {
-      case 'fetchTrackingByOrderNumber':
-        if (!orderNumber) {
-          return new Response(
-            JSON.stringify({ 
-              error: 'Order number is required',
-              code: 400
-            }),
-            { 
-              status: 400, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
+    // Only support fetchTrackingByOrderNumber action
+    if (action !== 'fetchTrackingByOrderNumber') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Only fetchTrackingByOrderNumber action is supported',
+          code: 400
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-        apiUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`
-        break
-
-      case 'trackPackage':
-        if (!trackingNumber) {
-          return new Response(
-            JSON.stringify({ 
-              error: 'Tracking number is required',
-              code: 400
-            }),
-            { 
-              status: 400, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          )
-        }
-        apiUrl = `https://open.parcelpanel.com/api/v2/tracking?tracking_number=${encodeURIComponent(trackingNumber)}`
-        break
-
-      case 'fetchOrders':
-        const queryParams = new URLSearchParams()
-        if (params.page) queryParams.append('page', params.page.toString())
-        if (params.limit) queryParams.append('limit', params.limit.toString())
-        if (params.status) queryParams.append('status', params.status)
-        
-        apiUrl = `https://open.parcelpanel.com/api/v2/orders${queryParams.toString() ? '?' + queryParams.toString() : ''}`
-        break
-
-      case 'getAnalytics':
-        const analyticsParams = new URLSearchParams()
-        if (params.start_date) analyticsParams.append('start_date', params.start_date)
-        if (params.end_date) analyticsParams.append('end_date', params.end_date)
-        
-        apiUrl = `https://open.parcelpanel.com/api/v2/analytics${analyticsParams.toString() ? '?' + analyticsParams.toString() : ''}`
-        break
-
-      case 'getSupportedCouriers':
-        apiUrl = 'https://open.parcelpanel.com/api/v2/couriers'
-        break
-
-      default:
-        return new Response(
-          JSON.stringify({ 
-            error: 'Invalid action specified',
-            code: 400
-          }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+      )
     }
+
+    if (!orderNumber) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Order number is required',
+          code: 400
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Use only the specified Parcel Panel API endpoint
+    apiUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`
 
     console.log(`Making request to: ${apiUrl}`)
     console.log('Request headers:', fetchOptions.headers)
