@@ -54,6 +54,8 @@ export const useParcelPanelSync = () => {
           description: "No orders found to sync tracking information for.",
           variant: "default",
         });
+        setSyncProgress({ total: 0, processed: 0, stage: 'completed' });
+        setIsSyncing(false);
         return;
       }
 
@@ -74,7 +76,7 @@ export const useParcelPanelSync = () => {
           }));
 
           console.log(`🔄 Syncing tracking for order: ${order.order_number}`);
-          await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
+          await service.fetchTrackingDetails(order.order_number);
           
           processed++;
           
@@ -131,7 +133,7 @@ export const useParcelPanelSync = () => {
         if (recentOrders && recentOrders.length > 0) {
           for (const order of recentOrders) {
             try {
-              await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
+              await service.fetchTrackingDetails(order.order_number);
               // Small delay between requests
               await new Promise(resolve => setTimeout(resolve, 2000));
             } catch (error) {

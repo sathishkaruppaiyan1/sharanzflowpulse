@@ -7,15 +7,34 @@ import { useParcelPanelSync } from '@/hooks/useParcelPanelSync';
 import { Package, Truck, Building, CheckCircle, Loader2 } from 'lucide-react';
 
 const ParcelPanelSync: React.FC = () => {
-  const { syncAllData, isSyncing, syncProgress, isConfigured } = useParcelPanelSync();
+  const { syncOrders, isSyncing, syncProgress, isConfigured } = useParcelPanelSync();
 
   const getStageIcon = (stage: string) => {
     switch (stage) {
       case 'orders': return <Package className="h-4 w-4" />;
       case 'tracking': return <Truck className="h-4 w-4" />;
       case 'couriers': return <Building className="h-4 w-4" />;
-      case 'complete': return <CheckCircle className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
       default: return <Loader2 className="h-4 w-4 animate-spin" />;
+    }
+  };
+
+  const getProgressPercentage = () => {
+    if (!syncProgress || syncProgress.total === 0) return 0;
+    return Math.round((syncProgress.processed / syncProgress.total) * 100);
+  };
+
+  const getStatusText = () => {
+    if (!syncProgress) return '';
+    if (syncProgress.current) {
+      return `Processing: ${syncProgress.current}`;
+    }
+    switch (syncProgress.stage) {
+      case 'orders': return 'Fetching orders...';
+      case 'tracking': return 'Syncing tracking details...';
+      case 'completed': return 'Sync completed';
+      case 'error': return 'Sync failed';
+      default: return 'Processing...';
     }
   };
 
@@ -40,15 +59,15 @@ const ParcelPanelSync: React.FC = () => {
           </div>
         )}
 
-        {syncProgress && (
+        {syncProgress && isSyncing && (
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
               {getStageIcon(syncProgress.stage)}
-              <span className="text-sm font-medium">{syncProgress.status}</span>
+              <span className="text-sm font-medium">{getStatusText()}</span>
             </div>
-            <Progress value={syncProgress.progress} className="w-full" />
+            <Progress value={getProgressPercentage()} className="w-full" />
             <div className="text-xs text-gray-500">
-              {syncProgress.progress}% complete
+              {getProgressPercentage()}% complete ({syncProgress.processed}/{syncProgress.total})
             </div>
           </div>
         )}
@@ -69,7 +88,7 @@ const ParcelPanelSync: React.FC = () => {
         </div>
 
         <Button
-          onClick={syncAllData}
+          onClick={syncOrders}
           disabled={!isConfigured || isSyncing}
           className="w-full"
         >
