@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -8,6 +7,7 @@ import {
   PackageCheck, 
   Truck, 
   Ship,
+  MapPin,
   BarChart3,
   Settings,
   Home,
@@ -31,6 +31,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
     { name: 'Packing', href: '/packing', icon: PackageCheck },
     { name: 'Tracking', href: '/tracking', icon: Truck },
     { name: 'Shipping', href: '/shipping', icon: Ship },
+    { name: 'Delivery', href: '/delivery', icon: MapPin },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 
