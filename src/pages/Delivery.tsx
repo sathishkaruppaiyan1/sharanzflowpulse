@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Package, MapPin, Clock, Truck, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Package, MapPin, Clock, Truck, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
@@ -36,10 +36,12 @@ const Delivery = () => {
     try {
       await fetchDeliveryDetails(orderNumber.trim());
       setSearchedOrderNumber(orderNumber.trim());
-      toast({
-        title: "Success",
-        description: "Delivery details fetched successfully",
-      });
+      if (!error) {
+        toast({
+          title: "Success",
+          description: "Delivery details fetched successfully",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -128,8 +130,8 @@ const Delivery = () => {
         </Card>
       )}
 
-      {/* Current Search Results */}
-      {deliveryDetails && searchedOrderNumber && (
+      {/* Current Search Results - Only show if we have delivery details */}
+      {deliveryDetails && searchedOrderNumber && !error && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -227,7 +229,7 @@ const Delivery = () => {
         </Card>
       )}
 
-      {/* Delivery History */}
+      {/* Delivery History - Only show if there are items in history */}
       {deliveryHistory && deliveryHistory.length > 0 && (
         <Card>
           <CardHeader>
@@ -266,6 +268,7 @@ const Delivery = () => {
                         onClick={() => {
                           setOrderNumber(delivery.order_number);
                           setSearchedOrderNumber(delivery.order_number);
+                          fetchDeliveryDetails(delivery.order_number);
                         }}
                       >
                         View

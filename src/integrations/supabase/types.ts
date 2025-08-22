@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -91,6 +91,60 @@ export type Database = {
           phone?: string | null
           shopify_customer_id?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_tracking_details: {
+        Row: {
+          courier_code: string | null
+          courier_name: string | null
+          created_at: string
+          delivered_at: string | null
+          destination_country: string | null
+          estimated_delivery_date: string | null
+          id: string
+          last_updated: string
+          order_number: string
+          origin_country: string | null
+          shipped_at: string | null
+          status: string | null
+          sub_status: string | null
+          tracking_events: Json | null
+          tracking_number: string | null
+        }
+        Insert: {
+          courier_code?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_country?: string | null
+          estimated_delivery_date?: string | null
+          id?: string
+          last_updated?: string
+          order_number: string
+          origin_country?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          sub_status?: string | null
+          tracking_events?: Json | null
+          tracking_number?: string | null
+        }
+        Update: {
+          courier_code?: string | null
+          courier_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          destination_country?: string | null
+          estimated_delivery_date?: string | null
+          id?: string
+          last_updated?: string
+          order_number?: string
+          origin_country?: string | null
+          shipped_at?: string | null
+          status?: string | null
+          sub_status?: string | null
+          tracking_events?: Json | null
+          tracking_number?: string | null
         }
         Relationships: []
       }

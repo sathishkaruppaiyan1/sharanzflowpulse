@@ -62,18 +62,65 @@ export const useDeliveryTracking = () => {
     }
   };
 
+  // Check if delivery details exist in database
+  const checkExistingDeliveryDetails = async (orderNumber: string): Promise<DeliveryDetails | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_tracking_details')
+        .select('*')
+        .eq('order_number', orderNumber)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        throw error;
+      }
+
+      if (data) {
+        return {
+          ...data,
+          tracking_events: Array.isArray(data.tracking_events) 
+            ? data.tracking_events.map((event: any) => ({
+                time: event.time || '',
+                description: event.description || '',
+                location: event.location,
+                status: event.status
+              }))
+            : []
+        };
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error checking existing delivery details:', err);
+      return null;
+    }
+  };
+
   // Fetch delivery details from Parcel Panel API
   const fetchDeliveryDetails = async (orderNumber: string) => {
-    if (!service || !isConfigured) {
-      setError('Parcel Panel service is not configured');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
+    setDeliveryDetails(null);
 
     try {
-      console.log(`🔄 Fetching delivery details for order: ${orderNumber}`);
+      console.log(`🔄 Checking for existing delivery details for order: ${orderNumber}`);
+      
+      // First check if data already exists in database
+      const existingData = await checkExistingDeliveryDetails(orderNumber);
+      
+      if (existingData) {
+        console.log(`✅ Found existing delivery details for order ${orderNumber}`);
+        setDeliveryDetails(existingData);
+        return;
+      }
+
+      // If no existing data, fetch from API
+      if (!service || !isConfigured) {
+        setError('Parcel Panel service is not configured');
+        return;
+      }
+
+      console.log(`🔄 Fetching delivery details from API for order: ${orderNumber}`);
       
       const response = await service.fetchTrackingByOrderNumber(orderNumber);
       
@@ -83,7 +130,6 @@ export const useDeliveryTracking = () => {
 
       if (!response.data.trackings || response.data.trackings.length === 0) {
         setError('No tracking information found for this order');
-        setDeliveryDetails(null);
         return;
       }
 
@@ -114,11 +160,10 @@ export const useDeliveryTracking = () => {
       // Reload history to include the new entry
       await loadDeliveryHistory();
 
-      console.log(`✅ Successfully fetched delivery details for order ${orderNumber}`);
+      console.log(`✅ Successfully fetched and stored delivery details for order ${orderNumber}`);
     } catch (err: any) {
       console.error('❌ Error fetching delivery details:', err);
       setError(err.message || 'Failed to fetch delivery details');
-      setDeliveryDetails(null);
     } finally {
       setIsLoading(false);
     }
