@@ -108,6 +108,80 @@ const Delivery = () => {
     }
   };
 
+  const getOrdersByStatus = (status: string) => {
+    if (!trackingOrders) return [];
+    
+    return trackingOrders.filter(order => {
+      const orderStatus = order.tracking_status?.toLowerCase();
+      switch (status) {
+        case 'in_transit':
+          return orderStatus === 'in_transit' || orderStatus === 'transit';
+        case 'out_for_delivery':
+          return orderStatus === 'out_for_delivery' || orderStatus === 'out for delivery';
+        case 'delivered':
+          return orderStatus === 'delivered';
+        default:
+          return false;
+      }
+    });
+  };
+
+  const renderOrdersTable = (orders: any[]) => {
+    if (orders.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No orders found for this status</p>
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Order Number</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Carrier</TableHead>
+            <TableHead>Tracking Number</TableHead>
+            <TableHead>Last Updated</TableHead>
+            <TableHead>Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell className="font-medium">
+                #{order.order_number}
+              </TableCell>
+              <TableCell>
+                <Badge className={getStatusColor(order.tracking_status || 'pending')}>
+                  {order.tracking_sub_status || order.tracking_status || 'Pending'}
+                </Badge>
+              </TableCell>
+              <TableCell>{order.courier_name || 'N/A'}</TableCell>
+              <TableCell>{order.tracking_number || 'N/A'}</TableCell>
+              <TableCell>{formatDate(order.tracking_last_updated || order.updated_at)}</TableCell>
+              <TableCell>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOrderNumber(order.order_number);
+                    setSearchedOrderNumber(order.order_number);
+                    fetchDeliveryDetails(order.order_number);
+                  }}
+                >
+                  View Details
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
@@ -123,7 +197,6 @@ const Delivery = () => {
         <TabsContent value="search" className="space-y-4">
           <ScrollArea className="h-[calc(100vh-200px)]">
             <div className="space-y-4 pr-4">
-              {/* Search Section */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -153,7 +226,6 @@ const Delivery = () => {
                 </CardContent>
               </Card>
 
-              {/* Error Display with Configuration Link */}
               {error && (
                 <Card>
                   <CardContent className="p-4">
@@ -175,7 +247,6 @@ const Delivery = () => {
                 </Card>
               )}
 
-              {/* Current Search Results - Only show if we have delivery details and no error */}
               {deliveryDetails && searchedOrderNumber && !error && (
                 <Card>
                   <CardHeader>
@@ -191,7 +262,6 @@ const Delivery = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-6">
-                      {/* Overview Cards */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="flex items-center space-x-2 p-4 bg-gray-50 rounded-lg">
                           <Truck className="h-4 w-4 text-gray-500" />
@@ -236,7 +306,6 @@ const Delivery = () => {
                         </div>
                       </div>
 
-                      {/* Tracking Events */}
                       {deliveryDetails.tracking_events && deliveryDetails.tracking_events.length > 0 && (
                         <div>
                           <h3 className="text-lg font-semibold mb-4">Tracking History</h3>
@@ -274,7 +343,6 @@ const Delivery = () => {
                 </Card>
               )}
 
-              {/* Delivery History - Only show if there are items in history */}
               {deliveryHistory && deliveryHistory.length > 0 && (
                 <Card>
                   <CardHeader>
@@ -333,7 +401,6 @@ const Delivery = () => {
         <TabsContent value="status" className="space-y-4">
           <ScrollArea className="h-[calc(100vh-200px)]">
             <div className="space-y-4 pr-4">
-              {/* Status Tracking Section */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -363,54 +430,34 @@ const Delivery = () => {
                       <span className="ml-2">Loading tracking orders...</span>
                     </div>
                   ) : trackingOrders && trackingOrders.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Order Number</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Carrier</TableHead>
-                          <TableHead>Tracking Number</TableHead>
-                          <TableHead>Stage</TableHead>
-                          <TableHead>Last Updated</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {trackingOrders.map((order) => (
-                          <TableRow key={order.id}>
-                            <TableCell className="font-medium">
-                              #{order.order_number}
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(order.tracking_status || 'pending')}>
-                                {order.tracking_sub_status || order.tracking_status || 'Pending'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{order.courier_name || 'N/A'}</TableCell>
-                            <TableCell>{order.tracking_number || 'N/A'}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {order.stage}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatDate(order.tracking_last_updated || order.updated_at)}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setOrderNumber(order.order_number);
-                                  setSearchedOrderNumber(order.order_number);
-                                  fetchDeliveryDetails(order.order_number);
-                                }}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <Tabs defaultValue="in_transit" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="in_transit" className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          In Transit ({getOrdersByStatus('in_transit').length})
+                        </TabsTrigger>
+                        <TabsTrigger value="out_for_delivery" className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Out for Delivery ({getOrdersByStatus('out_for_delivery').length})
+                        </TabsTrigger>
+                        <TabsTrigger value="delivered" className="flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Delivered ({getOrdersByStatus('delivered').length})
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="in_transit" className="mt-4">
+                        {renderOrdersTable(getOrdersByStatus('in_transit'))}
+                      </TabsContent>
+
+                      <TabsContent value="out_for_delivery" className="mt-4">
+                        {renderOrdersTable(getOrdersByStatus('out_for_delivery'))}
+                      </TabsContent>
+
+                      <TabsContent value="delivered" className="mt-4">
+                        {renderOrdersTable(getOrdersByStatus('delivered'))}
+                      </TabsContent>
+                    </Tabs>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
