@@ -46,18 +46,18 @@ const PrintQueue = ({
   const endIndex = startIndex + itemsPerPage;
   const paginatedOrders = orders.slice(startIndex, endIndex);
 
-  // Reset to valid page when orders change or current page becomes invalid
+  // Only reset pagination when absolutely necessary
   useEffect(() => {
-    if (orders.length === 0) {
+    // Only reset to page 1 if there are no orders at all
+    if (orders.length === 0 && currentPage !== 1) {
       setCurrentPage(1);
       return;
     }
     
+    // Only adjust page if current page is beyond available pages AND we have orders
     const newTotalPages = Math.ceil(orders.length / itemsPerPage);
-    
-    // If current page is now beyond the available pages, reset to the last valid page
-    if (currentPage > newTotalPages && newTotalPages > 0) {
-      console.log(`Pagination: Resetting from page ${currentPage} to page ${newTotalPages} (total orders: ${orders.length})`);
+    if (orders.length > 0 && currentPage > newTotalPages) {
+      console.log(`Pagination: Adjusting from page ${currentPage} to page ${newTotalPages}`);
       setCurrentPage(newTotalPages);
     }
   }, [orders.length, itemsPerPage, currentPage]);
