@@ -292,8 +292,8 @@ export const supabaseOrderService = {
     return data as Order[] || [];
   },
 
-  async createOrderFromShopify(shopifyOrder: any): Promise<string> {
-    console.log('Creating order in Supabase from Shopify order:', shopifyOrder.id);
+  async createOrderFromShopify(shopifyOrder: any, targetStage: OrderStage = 'packing'): Promise<string> {
+    console.log(`Creating order in Supabase from Shopify order: ${shopifyOrder.id} with stage: ${targetStage}`);
     
     try {
       // Determine the best phone number from Shopify data
@@ -364,19 +364,25 @@ export const supabaseOrderService = {
         shippingAddressId = newAddress.id;
       }
 
-      // Create order
+      // Create order with proper stage and timestamp based on target stage
+      const orderData: any = {
+        shopify_order_id: Number(shopifyOrder.id),
+        order_number: shopifyOrder.order_number || shopifyOrder.name,
+        customer_id: customerId,
+        shipping_address_id: shippingAddressId,
+        stage: targetStage,
+        total_amount: parseFloat(shopifyOrder.current_total_price || shopifyOrder.total_amount || '0'),
+        currency: shopifyOrder.currency || 'INR'
+      };
+
+      // Add appropriate timestamp based on target stage
+      if (targetStage === 'packing') {
+        orderData.printed_at = new Date().toISOString();
+      }
+
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          shopify_order_id: Number(shopifyOrder.id),
-          order_number: shopifyOrder.order_number || shopifyOrder.name,
-          customer_id: customerId,
-          shipping_address_id: shippingAddressId,
-          stage: 'packing',
-          total_amount: parseFloat(shopifyOrder.current_total_price || shopifyOrder.total_amount || '0'),
-          currency: shopifyOrder.currency || 'INR',
-          printed_at: new Date().toISOString()
-        })
+        .insert(orderData)
         .select('id')
         .single();
 
@@ -403,7 +409,7 @@ export const supabaseOrderService = {
         if (itemsError) throw itemsError;
       }
 
-      console.log('Successfully created order in Supabase with variation details:', newOrder.id);
+      console.log(`Successfully created order in Supabase with stage ${targetStage} and variation details:`, newOrder.id);
       console.log('Customer phone number stored:', phoneNumber);
       return newOrder.id;
       
@@ -414,22 +420,24 @@ export const supabaseOrderService = {
   },
 
   async syncShopifyOrderToSupabase(shopifyOrder: any): Promise<string> {
-    console.log('Syncing Shopify order to Supabase:', shopifyOrder.id);
+    console.log('Syncing Shopify order to Supabase for printing completion:', shopifyOrder.id);
     
     // Check if order already exists
     const { data: existingOrder } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, stage')
       .eq('shopify_order_id', shopifyOrder.id)
       .single();
 
     if (existingOrder) {
-      // Update existing order to packing stage
+      console.log(`Existing order found (${existingOrder.id}), updating to packing stage`);
+      // Update existing order to packing stage with printed timestamp
       await this.updateOrderStage(existingOrder.id, 'packing');
       return existingOrder.id;
     } else {
-      // Create new order
-      return await this.createOrderFromShopify(shopifyOrder);
+      console.log('New order - creating directly in packing stage after print');
+      // For printing flow: Create new order directly in packing stage since label was printed
+      return await this.createOrderFromShopify(shopifyOrder, 'packing');
     }
   },
 

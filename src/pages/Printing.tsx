@@ -280,8 +280,10 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Force refresh after printing
+    // Force refresh after printing and clear synced order cache
     console.log('Refreshing after successful print - orders should move to packing...');
+    // Clear the synced orders cache so excluded orders list is refreshed
+    setSyncedShopifyOrderIds(new Set());
     refetch();
   };
 
