@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const Printing = () => {
+  const queryClient = useQueryClient();
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   // Only fetch orders in printing stage, not packing
-  const { data: printingOrders = [], isPending: isLoadingPrintingOrders } = useOrdersByStage('printing');
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
+  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders, refetch: refetchPackingOrders } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -200,6 +202,19 @@ const Printing = () => {
     return readyToPrintOrders;
   }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, printingOrders, isLoadingPrintingOrders, isLoadingPackingOrders]);
 
+  // Handle orders update after printing
+  const handleOrdersUpdate = useCallback(async () => {
+    console.log('🔄 Refreshing orders after print completion...');
+    
+    // Invalidate and refetch all order-related queries
+    await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    await refetchPrintingOrders();
+    await refetchPackingOrders();
+    refetch(); // Refresh Shopify orders too
+    
+    console.log('✅ Orders refreshed successfully');
+  }, [queryClient, refetchPrintingOrders, refetchPackingOrders, refetch]);
+
   // Initialize filtered orders with default sorting only
   useEffect(() => {
     if (isLoadingPrintingOrders || isLoadingPackingOrders) {
@@ -256,7 +271,7 @@ const Printing = () => {
     setShowBulkPreview(true);
   };
 
-  const handleBulkPrintComplete = (orderIds: string | string[]) => {
+  const handleBulkPrintComplete = async (orderIds: string | string[]) => {
     const count = Array.isArray(orderIds) ? orderIds.length : 1;
     
     // Update today's printed count
@@ -272,8 +287,8 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh the orders to show updated stages
-    refetch();
+    // Refresh all orders
+    await handleOrdersUpdate();
   };
 
   if (isLoading || isLoadingPrintingOrders || isLoadingPackingOrders) {
@@ -498,6 +513,7 @@ const Printing = () => {
                 onSelectAll={handleSelectAll}
                 onUnselectAll={handleUnselectAll}
                 itemsPerPage={10}
+                onOrdersUpdate={handleOrdersUpdate}
               />
             </CardContent>
           </Card>

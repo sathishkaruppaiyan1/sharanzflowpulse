@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import ShippingLabelPreview from './ShippingLabelPreview';
 import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
+import { useBulkUpdateOrderStage } from '@/hooks/useOrders';
 
 interface PrintQueueProps {
   orders: any[];
@@ -18,6 +18,7 @@ interface PrintQueueProps {
   onSelectAll?: (currentPageOrders?: any[]) => void;
   onUnselectAll?: () => void;
   itemsPerPage?: number;
+  onOrdersUpdate?: () => void;
 }
 
 const PrintQueue = ({ 
@@ -27,13 +28,15 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
-  itemsPerPage = 10
+  itemsPerPage = 10,
+  onOrdersUpdate
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
   const [previewOrder, setPreviewOrder] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const bulkUpdateOrderStage = useBulkUpdateOrderStage();
 
   // Update local state when external selectedOrderIds changes
   useEffect(() => {
@@ -68,23 +71,38 @@ const PrintQueue = ({
     setShowPreview(true);
   };
 
-  const handlePrintComplete = (orderId: string) => {
-    // Remove from selected orders after successful print
-    const newSelected = new Set(selectedOrders);
-    if (Array.isArray(orderId)) {
-      orderId.forEach(id => newSelected.delete(id));
-    } else {
-      newSelected.delete(orderId);
-    }
-    setSelectedOrders(newSelected);
-    onSelectedCountChange?.(newSelected.size, newSelected);
+  const handlePrintComplete = async (orderId: string | string[]) => {
+    console.log('🎯 Print completed for:', orderId);
+    
+    // Convert single orderId to array for consistent handling
+    const orderIds = Array.isArray(orderId) ? orderId : [orderId];
+    
+    try {
+      // Move order(s) to packing stage
+      await bulkUpdateOrderStage.mutateAsync({
+        orderIds,
+        stage: 'packing'
+      });
 
-    // More prominent notification for stage movement
-    toast({
-      title: "🎉 Order Moved to Packing!", 
-      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
-    });
-    console.log('Moving order to packing stage:', orderId);
+      // Remove from selected orders after successful print
+      const newSelected = new Set(selectedOrders);
+      orderIds.forEach(id => newSelected.delete(id));
+      setSelectedOrders(newSelected);
+      onSelectedCountChange?.(newSelected.size, newSelected);
+
+      // Notify parent to refresh data
+      onOrdersUpdate?.();
+
+      console.log('✅ Orders successfully moved to packing stage:', orderIds);
+      
+    } catch (error) {
+      console.error('❌ Error moving orders to packing stage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to move order to packing stage. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const isPrinting = (orderId: string) => printingOrders.has(orderId);
