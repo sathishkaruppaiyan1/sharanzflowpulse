@@ -1,5 +1,5 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -8,204 +8,194 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('=== PARCEL PANEL API FUNCTION STARTED ===')
-  console.log('Request method:', req.method)
-  console.log('Request URL:', req.url)
-
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request')
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('Creating Supabase client...')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase environment variables')
-      return new Response(
-        JSON.stringify({ error: 'Missing Supabase environment variables' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    )
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Get API configuration from database
-    console.log('Fetching Parcel Panel API configuration...')
-    const { data: configData, error: configError } = await supabase
+    // Get API configurations from database
+    const { data: configData, error: configError } = await supabaseClient
       .from('system_settings')
       .select('value')
       .eq('key', 'api_configs')
       .single()
 
     if (configError || !configData?.value?.parcel_panel?.api_key) {
-      console.error('Parcel Panel API not configured:', configError)
+      console.error('Failed to get Parcel Panel API key:', configError)
       return new Response(
         JSON.stringify({ 
-          error: 'Parcel Panel API not configured',
-          code: 'API_NOT_CONFIGURED'
+          error: 'Parcel Panel API configuration not found',
+          code: 500
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       )
     }
 
-    const apiKey = configData.value.parcel_panel.api_key
-    console.log('API key found, processing request...')
+    const parcelPanelConfig = configData.value.parcel_panel
+    const apiKey = parcelPanelConfig.api_key
+    
+    console.log('Using Parcel Panel API key:', apiKey ? 'Present' : 'Missing')
 
-    const requestData = await req.json()
-    const { action, ...params } = requestData
+    const body = await req.json()
+    const { action, orderNumber } = body
 
-    console.log('Action requested:', action)
-    console.log('Parameters:', params)
-
-    let response
-    let result
-
-    switch (action) {
-      case 'fetchOrders':
-        console.log('Fetching orders from Parcel Panel...')
-        const ordersUrl = new URL('https://api.parcelpanel.com/api/v1/orders')
-        if (params.page) ordersUrl.searchParams.append('page', params.page.toString())
-        if (params.limit) ordersUrl.searchParams.append('limit', params.limit.toString())
-        if (params.status) ordersUrl.searchParams.append('status', params.status)
-
-        response = await fetch(ordersUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
-          },
-        })
-        result = await response.json()
-        break
-
-      case 'trackPackage':
-        console.log('Tracking package:', params.trackingNumber)
-        const trackUrl = `https://api.parcelpanel.com/api/v1/trackings/${params.trackingNumber}`
-        response = await fetch(trackUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
-          },
-        })
-        result = await response.json()
-        break
-
-      case 'fetchTrackingByOrderNumber':
-        console.log('Fetching tracking by order number:', params.orderNumber)
-        const orderTrackUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${params.orderNumber}`
-        response = await fetch(orderTrackUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
-          }
-        })
-        result = await response.json()
-        break
-
-      case 'getAnalytics':
-        console.log('Fetching analytics...')
-        const analyticsUrl = new URL('https://api.parcelpanel.com/api/v1/analytics/orders')
-        if (params.start_date) analyticsUrl.searchParams.append('start_date', params.start_date)
-        if (params.end_date) analyticsUrl.searchParams.append('end_date', params.end_date)
-
-        response = await fetch(analyticsUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
-          },
-        })
-        result = await response.json()
-        break
-
-      case 'getSupportedCouriers':
-        console.log('Fetching supported couriers...')
-        response = await fetch('https://api.parcelpanel.com/api/v1/couriers', {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-KEY': apiKey,
-          },
-        })
-        result = await response.json()
-        break
-
-      default:
-        console.error('Unknown action:', action)
-        return new Response(
-          JSON.stringify({ error: 'Unknown action', action }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-    }
-
-    console.log('API response status:', response?.status)
-    console.log('API response received:', result)
-
-    if (!response?.ok) {
-      console.error('API request failed:', response?.status, result)
+    // Only support fetchTrackingByOrderNumber action
+    if (action !== 'fetchTrackingByOrderNumber') {
       return new Response(
         JSON.stringify({ 
-          error: 'Parcel Panel API request failed',
-          details: result,
-          status: response?.status
+          error: 'Only fetchTrackingByOrderNumber action is supported',
+          code: 400
         }),
-        { status: response?.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       )
     }
 
-    // Store tracking details if it's a tracking request and order ID is provided
-    if (action === 'fetchTrackingByOrderNumber' && params.orderId && result.code === 200 && result.data?.trackings?.length > 0) {
-      console.log('Storing tracking details in database...')
-      const tracking = result.data.trackings[0]
-      
-      const { error: upsertError } = await supabase
-        .from('order_tracking_details')
-        .upsert({
-          order_id: params.orderId,
-          tracking_number: tracking.tracking_number,
-          courier_code: tracking.courier_code,
-          courier_name: tracking.courier_name,
-          status: tracking.status,
-          sub_status: tracking.sub_status,
-          origin_country: tracking.origin_country,
-          destination_country: tracking.destination_country,
-          estimated_delivery_date: tracking.estimated_delivery_date,
-          delivered_at: tracking.delivered_at,
-          shipped_at: tracking.shipped_at,
-          tracking_events: tracking.tracking_events || [],
-          last_updated: new Date().toISOString()
-        }, {
-          onConflict: 'order_id'
-        })
+    if (!orderNumber) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Order number is required',
+          code: 400
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
-      if (upsertError) {
-        console.error('Error storing tracking details:', upsertError)
-      } else {
-        console.log('Successfully stored tracking details')
+    // Use the correct Parcel Panel API endpoint
+    const apiUrl = `https://open.parcelpanel.com/api/v2/tracking/order?order_number=${encodeURIComponent(orderNumber)}`
+    
+    const fetchOptions: RequestInit = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-parcelpanel-api-key': apiKey
       }
     }
 
-    console.log('=== PARCEL PANEL API FUNCTION COMPLETE ===')
+    console.log(`Making request to: ${apiUrl}`)
+    console.log('Request headers:', fetchOptions.headers)
 
+    // Make request to Parcel Panel API
+    const response = await fetch(apiUrl, fetchOptions)
+    const responseData = await response.json()
+
+    console.log('Parcel Panel API response status:', response.status)
+    console.log('Parcel Panel API response:', JSON.stringify(responseData, null, 2))
+
+    // Handle API errors
+    if (!response.ok) {
+      let errorMessage = 'Parcel Panel API request failed'
+      let errorCode = response.status
+
+      if (response.status === 401) {
+        errorMessage = 'Invalid API key or access token'
+      } else if (response.status === 404) {
+        errorMessage = 'Resource not found'
+      } else if (responseData.message) {
+        errorMessage = responseData.message
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          error: errorMessage,
+          details: responseData,
+          code: errorCode
+        }),
+        { 
+          status: response.status, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Store delivery tracking data in database if successful
+    if (responseData && responseData.order && responseData.order.shipments) {
+      try {
+        const order = responseData.order;
+        const shipment = order.shipments[0]; // Take the first shipment
+        
+        if (shipment) {
+          // Convert checkpoints to tracking events
+          const tracking_events = shipment.checkpoints?.map((checkpoint: any) => ({
+            time: checkpoint.checkpoint_time,
+            description: checkpoint.detail,
+            location: checkpoint.detail.split(',').slice(-2).join(',').trim(),
+            status: checkpoint.status
+          })) || [];
+
+          const deliveryData = {
+            order_number: orderNumber,
+            tracking_number: shipment.tracking_number,
+            courier_code: shipment.carrier?.code,
+            courier_name: shipment.carrier?.name,
+            status: shipment.status,
+            sub_status: shipment.substatus_label || shipment.substatus,
+            origin_country: 'India',
+            destination_country: order.shipping_address?.country,
+            estimated_delivery_date: shipment.estimated_delivery_date,
+            delivered_at: shipment.delivery_date,
+            shipped_at: shipment.pickup_date,
+            tracking_events: tracking_events,
+            last_updated: new Date().toISOString()
+          }
+
+          const { error: insertError } = await supabaseClient
+            .from('delivery_tracking_details')
+            .upsert(deliveryData, {
+              onConflict: 'order_number'
+            })
+
+          if (insertError) {
+            console.error('Error storing delivery tracking data:', insertError)
+          } else {
+            console.log('✅ Delivery tracking data stored successfully')
+          }
+        }
+      } catch (storeError) {
+        console.error('Error processing tracking data for storage:', storeError)
+      }
+    }
+
+    // Return the response data as-is since the frontend expects the raw format
     return new Response(
-      JSON.stringify(result),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        code: 200,
+        message: 'Success',
+        data: responseData
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
 
   } catch (error) {
-    console.error('=== PARCEL PANEL API FUNCTION ERROR ===')
-    console.error('Error:', error)
-    console.error('Error message:', error.message)
-    console.error('Error stack:', error.stack)
-    
+    console.error('Edge function error:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error.message 
+        error: 'Internal server error',
+        details: error.message || 'Unknown error',
+        code: 500
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
   }
 })

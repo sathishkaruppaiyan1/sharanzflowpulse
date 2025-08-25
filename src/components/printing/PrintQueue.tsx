@@ -1,289 +1,271 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Printer, Package, Phone, Calendar } from 'lucide-react';
-import { ShopifyOrder } from '@/hooks/useShopifyOrders';
-import ShippingLabelPreview from './ShippingLabelPreview';
-import { useBulkUpdateOrderStage } from '@/hooks/useOrders';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import ShippingLabelPreview from './ShippingLabelPreview';
+import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
 interface PrintQueueProps {
-  orders: ShopifyOrder[];
+  orders: any[];
   isShopifyOrders?: boolean;
   onSelectedCountChange?: (count: number, selectedIds: Set<string>) => void;
   selectedOrderIds?: Set<string>;
-  onSelectAll?: (currentPageOrders?: ShopifyOrder[]) => void;
+  onSelectAll?: (currentPageOrders?: any[]) => void;
   onUnselectAll?: () => void;
   itemsPerPage?: number;
 }
 
-const PrintQueue: React.FC<PrintQueueProps> = ({
-  orders,
-  isShopifyOrders = false,
+const PrintQueue = ({ 
+  orders, 
+  isShopifyOrders = false, 
   onSelectedCountChange,
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
   itemsPerPage = 10
-}) => {
-  const [currentPage, setCurrentPage] = useState(1);
+}: PrintQueueProps) => {
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
+  const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
+  const [previewOrder, setPreviewOrder] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
-  const bulkUpdateStage = useBulkUpdateOrderStage();
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Reset to page 1 when orders change significantly (like after printing)
+  // Update local state when external selectedOrderIds changes
   useEffect(() => {
-    const totalPages = Math.ceil(orders.length / itemsPerPage);
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
-  }, [orders.length, itemsPerPage, currentPage]);
+    setSelectedOrders(selectedOrderIds);
+  }, [selectedOrderIds]);
 
+  // Calculate pagination
   const totalPages = Math.ceil(orders.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentPageOrders = orders.slice(startIndex, endIndex);
+  const paginatedOrders = orders.slice(startIndex, endIndex);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
+  // Reset to first page when orders change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [orders.length]);
 
-  const handleOrderSelect = (orderId: string, isSelected: boolean) => {
-    const newSelectedIds = new Set(selectedOrderIds);
-    
-    if (isSelected) {
-      newSelectedIds.add(orderId);
+  const handleSelectOrder = (orderId: string, checked: boolean) => {
+    const newSelected = new Set(selectedOrders);
+    if (checked) {
+      newSelected.add(orderId);
     } else {
-      newSelectedIds.delete(orderId);
+      newSelected.delete(orderId);
     }
-    
-    onSelectedCountChange?.(newSelectedIds.size, newSelectedIds);
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
   };
 
-  const handleSelectAllCurrentPage = () => {
-    onSelectAll?.(currentPageOrders);
-  };
-
-  const handlePrintSingle = (order: ShopifyOrder) => {
-    setSelectedOrder(order);
+  const handlePrintSingle = (order: any) => {
+    console.log('Opening print preview for order:', order.id);
+    setPreviewOrder(order);
     setShowPreview(true);
   };
 
-  const handlePrintComplete = async (orderIds: string | string[]) => {
-    const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
-    
-    try {
-      await bulkUpdateStage.mutateAsync({ 
-        orderIds: ids, 
-        stage: 'packing' 
-      });
-      
-      // Reset pagination if current page becomes empty
-      const remainingOrders = orders.length - ids.length;
-      const newTotalPages = Math.ceil(remainingOrders / itemsPerPage);
-      
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(1);
-      }
-      
-      toast({
-        title: "Success",
-        description: `${ids.length} order(s) printed and moved to packing stage`
-      });
-      
-    } catch (error) {
-      console.error('Error updating order stage:', error);
-      toast({
-        title: "Error", 
-        description: "Failed to update order stage",
-        variant: "destructive"
-      });
+  const handlePrintComplete = (orderId: string) => {
+    // Remove from selected orders after successful print
+    const newSelected = new Set(selectedOrders);
+    if (Array.isArray(orderId)) {
+      orderId.forEach(id => newSelected.delete(id));
+    } else {
+      newSelected.delete(orderId);
     }
-    
-    setShowPreview(false);
-    setSelectedOrder(null);
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
+
+    // More prominent notification for stage movement
+    toast({
+      title: "🎉 Order Moved to Packing!", 
+      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
+    });
+    console.log('Moving order to packing stage:', orderId);
   };
 
-  if (orders.length === 0) {
-    return (
-      <Card className="p-8">
-        <div className="text-center text-gray-500">
-          <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-medium mb-2">No Orders Found</h3>
-          <p>No orders are currently ready for printing.</p>
-        </div>
-      </Card>
-    );
-  }
+  const isPrinting = (orderId: string) => printingOrders.has(orderId);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleSelectCurrentPage = () => {
+    onSelectAll?.(paginatedOrders);
+  };
+
+  const handleUnselectCurrentPage = () => {
+    onUnselectAll?.();
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Orders List */}
-      <div className="space-y-3">
-        {currentPageOrders.map((order) => {
-          const isSelected = selectedOrderIds.has(order.id);
-          const customerName = order.customer_name || 'Guest';
-          const phone = order.phone || order.shipping_address?.phone || order.customer?.phone;
+    <>
+      <div className="space-y-2">
+        {paginatedOrders.map((order) => {
+          // Get product items with variations and debug logging
+          const rawItems = isShopifyOrders 
+            ? (order.line_items || [])
+            : (order.order_items || []);
+            
+          console.log(`Processing order ${order.id} items:`, rawItems);
           
+          const productItems = rawItems.map(item => {
+            const normalized = normalizeItemForDisplay(item);
+            console.log(`Normalized item for order ${order.id}:`, {
+              original: item,
+              normalized: normalized,
+              variationText: normalized.variationText
+            });
+            return normalized;
+          });
+
           return (
-            <Card key={order.id} className={`transition-colors ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) => handleOrderSelect(order.id, checked as boolean)}
-                    />
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="font-semibold text-lg">#{order.order_number}</h4>
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                          {order.currency} {parseFloat(order.current_total_price || order.total_amount || '0').toFixed(2)}
-                        </Badge>
-                        <Badge variant="secondary">
-                          {order.line_items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1} items
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <span className="font-medium">{customerName}</span>
-                        {phone && (
-                          <div className="flex items-center space-x-1">
-                            <Phone className="h-3 w-3" />
-                            <span>{phone}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(order.created_at), 'MMM dd, HH:mm')}</span>
+            <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
+              <div className="grid grid-cols-12 gap-3 items-start">
+                {/* Checkbox and Order Info */}
+                <div className="col-span-2 flex items-start space-x-2">
+                  <Checkbox
+                    checked={selectedOrders.has(order.id)}
+                    onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
+                    <p className="text-gray-600 text-xs">
+                      {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Products with Variations */}
+                <div className="col-span-4">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
+                  <div className="space-y-1">
+                    {productItems.map((item: any, index: number) => (
+                      <div key={index} className="text-xs text-gray-900">
+                        <div className="font-medium">{item.displayName}</div>
+                        <div className="text-blue-600 ml-1 text-xs font-medium">
+                          {item.variationText}
                         </div>
                       </div>
-                      
-                      {order.line_items && order.line_items.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-xs text-gray-500 mb-1">Products:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {order.line_items.slice(0, 3).map((item, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                {item.quantity}x {(item.title || item.name)?.substring(0, 30)}
-                                {item.variant_title ? ` (${item.variant_title})` : ''}
-                              </Badge>
-                            ))}
-                            {order.line_items.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{order.line_items.length - 3} more
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                    ))}
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="col-span-2">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Details:</h4>
+                  <div className="space-y-0.5 text-xs">
+                    <div className="text-gray-900">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                    <div className="font-medium text-gray-900">₹{order.total_amount || order.current_total_price}</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString('en-IN')}
                     </div>
                   </div>
-                  
-                  <Button
+                </div>
+
+                {/* Address */}
+                <div className="col-span-3">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
+                  <div className="text-xs text-gray-900">
+                    {order.shipping_address ? (
+                      <>
+                        <div>{order.shipping_address.address1 || order.shipping_address.address_line_1}</div>
+                        {(order.shipping_address.address2 || order.shipping_address.address_line_2) && (
+                          <div>{order.shipping_address.address2 || order.shipping_address.address_line_2}</div>
+                        )}
+                        <div>{order.shipping_address.city}, {order.shipping_address.province || order.shipping_address.state}</div>
+                        <div>{order.shipping_address.zip || order.shipping_address.postal_code} {order.shipping_address.country}</div>
+                        {order.shipping_address.phone && (
+                          <div className="flex items-center mt-0.5 text-red-600">
+                            <Phone className="h-2.5 w-2.5 mr-1" />
+                            <span>{order.shipping_address.phone}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-gray-500">Address not available</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Print Button */}
+                <div className="col-span-1 flex justify-end">
+                  <Button 
                     onClick={() => handlePrintSingle(order)}
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={isPrinting(order.id)}
                     size="sm"
+                    variant="outline"
+                    className="flex items-center space-x-1 h-7 px-2"
                   >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Label
+                    <Printer className="h-3 w-3" />
+                    <span className="text-xs">Print</span>
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           );
         })}
+        
+        {orders.length === 0 && (
+          <Card className="text-center py-8">
+            <CardContent>
+              <div className="text-gray-500">No orders found matching your criteria</div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Showing {startIndex + 1} to {Math.min(endIndex, orders.length)} of {orders.length} orders
-          </div>
-          
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink
-                      onClick={() => handlePageChange(pageNum)}
-                      isActive={currentPage === pageNum}
-                      className="cursor-pointer"
-                    >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      )}
-
-      {/* Select All Button for Current Page */}
-      {currentPageOrders.length > 0 && (
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSelectAllCurrentPage}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            Select All on This Page ({currentPageOrders.length})
-          </Button>
-        </div>
-      )}
-
-      {/* Single Order Preview */}
-      {showPreview && selectedOrder && (
-        <ShippingLabelPreview
-          open={showPreview}
-          onClose={() => setShowPreview(false)}
-          orders={[selectedOrder]}
-          onPrintComplete={handlePrintComplete}
-        />
-      )}
-    </div>
+      <ShippingLabelPreview 
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        order={previewOrder}
+        onPrintComplete={handlePrintComplete}
+      />
+    </>
   );
 };
 

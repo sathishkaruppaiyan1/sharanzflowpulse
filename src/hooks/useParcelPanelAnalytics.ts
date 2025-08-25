@@ -20,12 +20,12 @@ export interface AnalyticsData {
 }
 
 export const useParcelPanelAnalytics = () => {
-  const { service, isConfigured } = useParcelPanelService();
+  const { isConfigured } = useParcelPanelService();
   const { toast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
 
   const syncAnalytics = async (startDate?: string, endDate?: string) => {
-    if (!service || !isConfigured) {
+    if (!isConfigured) {
       toast({
         title: "Error",
         description: "Parcel Panel API is not configured",
@@ -35,43 +35,47 @@ export const useParcelPanelAnalytics = () => {
     }
 
     setIsSyncing(true);
-    console.log('📊 Starting analytics sync...');
+    console.log('📊 Analytics sync is not available - tracking only functionality is implemented');
 
     try {
-      // Fetch analytics data from Parcel Panel
-      const response = await service.getAnalytics({
-        start_date: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end_date: endDate || new Date().toISOString().split('T')[0]
-      });
+      // Since we only have tracking functionality, we'll generate basic analytics from stored data
+      const { data: trackingData, error } = await supabase
+        .from('delivery_tracking_details')
+        .select('*')
+        .order('last_updated', { ascending: false })
+        .limit(100);
 
-      if (response.code === 200 && response.data) {
-        const analyticsData = response.data;
-        
-        // Store analytics data in database
-        await supabase
-          .from('parcel_panel_analytics')
-          .upsert({
-            date: new Date().toISOString().split('T')[0],
-            total_orders: analyticsData.total_orders || 0,
-            delivered_orders: analyticsData.delivered_orders || 0,
-            in_transit_orders: analyticsData.in_transit_orders || 0,
-            out_for_delivery_orders: analyticsData.out_for_delivery_orders || 0,
-            exception_orders: analyticsData.exception_orders || 0,
-            delivery_rate: analyticsData.delivery_rate || 0,
-            avg_delivery_time_days: analyticsData.avg_delivery_time_days || 0,
-            top_carriers: JSON.parse(JSON.stringify(analyticsData.top_carriers || [])),
-            top_destinations: JSON.parse(JSON.stringify(analyticsData.top_destinations || [])),
-            status_breakdown: JSON.parse(JSON.stringify(analyticsData.status_breakdown || {})),
-            raw_data: JSON.parse(JSON.stringify(analyticsData))
-          }, {
-            onConflict: 'date'
-          });
+      if (error) throw error;
 
-        toast({
-          title: "Success",
-          description: "Analytics data synced successfully",
+      // Generate basic analytics from existing tracking data
+      const analyticsData = {
+        total_orders: trackingData?.length || 0,
+        delivered_orders: trackingData?.filter(item => item.status?.toLowerCase().includes('delivered')).length || 0,
+        in_transit_orders: trackingData?.filter(item => item.status?.toLowerCase().includes('transit')).length || 0,
+        out_for_delivery_orders: trackingData?.filter(item => item.status?.toLowerCase().includes('out_for_delivery')).length || 0,
+        exception_orders: trackingData?.filter(item => item.status?.toLowerCase().includes('exception')).length || 0,
+        delivery_rate: 0,
+        avg_delivery_time_days: 0,
+        top_carriers: [],
+        top_destinations: [],
+        status_breakdown: {}
+      };
+
+      // Store basic analytics data in database
+      await supabase
+        .from('parcel_panel_analytics')
+        .upsert({
+          date: new Date().toISOString().split('T')[0],
+          ...analyticsData,
+          raw_data: JSON.parse(JSON.stringify(analyticsData))
+        }, {
+          onConflict: 'date'
         });
-      }
+
+      toast({
+        title: "Success",
+        description: "Basic analytics data generated from tracking data",
+      });
     } catch (error) {
       console.error('❌ Analytics sync failed:', error);
       toast({
