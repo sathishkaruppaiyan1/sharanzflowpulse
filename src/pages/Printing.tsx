@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -15,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   
-  // Separate queries for printing and packing stage orders
+  // Separate queries - ONLY printing stage for display, packing for stats only
   const { data: printingOrders = [], isPending: isLoadingPrintingOrders } = useOrdersByStage('printing');
   const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
   
@@ -40,17 +41,17 @@ const Printing = () => {
 
   // Clear cache and refetch when component mounts to handle token changes
   useEffect(() => {
-    console.log('Printing page mounted - clearing stale data after potential token change');
+    console.log('Printing page mounted - clearing stale data after token change');
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     setSyncedShopifyOrderIds(new Set());
   }, []);
 
-  // Fetch synced Shopify order IDs and exclude orders that are beyond printing stage
+  // Fetch synced Shopify order IDs - exclude orders that are beyond printing stage
   useEffect(() => {
     const fetchSyncedOrders = async () => {
       try {
-        console.log('Fetching synced orders to determine which Shopify orders to exclude...');
+        console.log('Fetching synced orders to determine exclusions...');
         const { data: syncedOrders, error } = await supabase
           .from('orders')
           .select('shopify_order_id, stage')
@@ -61,17 +62,16 @@ const Printing = () => {
           return;
         }
         
-        // Exclude orders that are in packing, tracking, shipped, or delivered stages
-        // Only allow orders in printing stage to potentially show up from Shopify
+        // Exclude orders that are NOT in printing stage (packing, tracking, shipped, delivered)
         const syncedIds = new Set(
           syncedOrders
-            .filter(order => order.stage !== 'printing') // Exclude all non-printing stage orders
+            .filter(order => order.stage !== 'printing')
             .map(order => order.shopify_order_id)
             .filter(Boolean)
         );
         
         console.log(`Found ${syncedIds.size} synced orders to exclude from Shopify display`);
-        console.log('Excluded order stages:', syncedOrders.filter(o => o.stage !== 'printing').map(o => `${o.shopify_order_id}:${o.stage}`));
+        console.log('Excluded stages:', syncedOrders.filter(o => o.stage !== 'printing').map(o => `${o.shopify_order_id}:${o.stage}`));
         setSyncedShopifyOrderIds(syncedIds);
       } catch (error) {
         console.error('Error in fetchSyncedOrders:', error);
@@ -81,7 +81,7 @@ const Printing = () => {
     fetchSyncedOrders();
   }, [printingOrders, packingOrders]); // Refresh when orders change
 
-  // Calculate today's printed orders count from packing stage
+  // Calculate today's printed orders count from packing stage only
   useEffect(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -96,36 +96,35 @@ const Printing = () => {
     setTodayPrintedCount(todayPrinted.length);
   }, [packingOrders]);
 
-  // Process and filter orders with proper deduplication - only show printing stage orders
+  // Process and filter orders - ONLY show printing stage orders
   const getBaseFilteredOrders = useCallback(() => {
     if (isLoadingPrintingOrders) {
       return [];
     }
     
-    console.log('=== ORDER FILTERING DEBUG ===');
+    console.log('=== PRINTING ORDER FILTERING DEBUG ===');
     console.log('Total Shopify orders:', shopifyOrders.length);
     console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
-    console.log('Supabase orders in printing stage:', printingOrders.length);
+    console.log('Supabase orders in PRINTING stage ONLY:', printingOrders.length);
     
-    // Create a map to track orders by Shopify order ID to prevent duplicates
+    // Create a map to track orders by Shopify order ID
     const orderMap = new Map();
     
-    // First, add Supabase orders that are specifically in printing stage
+    // First, add ONLY printing stage orders from Supabase
     printingOrders.forEach(order => {
       const shopifyOrderId = order.shopify_order_id?.toString();
       if (shopifyOrderId) {
-        // Convert Supabase order to Shopify-like format for consistency
         const formattedOrder = {
           id: shopifyOrderId,
           order_number: order.order_number,
           created_at: order.created_at,
-          fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
+          fulfillment_status: 'unfulfilled',
           current_total_price: order.total_amount?.toString() || '0',
           currency: order.currency || 'INR',
           customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
           total_amount: order.total_amount?.toString() || '0',
-          financial_status: 'paid', // Assume paid for orders in system
-          total_weight: 0, // Default weight
+          financial_status: 'paid',
+          total_weight: 0,
           customer: order.customer ? {
             first_name: order.customer.first_name,
             last_name: order.customer.last_name,
@@ -152,67 +151,59 @@ const Printing = () => {
             variant_id: item.shopify_variant_id,
             sku: item.sku
           })) || [],
-          // Mark as Supabase order to identify source
           _isSupabaseOrder: true
         };
         orderMap.set(shopifyOrderId, formattedOrder);
-        console.log(`✓ Added Supabase printing order ${order.order_number} (Shopify ID: ${shopifyOrderId}) to map`);
+        console.log(`✓ Added Supabase PRINTING order ${order.order_number} (ID: ${shopifyOrderId})`);
       }
     });
 
-    // Then, add Shopify orders that are not already synced and meet criteria
+    // Then, add unfulfilled Shopify orders that are NOT already synced to any stage
     shopifyOrders.forEach(order => {
       const orderId = order.id.toString();
       
-      // Skip if already in map (from Supabase)
+      // Skip if already in map (from Supabase printing stage)
       if (orderMap.has(orderId)) {
-        console.log(`⚠ Skipping Shopify order ${order.id} - already exists from Supabase`);
+        console.log(`⚠ Skipping Shopify order ${order.id} - already exists in printing stage`);
         return;
       }
       
-      // Check if order should be included
+      // Only include unfulfilled orders that are not synced to ANY stage
       const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
       const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
       
-      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}, include=${isUnfulfilled && isNotSynced}`);
+      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
       
       if (isUnfulfilled && isNotSynced) {
         orderMap.set(orderId, {
           ...order,
           _isSupabaseOrder: false
         });
-        console.log(`✓ Added Shopify order ${order.id} to map`);
+        console.log(`✓ Added NEW Shopify order ${order.id} to printing display`);
       } else {
         console.log(`✗ Excluded Shopify order ${order.id} - fulfilled: ${!isUnfulfilled}, synced: ${!isNotSynced}`);
       }
     });
 
-    // Convert map to array
     let readyToPrintOrders = Array.from(orderMap.values());
     
-    console.log('=== FINAL FILTERING RESULTS ===');
-    console.log('Total unique orders ready for printing:', readyToPrintOrders.length);
+    console.log('=== FINAL PRINTING RESULTS ===');
+    console.log('Total orders ready for PRINTING:', readyToPrintOrders.length);
     console.log('Orders by source:', {
-      supabase: readyToPrintOrders.filter(o => o._isSupabaseOrder).length,
-      shopify: readyToPrintOrders.filter(o => !o._isSupabaseOrder).length
+      supabase_printing: readyToPrintOrders.filter(o => o._isSupabaseOrder).length,
+      shopify_new: readyToPrintOrders.filter(o => !o._isSupabaseOrder).length
     });
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       readyToPrintOrders = readyToPrintOrders.filter(order => {
-        // Search in order number/ID
         if (order.order_number?.toLowerCase().includes(query)) return true;
         if (order.id?.toString().toLowerCase().includes(query)) return true;
-        
-        // Search in customer phone
         if (order.shipping_address?.phone?.toLowerCase().includes(query)) return true;
-        
-        // Search in product names
         if (order.line_items?.some((item: any) => 
           (item.title || item.name)?.toLowerCase().includes(query)
         )) return true;
-        
         return false;
       });
       console.log(`Search filtered orders: ${readyToPrintOrders.length} match "${query}"`);
@@ -221,18 +212,18 @@ const Printing = () => {
     return readyToPrintOrders;
   }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, printingOrders, isLoadingPrintingOrders]);
 
-  // Initialize filtered orders with default sorting only
+  // Initialize filtered orders with default sorting
   useEffect(() => {
     if (isLoadingPrintingOrders) {
       return;
     }
       
     const baseOrders = getBaseFilteredOrders();
-    // Apply default sorting (newest first)
+    // Sort by newest first
     const sorted = [...baseOrders].sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA; // Newest first
+      return dateB - dateA;
     });
     setFilteredOrders(sorted);
   }, [getBaseFilteredOrders, isLoadingPrintingOrders]);
@@ -289,17 +280,16 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Force refresh after printing to update order lists
-    console.log('Refreshing orders after successful print...');
+    // Force refresh after printing
+    console.log('Refreshing after successful print - orders should move to packing...');
     refetch();
   };
 
   const handleRefresh = () => {
-    console.log('Manual refresh triggered - clearing cache and refetching...');
-    // Clear selections
+    console.log('Manual refresh - clearing cache and refetching after token change...');
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
-    // Force refetch with cache invalidation
+    setSyncedShopifyOrderIds(new Set());
     refetch();
   };
 
@@ -311,7 +301,7 @@ const Printing = () => {
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <Printer className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading orders after token update...</p>
+              <p className="text-gray-500">Loading orders with updated token...</p>
             </div>
           </div>
         </div>
@@ -328,14 +318,14 @@ const Printing = () => {
             <CardHeader>
               <CardTitle className="text-red-600">Shopify Connection Error</CardTitle>
               <CardDescription>
-                Unable to load orders from Shopify. This may be due to the recent token change.
+                Unable to load orders with the new token. Please check your Shopify configuration.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">{error}</p>
               <Button onClick={handleRefresh} className="w-full">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retry Connection
+                Retry with New Token
               </Button>
             </CardContent>
           </Card>
@@ -354,7 +344,7 @@ const Printing = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
             <p className="text-gray-600 text-sm">
-              Generate shipping labels with smart filtering • Updated after token change
+              Generate shipping labels • Updated with new token
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -497,7 +487,7 @@ const Printing = () => {
                 <div>
                   <CardTitle className="text-lg">Orders for Printing</CardTitle>
                   <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders match your filter criteria
+                    {filteredOrders.length} orders ready for printing • Token updated
                   </p>
                 </div>
                 <div className="flex space-x-2">
