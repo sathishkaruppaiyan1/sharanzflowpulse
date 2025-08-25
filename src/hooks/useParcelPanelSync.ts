@@ -1,158 +1,211 @@
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
 import { useParcelPanelService } from '@/services/parcelPanelService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface SyncProgress {
+  stage: 'orders' | 'tracking' | 'couriers' | 'complete';
+  progress: number;
   total: number;
-  processed: number;
-  current?: string;
-  stage: 'orders' | 'tracking' | 'completed' | 'error';
+  status: string;
 }
 
 export const useParcelPanelSync = () => {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<SyncProgress>({
-    total: 0,
-    processed: 0,
-    stage: 'completed'
-  });
-  
   const { service, isConfigured } = useParcelPanelService();
   const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
 
-  const syncOrders = async () => {
+  const syncAllData = async () => {
     if (!service || !isConfigured) {
       toast({
-        title: "Configuration Error",
-        description: "Parcel Panel API is not configured. Please check your settings.",
+        title: "Error",
+        description: "Parcel Panel API is not configured",
         variant: "destructive",
       });
       return;
     }
 
     setIsSyncing(true);
-    setSyncProgress({ total: 0, processed: 0, stage: 'orders' });
+    console.log('🚀 Starting comprehensive Parcel Panel data sync...');
 
     try {
-      console.log('🔄 Starting Parcel Panel sync...');
-      
-      // Get existing orders from our database that might need tracking updates
-      const { data: existingOrders, error } = await supabase
-        .from('orders')
-        .select('id, order_number')
-        .limit(50); // Limit to avoid overwhelming the API
-
-      if (error) {
-        throw new Error(`Failed to fetch existing orders: ${error.message}`);
-      }
-
-      if (!existingOrders || existingOrders.length === 0) {
-        toast({
-          title: "No Orders Found",
-          description: "No orders found to sync tracking information for.",
-          variant: "default",
-        });
-        setSyncProgress({ total: 0, processed: 0, stage: 'completed' });
-        setIsSyncing(false);
-        return;
-      }
-
+      // Stage 1: Sync Orders
       setSyncProgress({
-        total: existingOrders.length,
-        processed: 0,
-        stage: 'tracking'
+        stage: 'orders',
+        progress: 0,
+        total: 100,
+        status: 'Fetching all orders from Parcel Panel...'
       });
 
-      // Sync tracking details for existing orders
-      let processed = 0;
-      for (const order of existingOrders) {
-        try {
-          setSyncProgress(prev => ({
-            ...prev,
-            processed,
-            current: order.order_number
-          }));
+      await syncOrders();
 
-          console.log(`🔄 Syncing tracking for order: ${order.order_number}`);
-          await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
-          
-          processed++;
-          
-          // Add delay to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (error) {
-          console.error(`❌ Error syncing order ${order.order_number}:`, error);
-          processed++;
-        }
-      }
-
+      // Stage 2: Sync Tracking Details
       setSyncProgress({
-        total: existingOrders.length,
-        processed,
-        stage: 'completed'
+        stage: 'tracking',
+        progress: 30,
+        total: 100,
+        status: 'Syncing tracking details...'
+      });
+
+      await syncTrackingDetails();
+
+      // Stage 3: Sync Couriers
+      setSyncProgress({
+        stage: 'couriers',
+        progress: 60,
+        total: 100,
+        status: 'Fetching courier information...'
+      });
+
+      await syncCouriers();
+
+      // Stage 4: Complete
+      setSyncProgress({
+        stage: 'complete',
+        progress: 100,
+        total: 100,
+        status: 'Sync completed successfully!'
       });
 
       toast({
-        title: "Sync Completed",
-        description: `Successfully processed ${processed} orders for tracking updates.`,
+        title: "Success",
+        description: "All Parcel Panel data synced successfully",
       });
 
-      console.log(`✅ Parcel Panel sync completed: ${processed}/${existingOrders.length} orders processed`);
-
-    } catch (error: any) {
-      console.error('❌ Parcel Panel sync failed:', error);
-      setSyncProgress(prev => ({ ...prev, stage: 'error' }));
-      
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
       toast({
         title: "Sync Failed",
-        description: error.message || "An unexpected error occurred during sync",
+        description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
       setIsSyncing(false);
+      setTimeout(() => setSyncProgress(null), 3000);
     }
   };
 
-  // Auto-sync tracking details every hour for recent orders
-  useEffect(() => {
-    if (!service || !isConfigured) return;
+  const syncOrders = async () => {
+    console.log('📦 Syncing orders from Parcel Panel...');
+    
+    // Fetch orders in batches
+    let page = 1;
+    let hasMore = true;
+    let totalOrders = 0;
 
-    const interval = setInterval(async () => {
-      console.log('🔄 Auto-syncing recent order tracking...');
-      
-      try {
-        // Get recent orders (last 24 hours) that might need tracking updates
-        const { data: recentOrders } = await supabase
-          .from('orders')
-          .select('id, order_number')
-          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .limit(10);
+    while (hasMore) {
+      const response = await service!.fetchOrders({
+        page,
+        limit: 100
+      });
 
-        if (recentOrders && recentOrders.length > 0) {
-          for (const order of recentOrders) {
-            try {
-              await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
-              // Small delay between requests
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            } catch (error) {
-              console.error(`Error auto-syncing order ${order.order_number}:`, error);
+      if (response.code === 200 && response.data?.orders) {
+        const orders = response.data.orders;
+        console.log(`📄 Processing page ${page} with ${orders.length} orders`);
+
+        // Convert orders to JSON format for storage
+        const ordersData = JSON.parse(JSON.stringify(orders));
+
+        // Store orders in system_settings for now
+        await supabase
+          .from('system_settings')
+          .upsert({
+            key: `parcel_panel_orders_page_${page}`,
+            value: {
+              page,
+              orders: ordersData,
+              synced_at: new Date().toISOString()
+            }
+          });
+
+        totalOrders += orders.length;
+        hasMore = orders.length === 100; // Continue if we got a full page
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log(`✅ Synced ${totalOrders} orders total`);
+  };
+
+  const syncTrackingDetails = async () => {
+    console.log('🚚 Syncing tracking details...');
+    
+    // Get all orders with tracking numbers from our database
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number, tracking_number')
+      .not('tracking_number', 'is', null);
+
+    if (orders) {
+      for (const order of orders) {
+        try {
+          if (order.tracking_number) {
+            console.log(`🔍 Fetching tracking for order ${order.order_number}`);
+            const response = await service!.fetchTrackingByOrderNumber(order.order_number);
+            
+            if (response.code === 200 && response.data?.trackings?.length > 0) {
+              const trackingData = response.data.trackings[0]; // Get first tracking result
+              
+              // Store detailed tracking info with proper type handling
+              await supabase
+                .from('order_tracking_details')
+                .upsert({
+                  order_id: order.id,
+                  tracking_number: trackingData.tracking_number,
+                  courier_code: trackingData.courier_code,
+                  courier_name: trackingData.courier_name,
+                  status: trackingData.status,
+                  sub_status: trackingData.sub_status,
+                  origin_country: trackingData.origin_country,
+                  destination_country: trackingData.destination_country,
+                  estimated_delivery_date: trackingData.estimated_delivery_date,
+                  delivered_at: trackingData.delivered_at,
+                  shipped_at: trackingData.shipped_at,
+                  tracking_events: JSON.parse(JSON.stringify(trackingData.tracking_events || [])),
+                  last_updated: new Date().toISOString()
+                }, {
+                  onConflict: 'order_id'
+                });
             }
           }
+        } catch (error) {
+          console.error(`❌ Failed to sync tracking for order ${order.order_number}:`, error);
         }
-      } catch (error) {
-        console.error('Error during auto-sync:', error);
       }
-    }, 60 * 60 * 1000); // Every hour
+    }
+  };
 
-    return () => clearInterval(interval);
-  }, [service, isConfigured]);
+  const syncCouriers = async () => {
+    console.log('🚛 Syncing courier information...');
+    
+    try {
+      const couriersResponse = await service!.getSupportedCouriers();
+      
+      // Store courier data with JSON conversion
+      await supabase
+        .from('system_settings')
+        .upsert({
+          key: 'parcel_panel_couriers',
+          value: {
+            couriers: JSON.parse(JSON.stringify(couriersResponse)),
+            synced_at: new Date().toISOString()
+          }
+        });
+
+      console.log('✅ Couriers synced successfully');
+    } catch (error) {
+      console.error('❌ Failed to sync couriers:', error);
+    }
+  };
 
   return {
+    syncAllData,
     isSyncing,
     syncProgress,
-    syncOrders,
     isConfigured
   };
 };

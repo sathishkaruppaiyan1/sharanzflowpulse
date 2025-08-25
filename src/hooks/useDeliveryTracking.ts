@@ -96,41 +96,6 @@ export const useDeliveryTracking = () => {
     }
   };
 
-  // Parse API response to extract tracking data
-  const parseApiResponse = (response: any): DeliveryDetails | null => {
-    if (!response.data?.order?.shipments || response.data.order.shipments.length === 0) {
-      return null;
-    }
-
-    const order = response.data.order;
-    const shipment = order.shipments[0]; // Take the first shipment
-
-    // Convert checkpoints to tracking events
-    const tracking_events = shipment.checkpoints?.map((checkpoint: any) => ({
-      time: checkpoint.checkpoint_time,
-      description: checkpoint.detail,
-      location: checkpoint.detail.split(',').slice(-2).join(',').trim(), // Extract location from detail
-      status: checkpoint.status
-    })) || [];
-
-    return {
-      id: `delivery_${order.order_number}_${Date.now()}`,
-      order_number: order.order_number,
-      tracking_number: shipment.tracking_number,
-      courier_code: shipment.carrier?.code,
-      courier_name: shipment.carrier?.name,
-      status: shipment.status,
-      sub_status: shipment.substatus_label || shipment.substatus,
-      origin_country: 'India', // Default based on API response
-      destination_country: order.shipping_address?.country,
-      estimated_delivery_date: shipment.estimated_delivery_date,
-      delivered_at: shipment.delivery_date,
-      shipped_at: shipment.pickup_date,
-      tracking_events,
-      last_updated: new Date().toISOString()
-    };
-  };
-
   // Fetch delivery details from Parcel Panel API
   const fetchDeliveryDetails = async (orderNumber: string) => {
     setIsLoading(true);
@@ -151,34 +116,41 @@ export const useDeliveryTracking = () => {
 
       // If no existing data, fetch from API
       if (!service || !isConfigured) {
-        setError('Parcel Panel API is not configured. Please check your API settings.');
+        setError('Parcel Panel service is not configured');
         return;
       }
 
       console.log(`🔄 Fetching delivery details from API for order: ${orderNumber}`);
       
       const response = await service.fetchTrackingByOrderNumber(orderNumber);
-      console.log('📥 API Response received:', JSON.stringify(response, null, 2));
       
       if (response.code !== 200 || !response.data) {
-        // Handle specific API errors
-        if (response.code === 401) {
-          setError('Invalid API key. Please check your Parcel Panel API configuration in settings.');
-        } else if (response.code === 404) {
-          setError('No tracking information found for this order number.');
-        } else {
-          setError(response.message || 'Failed to fetch tracking details from Parcel Panel API.');
-        }
-        return;
+        throw new Error(response.message || 'Failed to fetch tracking details');
       }
 
-      // Parse the response using the new structure
-      const deliveryData = parseApiResponse(response);
-      
-      if (!deliveryData) {
+      if (!response.data.trackings || response.data.trackings.length === 0) {
         setError('No tracking information found for this order');
         return;
       }
+
+      const tracking = response.data.trackings[0];
+      
+      const deliveryData: DeliveryDetails = {
+        id: `delivery_${orderNumber}_${Date.now()}`,
+        order_number: orderNumber,
+        tracking_number: tracking.tracking_number,
+        courier_code: tracking.courier_code,
+        courier_name: tracking.courier_name,
+        status: tracking.status,
+        sub_status: tracking.sub_status,
+        origin_country: tracking.origin_country,
+        destination_country: tracking.destination_country,
+        estimated_delivery_date: tracking.estimated_delivery_date,
+        delivered_at: tracking.delivered_at,
+        shipped_at: tracking.shipped_at,
+        tracking_events: tracking.tracking_events || [],
+        last_updated: new Date().toISOString()
+      };
 
       setDeliveryDetails(deliveryData);
 
@@ -191,15 +163,7 @@ export const useDeliveryTracking = () => {
       console.log(`✅ Successfully fetched and stored delivery details for order ${orderNumber}`);
     } catch (err: any) {
       console.error('❌ Error fetching delivery details:', err);
-      
-      // Handle specific error types
-      if (err.message?.includes('Invalid API key') || err.message?.includes('401')) {
-        setError('Invalid API key. Please check your Parcel Panel API configuration in settings.');
-      } else if (err.message?.includes('not configured')) {
-        setError('Parcel Panel API is not configured. Please check your API settings.');
-      } else {
-        setError('Unable to fetch delivery details. Please try again later.');
-      }
+      setError(err.message || 'Failed to fetch delivery details');
     } finally {
       setIsLoading(false);
     }
