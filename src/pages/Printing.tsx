@@ -1,519 +1,439 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
-import Header from '@/components/layout/Header';
-import PrintQueue from '@/components/printing/PrintQueue';
-import PrintingFilters from '@/components/printing/PrintingFilters';
-import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
-import { useShopifyOrders } from '@/hooks/useShopifyOrders';
-import { useOrdersByStage } from '@/hooks/useOrders';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Calendar, Package, CheckCircle2, Clock, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PrintingFilters } from '@/components/printing/PrintingFilters';
+import { ShippingLabelPreview } from '@/components/printing/ShippingLabelPreview';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useOrders } from '@/hooks/useOrders';
+import { useShopifyAutoSync } from '@/hooks/useShopifyAutoSync';
+import { ShopifySync } from '@/components/printing/ShopifySync';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { useToast } from '@/hooks/use-toast';
+import { format, isToday, parseISO } from 'date-fns';
+import type { Order } from '@/types/database';
 
-const Printing = () => {
-  const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage(['printing', 'packing']); // Include both printing and packing stages
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(true);
-  const [selectedCount, setSelectedCount] = useState(0);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
-  const [showBulkPreview, setShowBulkPreview] = useState(false);
-  const [bulkOrders, setBulkOrders] = useState<any[]>([]);
-  const [todayPrintedCount, setTodayPrintedCount] = useState(0);
-  const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
-  const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
+interface FilterState {
+  searchQuery: string;
+  selectedProducts: string[];
+  filterType: 'contains' | 'only';
+  selectedColors: string[];
+  selectedSizes: string[];
+  sortOrder: 'newest' | 'oldest';
+  dateRange: {
+    from: string;
+    to: string;
+  };
+}
 
-  // Sort Shopify orders by newest first (created_at descending)
-  const shopifyOrders = React.useMemo(() => {
-    return [...rawShopifyOrders].sort((a, b) => {
-      const dateA = new Date(a.created_at || 0).getTime();
-      const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA; // Newest first
-    });
-  }, [rawShopifyOrders]);
+const ITEMS_PER_PAGE = 10;
 
-  // Fetch synced Shopify order IDs but allow orders in printing stage to show
-  useEffect(() => {
-    const fetchSyncedOrders = async () => {
-      try {
-        const { data: syncedOrders, error } = await supabase
-          .from('orders')
-          .select('shopify_order_id, stage')
-          .not('shopify_order_id', 'is', null);
-          
-        if (error) {
-          console.error('Error fetching synced orders:', error);
-          return;
-        }
-        
-        // Only exclude orders that are NOT in printing stage
-        const syncedIds = new Set(
-          syncedOrders
-            .filter(order => order.stage !== 'printing') // Allow printing stage orders to show
-            .map(order => order.shopify_order_id)
-            .filter(Boolean)
-        );
-        setSyncedShopifyOrderIds(syncedIds);
-        console.log('Synced Shopify order IDs (excluding printing stage):', Array.from(syncedIds));
-      } catch (error) {
-        console.error('Error in fetchSyncedOrders:', error);
-      }
-    };
+export default function Printing() {
+  // Auto-sync Shopify orders every 5 minutes
+  useShopifyAutoSync(5);
 
-    fetchSyncedOrders();
-  }, [packingOrders]);
+  const { orders: printingOrders, loading: printingLoading, refetch: refetchPrinting } = useOrders('printing');
+  const { orders: packingOrders, loading: packingLoading, refetch: refetchPacking } = useOrders('packing');
+  const { toast } = useToast();
 
-  // Calculate today's printed orders count from packing stage
-  useEffect(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayPrinted = packingOrders.filter(order => {
-      if (!order.printed_at || order.stage !== 'packing') return false;
-      const printedDate = new Date(order.printed_at);
-      printedDate.setHours(0, 0, 0, 0);
-      return printedDate.getTime() === today.getTime();
-    });
-    
-    setTodayPrintedCount(todayPrinted.length);
-  }, [packingOrders]);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showLabelPreview, setShowLabelPreview] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState<FilterState>({
+    searchQuery: '',
+    selectedProducts: [],
+    filterType: 'contains',
+    selectedColors: [],
+    selectedSizes: [],
+    sortOrder: 'newest',
+    dateRange: { from: '', to: '' }
+  });
 
-  // Process and filter orders with proper deduplication
-  const getBaseFilteredOrders = useCallback(() => {
-    if (isLoadingPackingOrders) {
-      return [];
+  // Get filtered orders from database only
+  const filteredOrders = useMemo(() => {
+    if (!printingOrders) return [];
+
+    let filtered = [...printingOrders];
+
+    // Search filter
+    if (filters.searchQuery.trim()) {
+      const query = filters.searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(order => 
+        order.order_number?.toLowerCase().includes(query) ||
+        order.customer?.phone?.includes(query) ||
+        order.order_items?.some(item => 
+          item.title?.toLowerCase().includes(query) ||
+          item.sku?.toLowerCase().includes(query)
+        )
+      );
     }
-    console.log('Total Shopify orders:', shopifyOrders.length);
-    console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
-    
-    // Get orders from Supabase that are in printing stage
-    const supabaseOrdersInPrinting = packingOrders.filter(order => order.stage === 'printing');
-    console.log('Supabase orders in printing stage:', supabaseOrdersInPrinting.length);
-    
-    // Create a map to track orders by Shopify order ID to prevent duplicates
-    const orderMap = new Map();
-    
-    // First, add Supabase orders in printing stage (they have priority for complete data)
-    supabaseOrdersInPrinting.forEach(order => {
-      const shopifyOrderId = order.shopify_order_id?.toString();
-      if (shopifyOrderId) {
-        // Convert Supabase order to Shopify-like format for consistency
-        const formattedOrder = {
-          id: shopifyOrderId,
-          order_number: order.order_number,
-          created_at: order.created_at,
-          fulfillment_status: 'unfulfilled', // Assume unfulfilled for printing stage
-          current_total_price: order.total_amount?.toString() || '0',
-          currency: order.currency || 'INR',
-          customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
-          total_amount: order.total_amount?.toString() || '0',
-          financial_status: 'paid', // Assume paid for orders in system
-          total_weight: 0, // Default weight
-          customer: order.customer ? {
-            first_name: order.customer.first_name,
-            last_name: order.customer.last_name,
-            phone: order.customer.phone,
-            email: order.customer.email,
-            id: order.customer.id
-          } : null,
-          shipping_address: order.shipping_address ? {
-            address1: order.shipping_address.address_line_1,
-            address2: order.shipping_address.address_line_2,
-            city: order.shipping_address.city,
-            province: order.shipping_address.state,
-            zip: order.shipping_address.postal_code,
-            country: order.shipping_address.country,
-            phone: order.customer?.phone
-          } : null,
-          line_items: order.order_items?.map(item => ({
-            title: item.title,
-            name: item.title,
-            variant_title: item.variant_title,
-            quantity: item.quantity,
-            price: item.price,
-            product_id: item.product_id,
-            variant_id: item.shopify_variant_id,
-            sku: item.sku
-          })) || [],
-          // Mark as Supabase order to identify source
-          _isSupabaseOrder: true
-        };
-        orderMap.set(shopifyOrderId, formattedOrder);
-        console.log(`Added Supabase order ${order.order_number} (Shopify ID: ${shopifyOrderId}) to map`);
-      }
-    });
 
-    // Then, add Shopify orders that are not already in the map and meet criteria
-    shopifyOrders.forEach(order => {
-      const orderId = order.id.toString();
-      
-      // Skip if already in map (from Supabase)
-      if (orderMap.has(orderId)) {
-        console.log(`Skipping Shopify order ${order.id} - already exists from Supabase`);
-        return;
-      }
-      
-      // Check if order should be included
-      const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
-      const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
-      
-      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
-      
-      if (isUnfulfilled && isNotSynced) {
-        orderMap.set(orderId, {
-          ...order,
-          _isSupabaseOrder: false
-        });
-        console.log(`Added Shopify order ${order.id} to map`);
-      }
-    });
-
-    // Convert map to array
-    let readyToPrintOrders = Array.from(orderMap.values());
-    
-    console.log('Total unique orders ready for printing:', readyToPrintOrders.length);
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      readyToPrintOrders = readyToPrintOrders.filter(order => {
-        // Search in order number/ID
-        if (order.order_number?.toLowerCase().includes(query)) return true;
-        if (order.id?.toString().toLowerCase().includes(query)) return true;
+    // Product filter
+    if (filters.selectedProducts.length > 0) {
+      filtered = filtered.filter(order => {
+        const orderProducts = order.order_items?.map(item => item.title?.toLowerCase()) || [];
         
-        // Search in customer phone
-        if (order.shipping_address?.phone?.toLowerCase().includes(query)) return true;
-        
-        // Search in product names
-        if (order.line_items?.some((item: any) => 
-          (item.title || item.name)?.toLowerCase().includes(query)
-        )) return true;
-        
-        return false;
+        if (filters.filterType === 'only') {
+          return orderProducts.length > 0 && 
+                 orderProducts.every(product => 
+                   filters.selectedProducts.some(selected => 
+                     product?.includes(selected.toLowerCase())
+                   )
+                 );
+        } else {
+          return filters.selectedProducts.some(selected =>
+            orderProducts.some(product => 
+              product?.includes(selected.toLowerCase())
+            )
+          );
+        }
       });
     }
-    
-    return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, packingOrders, isLoadingPackingOrders]);
 
-  // Initialize filtered orders with default sorting only
-  useEffect(() => {
-    if (isLoadingPackingOrders) {
-      return;
+    // Color and size filters
+    if (filters.selectedColors.length > 0) {
+      filtered = filtered.filter(order =>
+        order.order_items?.some(item =>
+          filters.selectedColors.some(color =>
+            item.variant_title?.toLowerCase().includes(color.toLowerCase()) ||
+            item.title?.toLowerCase().includes(color.toLowerCase())
+          )
+        )
+      );
     }
-      
-    const baseOrders = getBaseFilteredOrders();
-    // Apply default sorting (newest first)
-    const sorted = [...baseOrders].sort((a, b) => {
-      const dateA = new Date(a.created_at || 0).getTime();
-      const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA; // Newest first
+
+    if (filters.selectedSizes.length > 0) {
+      filtered = filtered.filter(order =>
+        order.order_items?.some(item =>
+          filters.selectedSizes.some(size =>
+            item.variant_title?.toLowerCase().includes(size.toLowerCase()) ||
+            item.title?.toLowerCase().includes(size.toLowerCase())
+          )
+        )
+      );
+    }
+
+    // Date range filter
+    if (filters.dateRange.from || filters.dateRange.to) {
+      filtered = filtered.filter(order => {
+        if (!order.created_at) return false;
+        const orderDate = parseISO(order.created_at).toISOString().split('T')[0];
+        const fromDate = filters.dateRange.from || '2000-01-01';
+        const toDate = filters.dateRange.to || '2099-12-31';
+        return orderDate >= fromDate && orderDate <= toDate;
+      });
+    }
+
+    // Sort orders
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return filters.sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
-    setFilteredOrders(sorted);
-  }, [getBaseFilteredOrders, isLoadingPackingOrders]);
 
-  const handleFilterChange = (filtered: any[]) => {
-    setFilteredOrders(filtered);
-    console.log('Filter applied, showing orders:', filtered.length);
+    return filtered;
+  }, [printingOrders, filters]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    return filteredOrders.slice(start, end);
+  }, [filteredOrders, currentPage]);
+
+  // Stats calculations
+  const stats = useMemo(() => {
+    const today = new Date();
+    const todayPrintedCount = packingOrders?.filter(order => 
+      order.printed_at && isToday(parseISO(order.printed_at))
+    ).length || 0;
+
+    return {
+      todayPrinted: todayPrintedCount,
+      readyForPrinting: printingOrders?.length || 0,
+      readyForPacking: packingOrders?.length || 0,
+      selected: selectedOrders.length
+    };
+  }, [printingOrders, packingOrders, selectedOrders]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  // Reset selected orders when page changes
+  useEffect(() => {
+    setSelectedOrders([]);
+  }, [currentPage]);
+
+  const handleOrderSelect = (orderId: string, checked: boolean) => {
+    setSelectedOrders(prev => 
+      checked 
+        ? [...prev, orderId]
+        : prev.filter(id => id !== orderId)
+    );
   };
 
-  const handleSelectedCountChange = (count: number, selectedIds: Set<string>) => {
-    setSelectedCount(count);
-    setSelectedOrderIds(selectedIds);
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedOrders(checked ? paginatedOrders.map(order => order.id) : []);
   };
 
-  const handleSelectAll = (currentPageOrders?: any[]) => {
-    // If currentPageOrders is provided (from PrintQueue), select only current page
-    // Otherwise, select all filtered orders (for backward compatibility)
-    const ordersToSelect = currentPageOrders || filteredOrders;
-    const allIds = new Set(ordersToSelect.map(order => order.id));
-    setSelectedOrderIds(allIds);
-    setSelectedCount(allIds.size);
-  };
-
-  const handleUnselectAll = () => {
-    setSelectedOrderIds(new Set());
-    setSelectedCount(0);
-  };
-
-  const handleBulkPrint = () => {
-    if (selectedCount === 0) {
+  const handlePrintLabels = () => {
+    if (selectedOrders.length === 0) {
       toast({
         title: "No Orders Selected",
-        description: "Please select orders to print labels for.",
-        variant: "destructive"
+        description: "Please select at least one order to print labels.",
+        variant: "destructive",
       });
       return;
     }
-
-    // Get selected orders
-    const ordersToProcess = filteredOrders.filter(order => selectedOrderIds.has(order.id));
-    setBulkOrders(ordersToProcess);
-    setShowBulkPreview(true);
+    setShowLabelPreview(true);
   };
 
-  const handleBulkPrintComplete = (orderIds: string | string[]) => {
-    const count = Array.isArray(orderIds) ? orderIds.length : 1;
-    
-    // Update today's printed count
-    setTodayPrintedCount(prev => prev + count);
-    
-    toast({
-      title: "Success",
-      description: `${count} labels printed successfully! Orders moved to packing stage.`
-    });
-    
-    setShowBulkPreview(false);
-    setBulkOrders([]);
-    setSelectedOrderIds(new Set());
-    setSelectedCount(0);
-    
-    // Refresh the orders to show updated stages
-    refetch();
+  const handlePrintComplete = async () => {
+    try {
+      // Move selected orders to packing stage
+      for (const orderId of selectedOrders) {
+        await supabaseOrderService.updateOrderStage(orderId, 'packing');
+      }
+
+      toast({
+        title: "Success",
+        description: `${selectedOrders.length} order(s) moved to packing stage`,
+      });
+
+      // Reset selection and refresh data
+      setSelectedOrders([]);
+      setShowLabelPreview(false);
+      refetchPrinting();
+      refetchPacking();
+
+    } catch (error) {
+      console.error('Error moving orders to packing:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order stages. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (isLoading || isLoadingPackingOrders) {
-    return (
-      <div className="flex flex-col h-full">
-        <Header title="Printing Stage" showSearch={false} />
-        <div className="flex-1 p-6 bg-gray-50">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Printer className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading Shopify orders...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleSyncComplete = () => {
+    refetchPrinting();
+  };
 
-  if (error) {
-    return (
-      <div className="flex flex-col h-full">
-        <Header title="Printing Stage" showSearch={false} />
-        <div className="flex-1 p-6 bg-gray-50">
-          <Card className="max-w-md mx-auto mt-8">
-            <CardHeader>
-              <CardTitle className="text-red-600">Error Loading Shopify Orders</CardTitle>
-              <CardDescription>
-                Unable to load orders from Shopify. Please check your API configuration.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600">{error}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+  if (printingLoading || packingLoading) {
+    return <LoadingSpinner />;
   }
-
-  const readyForPacking = packingOrders.filter(order => order.stage === 'packing').length;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
-            <p className="text-gray-600 text-sm">
-              Generate shipping labels with smart filtering • Manual refresh
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              size="sm"
-              className="flex items-center space-x-2"
-            >
-              <Filter className="h-4 w-4" />
-              <span>Filters</span>
-            </Button>
-            <Button
-              onClick={refetch}
-              variant="outline"
-              size="sm"
-              className="flex items-center space-x-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
-            </Button>
-            <Button
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={selectedCount === 0}
-              onClick={handleBulkPrint}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print Selected Labels ({selectedCount})
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Printing Queue</h1>
+          <p className="text-gray-600">Print shipping labels for orders</p>
+        </div>
+        <ShopifySync onSyncComplete={handleSyncComplete} />
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today Printed</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.todayPrinted}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ready for Printing</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{stats.readyForPrinting}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ready for Packing</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.readyForPacking}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Selected</CardTitle>
+            <Users className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{stats.selected}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Controls */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex-1">
+          <PrintingFilters
+            orders={printingOrders || []}
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handlePrintLabels}
+            disabled={selectedOrders.length === 0}
+            className="min-w-[140px]"
+          >
+            Print Selected Labels
+            {selectedOrders.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {selectedOrders.length}
+              </Badge>
+            )}
+          </Button>
         </div>
       </div>
-      
-      <div className="flex-1 p-6 bg-gray-50 overflow-auto">
-        <div className="max-w-7xl mx-auto">
-          {/* Stats Section */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Printer className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <CardTitle className="text-sm font-medium text-gray-700">Today Printed</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-green-600">{todayPrintedCount}</div>
-                <p className="text-xs text-gray-500">Labels printed today</p>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Printer className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <CardTitle className="text-sm font-medium text-gray-700">Ready for Printing</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-blue-600">{filteredOrders.length}</div>
-                <p className="text-xs text-gray-500">Orders awaiting labels</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Printer className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <CardTitle className="text-sm font-medium text-gray-700">Ready for Packing</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-purple-600">{readyForPacking}</div>
-                <p className="text-xs text-gray-500">Printed orders</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Printer className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <CardTitle className="text-sm font-medium text-gray-700">Selected</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-orange-600">{selectedCount}</div>
-                <p className="text-xs text-gray-500">For batch printing</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Search Bar */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by product name, order ID, or phone number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Smart Filtering Section */}
-          {showFilters && (
-            <Card className="mb-6">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5 text-gray-600" />
-                  <CardTitle className="text-lg">Smart Product & Variation Filtering</CardTitle>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Filter orders by products, variations, date and sort order for efficient batch processing
-                </p>
-              </CardHeader>
-              <CardContent>
-                <PrintingFilters 
-                  orders={getBaseFilteredOrders()} 
-                  onFilterChange={handleFilterChange}
-                />
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Orders Section */}
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">Orders for Printing</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders match your filter criteria
-                  </p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900"
-                    onClick={() => handleSelectAll()}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900"
-                    onClick={handleUnselectAll}
-                  >
-                    Unselect All
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <PrintQueue 
-                orders={filteredOrders} 
-                isShopifyOrders={true}
-                onSelectedCountChange={handleSelectedCountChange}
-                selectedOrderIds={selectedOrderIds}
-                onSelectAll={handleSelectAll}
-                onUnselectAll={handleUnselectAll}
-                itemsPerPage={10}
+      {/* Orders List */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Orders Ready for Printing</CardTitle>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={paginatedOrders.length > 0 && selectedOrders.length === paginatedOrders.length}
+                onCheckedChange={handleSelectAll}
               />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              <span className="text-sm text-gray-600">Select All</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {paginatedOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+              <p className="text-gray-600">
+                {filters.searchQuery || filters.selectedProducts.length > 0 
+                  ? "No orders match your current filters."
+                  : "All orders have been processed or there are no new orders to print."
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paginatedOrders.map((order) => (
+                <div key={order.id} className="border rounded-lg p-4">
+                  <div className="flex items-start gap-4">
+                    <Checkbox
+                      checked={selectedOrders.includes(order.id)}
+                      onCheckedChange={(checked) => handleOrderSelect(order.id, checked as boolean)}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{order.order_number}</h3>
+                          <Badge variant="outline">Printing</Badge>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {order.created_at && format(parseISO(order.created_at), 'MMM d, yyyy HH:mm')}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Customer</p>
+                          <p className="font-medium">
+                            {order.customer ? `${order.customer.first_name} ${order.customer.last_name}`.trim() : 'Guest'}
+                          </p>
+                          {order.customer?.phone && (
+                            <p className="text-gray-600">{order.customer.phone}</p>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-600">Items ({order.order_items?.length || 0})</p>
+                          {order.order_items?.slice(0, 2).map((item, index) => (
+                            <p key={index} className="font-medium">
+                              {item.quantity}x {item.title}
+                              {item.variant_title && ` (${item.variant_title})`}
+                            </p>
+                          ))}
+                          {(order.order_items?.length || 0) > 2 && (
+                            <p className="text-gray-600">+{(order.order_items?.length || 0) - 2} more items</p>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-600">Total</p>
+                          <p className="font-medium">
+                            {order.currency} {order.total_amount}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {/* Bulk Print Preview */}
-      {showBulkPreview && bulkOrders.length > 0 && (
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length} orders
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Label Preview Modal */}
+      {showLabelPreview && (
         <ShippingLabelPreview
-          open={showBulkPreview}
-          onClose={() => setShowBulkPreview(false)}
-          orders={bulkOrders}
-          onPrintComplete={handleBulkPrintComplete}
+          orderIds={selectedOrders}
+          onClose={() => setShowLabelPreview(false)}
+          onPrintComplete={handlePrintComplete}
         />
       )}
     </div>
   );
-};
-
-export default Printing;
+}

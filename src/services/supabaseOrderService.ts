@@ -419,17 +419,29 @@ export const supabaseOrderService = {
     // Check if order already exists
     const { data: existingOrder } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, stage')
       .eq('shopify_order_id', shopifyOrder.id)
       .single();
 
     if (existingOrder) {
-      // Update existing order to packing stage
-      await this.updateOrderStage(existingOrder.id, 'packing');
+      // If order exists but is not in printing stage, update it to printing
+      if (existingOrder.stage !== 'printing') {
+        await this.updateOrderStage(existingOrder.id, 'printing');
+      }
       return existingOrder.id;
     } else {
-      // Create new order
-      return await this.createOrderFromShopify(shopifyOrder);
+      // Create new order using the database function
+      const { data: orderId, error } = await supabase.rpc(
+        'sync_shopify_order_to_db',
+        { shopify_order_data: shopifyOrder }
+      );
+
+      if (error) {
+        console.error('Error syncing Shopify order:', error);
+        throw error;
+      }
+
+      return orderId;
     }
   },
 
