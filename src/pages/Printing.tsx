@@ -272,8 +272,37 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh the orders to show updated stages
+    // Force refresh of all data - both Shopify and Supabase orders
     refetch();
+    
+    // Force re-execution of the synced orders effect by updating a dependency
+    const fetchSyncedOrders = async () => {
+      try {
+        const { data: allSyncedOrders, error } = await supabase
+          .from('orders')
+          .select('shopify_order_id, stage')
+          .not('shopify_order_id', 'is', null);
+          
+        if (error) {
+          console.error('Error fetching synced orders:', error);
+          return;
+        }
+        
+        // Get ALL synced order IDs to exclude them from Shopify orders display
+        const allSyncedIds = new Set(
+          allSyncedOrders
+            .map(order => order.shopify_order_id)
+            .filter(Boolean)
+        );
+        setAllSyncedShopifyOrderIds(allSyncedIds);
+        console.log('All synced Shopify order IDs to exclude from Shopify list (after print):', Array.from(allSyncedIds));
+      } catch (error) {
+        console.error('Error in fetchSyncedOrders after print:', error);
+      }
+    };
+    
+    // Refresh synced orders data immediately after printing
+    fetchSyncedOrders();
   };
 
   if (isLoading || isLoadingPrintingOrders || isLoadingPackingOrders) {
