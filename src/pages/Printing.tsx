@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -47,34 +46,46 @@ const Printing = () => {
     setSyncedShopifyOrderIds(new Set());
   }, []);
 
-  // Fetch synced Shopify order IDs - exclude orders that are beyond printing stage
+  // Fetch synced Shopify order IDs - Get ALL orders that exist in Supabase
   useEffect(() => {
     const fetchSyncedOrders = async () => {
       try {
-        console.log('Fetching synced orders to determine exclusions...');
-        const { data: syncedOrders, error } = await supabase
+        console.log('🔍 DEBUG: Fetching ALL synced orders from Supabase...');
+        const { data: allSupabaseOrders, error } = await supabase
           .from('orders')
-          .select('shopify_order_id, stage')
+          .select('shopify_order_id, stage, order_number')
           .not('shopify_order_id', 'is', null);
           
         if (error) {
-          console.error('Error fetching synced orders:', error);
+          console.error('❌ Error fetching synced orders:', error);
           return;
         }
         
-        // Exclude orders that are NOT in printing stage (packing, tracking, shipped, delivered)
-        const syncedIds = new Set(
-          syncedOrders
-            .filter(order => order.stage !== 'printing')
-            .map(order => order.shopify_order_id)
-            .filter(Boolean)
+        console.log('📊 DEBUG: All Supabase orders found:', allSupabaseOrders?.length || 0);
+        
+        // Get all Shopify order IDs that exist in Supabase (regardless of stage)
+        const allSyncedIds = new Set(
+          allSupabaseOrders
+            ?.map(order => order.shopify_order_id)
+            .filter(Boolean) || []
         );
         
-        console.log(`Found ${syncedIds.size} synced orders to exclude from Shopify display`);
-        console.log('Excluded stages:', syncedOrders.filter(o => o.stage !== 'printing').map(o => `${o.shopify_order_id}:${o.stage}`));
-        setSyncedShopifyOrderIds(syncedIds);
+        console.log('🔍 DEBUG: Orders by stage in Supabase:');
+        const stageBreakdown: { [key: string]: number } = {};
+        allSupabaseOrders?.forEach(order => {
+          stageBreakdown[order.stage] = (stageBreakdown[order.stage] || 0) + 1;
+          if (order.stage === 'packing') {
+            console.log(`  📦 PACKING: ${order.order_number} (Shopify ID: ${order.shopify_order_id})`);
+          }
+        });
+        
+        console.log('📈 DEBUG: Stage breakdown:', stageBreakdown);
+        console.log(`🚫 DEBUG: Total synced Shopify order IDs to exclude: ${allSyncedIds.size}`);
+        console.log('🚫 DEBUG: Synced IDs sample:', Array.from(allSyncedIds).slice(0, 10));
+        
+        setSyncedShopifyOrderIds(allSyncedIds);
       } catch (error) {
-        console.error('Error in fetchSyncedOrders:', error);
+        console.error('❌ Error in fetchSyncedOrders:', error);
       }
     };
 
@@ -96,21 +107,24 @@ const Printing = () => {
     setTodayPrintedCount(todayPrinted.length);
   }, [packingOrders]);
 
-  // Process and filter orders - ONLY show printing stage orders
+  // Process and filter orders - ONLY show printing stage orders + new Shopify orders
   const getBaseFilteredOrders = useCallback(() => {
     if (isLoadingPrintingOrders) {
       return [];
     }
     
-    console.log('=== PRINTING ORDER FILTERING DEBUG ===');
-    console.log('Total Shopify orders:', shopifyOrders.length);
-    console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
-    console.log('Supabase orders in PRINTING stage ONLY:', printingOrders.length);
+    console.log('🔧 === DETAILED PRINTING ORDER FILTERING DEBUG ===');
+    console.log('📥 Input data:');
+    console.log(`  - Total Shopify orders: ${shopifyOrders.length}`);
+    console.log(`  - Synced order IDs to exclude: ${syncedShopifyOrderIds.size}`);
+    console.log(`  - Supabase orders in PRINTING stage: ${printingOrders.length}`);
+    console.log(`  - Supabase orders in PACKING stage: ${packingOrders.length}`);
     
     // Create a map to track orders by Shopify order ID
     const orderMap = new Map();
     
     // First, add ONLY printing stage orders from Supabase
+    console.log('📦 Adding Supabase PRINTING stage orders:');
     printingOrders.forEach(order => {
       const shopifyOrderId = order.shopify_order_id?.toString();
       if (shopifyOrderId) {
@@ -154,45 +168,47 @@ const Printing = () => {
           _isSupabaseOrder: true
         };
         orderMap.set(shopifyOrderId, formattedOrder);
-        console.log(`✓ Added Supabase PRINTING order ${order.order_number} (ID: ${shopifyOrderId})`);
+        console.log(`  ✅ Added Supabase PRINTING order: ${order.order_number} (ID: ${shopifyOrderId})`);
       }
     });
 
-    // Then, add unfulfilled Shopify orders that are NOT already synced to any stage
+    // Then, add NEW unfulfilled Shopify orders that are NOT synced to Supabase at all
+    console.log('🛍️ Processing Shopify orders for new additions:');
     shopifyOrders.forEach(order => {
       const orderId = order.id.toString();
       
       // Skip if already in map (from Supabase printing stage)
       if (orderMap.has(orderId)) {
-        console.log(`⚠ Skipping Shopify order ${order.id} - already exists in printing stage`);
+        console.log(`  ⏭️ Skipping Shopify order ${order.order_number || order.id} - already exists in printing stage`);
         return;
       }
       
-      // Only include unfulfilled orders that are not synced to ANY stage
+      // Only include unfulfilled orders that are not synced to Supabase AT ALL
       const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
       const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
       
-      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
+      console.log(`  🔍 Shopify Order ${order.order_number || order.id}:`);
+      console.log(`    - Fulfillment: ${order.fulfillment_status} (unfulfilled: ${isUnfulfilled})`);
+      console.log(`    - Synced to Supabase: ${!isNotSynced} (should exclude: ${!isNotSynced})`);
       
       if (isUnfulfilled && isNotSynced) {
         orderMap.set(orderId, {
           ...order,
           _isSupabaseOrder: false
         });
-        console.log(`✓ Added NEW Shopify order ${order.id} to printing display`);
+        console.log(`    ✅ ADDED to printing display`);
       } else {
-        console.log(`✗ Excluded Shopify order ${order.id} - fulfilled: ${!isUnfulfilled}, synced: ${!isNotSynced}`);
+        console.log(`    ❌ EXCLUDED - fulfilled: ${!isUnfulfilled}, synced: ${!isNotSynced}`);
       }
     });
 
     let readyToPrintOrders = Array.from(orderMap.values());
     
-    console.log('=== FINAL PRINTING RESULTS ===');
-    console.log('Total orders ready for PRINTING:', readyToPrintOrders.length);
-    console.log('Orders by source:', {
-      supabase_printing: readyToPrintOrders.filter(o => o._isSupabaseOrder).length,
-      shopify_new: readyToPrintOrders.filter(o => !o._isSupabaseOrder).length
-    });
+    console.log('📈 === FINAL PRINTING RESULTS ===');
+    console.log(`Total orders ready for PRINTING: ${readyToPrintOrders.length}`);
+    console.log('Orders by source:');
+    console.log(`  - Supabase printing stage: ${readyToPrintOrders.filter(o => o._isSupabaseOrder).length}`);
+    console.log(`  - New Shopify orders: ${readyToPrintOrders.filter(o => !o._isSupabaseOrder).length}`);
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -206,7 +222,7 @@ const Printing = () => {
         )) return true;
         return false;
       });
-      console.log(`Search filtered orders: ${readyToPrintOrders.length} match "${query}"`);
+      console.log(`🔍 Search filtered orders: ${readyToPrintOrders.length} match "${query}"`);
     }
     
     return readyToPrintOrders;
@@ -281,14 +297,14 @@ const Printing = () => {
     setSelectedCount(0);
     
     // Force refresh after printing and clear synced order cache
-    console.log('Refreshing after successful print - orders should move to packing...');
-    // Clear the synced orders cache so excluded orders list is refreshed
+    console.log('🔄 PRINT COMPLETE: Refreshing data to remove printed orders from view...');
+    // Clear the synced orders cache so excluded orders list is refreshed immediately
     setSyncedShopifyOrderIds(new Set());
     refetch();
   };
 
   const handleRefresh = () => {
-    console.log('Manual refresh - clearing cache and refetching after token change...');
+    console.log('🔄 Manual refresh - clearing cache and refetching after token change...');
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     setSyncedShopifyOrderIds(new Set());
@@ -346,7 +362,7 @@ const Printing = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
             <p className="text-gray-600 text-sm">
-              Generate shipping labels • Updated with new token
+              Generate shipping labels • Debug mode active
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -489,7 +505,7 @@ const Printing = () => {
                 <div>
                   <CardTitle className="text-lg">Orders for Printing</CardTitle>
                   <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders ready for printing • Token updated
+                    {filteredOrders.length} orders ready for printing • Debug mode active
                   </p>
                 </div>
                 <div className="flex space-x-2">
