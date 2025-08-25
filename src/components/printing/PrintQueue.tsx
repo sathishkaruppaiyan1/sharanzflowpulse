@@ -46,10 +46,28 @@ const PrintQueue = ({
   const endIndex = startIndex + itemsPerPage;
   const paginatedOrders = orders.slice(startIndex, endIndex);
 
-  // Reset to first page when orders change
+  // Handle pagination when orders change - more robust approach
   useEffect(() => {
-    setCurrentPage(1);
-  }, [orders.length]);
+    if (orders.length === 0) {
+      setCurrentPage(1);
+      return;
+    }
+
+    const newTotalPages = Math.ceil(orders.length / itemsPerPage);
+    
+    // Only adjust current page if it's beyond the available pages
+    if (currentPage > newTotalPages) {
+      setCurrentPage(Math.max(1, newTotalPages));
+    }
+  }, [orders.length, itemsPerPage, currentPage]);
+
+  // Additional effect to handle when current page becomes empty
+  useEffect(() => {
+    if (paginatedOrders.length === 0 && orders.length > 0 && currentPage > 1) {
+      // If current page is empty but we have orders, go to previous page
+      setCurrentPage(prev => Math.max(1, prev - 1));
+    }
+  }, [paginatedOrders.length, orders.length, currentPage]);
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -69,6 +87,8 @@ const PrintQueue = ({
   };
 
   const handlePrintComplete = (orderId: string) => {
+    console.log('Print completed for order:', orderId);
+    
     // Remove from selected orders after successful print
     const newSelected = new Set(selectedOrders);
     if (Array.isArray(orderId)) {
@@ -85,6 +105,19 @@ const PrintQueue = ({
       description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
     });
     console.log('Moving order to packing stage:', orderId);
+
+    // Handle pagination after order removal with a small delay to allow state updates
+    setTimeout(() => {
+      const remainingOrders = orders.length;
+      const newTotalPages = Math.ceil(remainingOrders / itemsPerPage);
+      
+      // If current page becomes invalid after order removal, adjust it
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      } else if (remainingOrders === 0) {
+        setCurrentPage(1);
+      }
+    }, 100);
   };
 
   const isPrinting = (orderId: string) => printingOrders.has(orderId);
@@ -232,20 +265,12 @@ const PrintQueue = ({
                   />
                 </PaginationItem>
                 
-                {[...Array(totalPages)].map((_, i) => {
-                  const page = i + 1;
-                  return (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        onClick={() => handlePageChange(page)}
-                        isActive={currentPage === page}
-                        className="cursor-pointer"
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
+                {/* Show current page info instead of all page numbers */}
+                <PaginationItem>
+                  <span className="px-3 py-2 text-sm text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                </PaginationItem>
                 
                 <PaginationItem>
                   <PaginationNext 
