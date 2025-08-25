@@ -11,14 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
 
 const Printing = () => {
-  const queryClient = useQueryClient();
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
   // Only fetch orders in printing stage, not packing
-  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders, refetch: refetchPackingOrders } = useOrdersByStage('packing');
+  const { data: printingOrders = [], isPending: isLoadingPrintingOrders } = useOrdersByStage('printing');
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -26,7 +24,7 @@ const Printing = () => {
   const [showBulkPreview, setShowBulkPreview] = useState(false);
   const [bulkOrders, setBulkOrders] = useState<any[]>([]);
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
-  const [allSyncedShopifyOrderIds, setAllSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
+  const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
 
   // Sort Shopify orders by newest first (created_at descending)
@@ -38,11 +36,11 @@ const Printing = () => {
     });
   }, [rawShopifyOrders]);
 
-  // Fetch ALL synced Shopify order IDs - exclude ALL orders that are already in our system
+  // Fetch synced Shopify order IDs - exclude all orders that are already in our system
   useEffect(() => {
     const fetchSyncedOrders = async () => {
       try {
-        const { data: allSyncedOrders, error } = await supabase
+        const { data: syncedOrders, error } = await supabase
           .from('orders')
           .select('shopify_order_id, stage')
           .not('shopify_order_id', 'is', null);
@@ -52,14 +50,15 @@ const Printing = () => {
           return;
         }
         
-        // Get ALL synced order IDs to exclude them from Shopify orders display
-        const allSyncedIds = new Set(
-          allSyncedOrders
+        // Exclude ALL orders that are already in our system (any stage except printing)
+        const syncedIds = new Set(
+          syncedOrders
+            .filter(order => order.stage !== 'printing') // Only allow printing stage orders to show
             .map(order => order.shopify_order_id)
             .filter(Boolean)
         );
-        setAllSyncedShopifyOrderIds(allSyncedIds);
-        console.log('All synced Shopify order IDs to exclude from Shopify list:', Array.from(allSyncedIds));
+        setSyncedShopifyOrderIds(syncedIds);
+        console.log('Synced Shopify order IDs (excluding printing stage):', Array.from(syncedIds));
       } catch (error) {
         console.error('Error in fetchSyncedOrders:', error);
       }
@@ -89,7 +88,7 @@ const Printing = () => {
       return [];
     }
     console.log('Total Shopify orders:', shopifyOrders.length);
-    console.log('All synced order IDs to exclude:', Array.from(allSyncedShopifyOrderIds));
+    console.log('Synced order IDs to exclude:', Array.from(syncedShopifyOrderIds));
     
     // Get orders from Supabase that are ONLY in printing stage
     const supabaseOrdersInPrinting = printingOrders.filter(order => order.stage === 'printing');
@@ -148,7 +147,7 @@ const Printing = () => {
       }
     });
 
-    // Then, add Shopify orders that are not already in our system at all
+    // Then, add Shopify orders that are not already in the map and meet criteria
     shopifyOrders.forEach(order => {
       const orderId = order.id.toString();
       
@@ -158,20 +157,18 @@ const Printing = () => {
         return;
       }
       
-      // Check if order should be included - exclude ALL orders that exist in our system
+      // Check if order should be included
       const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
-      const isNotInOurSystem = !allSyncedShopifyOrderIds.has(Number(order.id));
+      const isNotSynced = !syncedShopifyOrderIds.has(Number(order.id));
       
-      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, inOurSystem=${!isNotInOurSystem}`);
+      console.log(`Shopify Order ${order.id}: fulfillment=${order.fulfillment_status}, synced=${!isNotSynced}`);
       
-      if (isUnfulfilled && isNotInOurSystem) {
+      if (isUnfulfilled && isNotSynced) {
         orderMap.set(orderId, {
           ...order,
           _isSupabaseOrder: false
         });
         console.log(`Added Shopify order ${order.id} to map`);
-      } else {
-        console.log(`Excluded Shopify order ${order.id} - ${!isUnfulfilled ? 'fulfilled' : 'already in our system'}`);
       }
     });
 
@@ -201,20 +198,7 @@ const Printing = () => {
     }
     
     return readyToPrintOrders;
-  }, [shopifyOrders, searchQuery, allSyncedShopifyOrderIds, printingOrders, isLoadingPrintingOrders, isLoadingPackingOrders]);
-
-  // Handle orders update after printing
-  const handleOrdersUpdate = useCallback(async () => {
-    console.log('🔄 Refreshing orders after print completion...');
-    
-    // Invalidate and refetch all order-related queries
-    await queryClient.invalidateQueries({ queryKey: ['orders'] });
-    await refetchPrintingOrders();
-    await refetchPackingOrders();
-    refetch(); // Refresh Shopify orders too
-    
-    console.log('✅ Orders refreshed successfully');
-  }, [queryClient, refetchPrintingOrders, refetchPackingOrders, refetch]);
+  }, [shopifyOrders, searchQuery, syncedShopifyOrderIds, printingOrders, isLoadingPrintingOrders, isLoadingPackingOrders]);
 
   // Initialize filtered orders with default sorting only
   useEffect(() => {
@@ -272,7 +256,7 @@ const Printing = () => {
     setShowBulkPreview(true);
   };
 
-  const handleBulkPrintComplete = async (orderIds: string | string[]) => {
+  const handleBulkPrintComplete = (orderIds: string | string[]) => {
     const count = Array.isArray(orderIds) ? orderIds.length : 1;
     
     // Update today's printed count
@@ -288,8 +272,8 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh all orders
-    await handleOrdersUpdate();
+    // Refresh the orders to show updated stages
+    refetch();
   };
 
   if (isLoading || isLoadingPrintingOrders || isLoadingPackingOrders) {
@@ -514,7 +498,6 @@ const Printing = () => {
                 onSelectAll={handleSelectAll}
                 onUnselectAll={handleUnselectAll}
                 itemsPerPage={10}
-                onOrdersUpdate={handleOrdersUpdate}
               />
             </CardContent>
           </Card>
