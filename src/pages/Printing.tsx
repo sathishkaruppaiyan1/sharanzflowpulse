@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -12,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 const Printing = () => {
   // Supabase-only approach: Fetch orders in 'printing' stage only
@@ -80,13 +80,16 @@ const Printing = () => {
     });
   }, [printingOrders]);
 
-  // Sync new orders function
+  // Enhanced sync function to automatically fetch and store new orders
   const syncNewOrders = useCallback(async () => {
     if (isSyncing || isLoadingShopify) return;
     
     setIsSyncing(true);
     try {
-      console.log('🔄 Starting sync of new Shopify orders...');
+      console.log('🔄 Starting comprehensive sync of Shopify orders...');
+      
+      // First, refresh Shopify orders to get latest data
+      await refetchShopify();
       
       // Get all existing Shopify order IDs from Supabase
       const { data: existingOrders, error: fetchError } = await supabase
@@ -100,20 +103,27 @@ const Printing = () => {
       
       const existingShopifyIds = new Set(existingOrders.map(order => order.shopify_order_id));
       console.log('📋 Found', existingShopifyIds.size, 'existing orders in Supabase');
+      console.log('📦 Total Shopify orders fetched:', shopifyOrders.length);
       
-      // Filter new unfulfilled Shopify orders
-      const newOrders = shopifyOrders.filter(order => {
+      // Filter unfulfilled orders that are not yet in database
+      const unfulfilled = shopifyOrders.filter(order => {
         const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
-        const isNew = !existingShopifyIds.has(Number(order.id));
-        return isUnfulfilled && isNew;
+        return isUnfulfilled;
       });
       
-      console.log('🆕 Found', newOrders.length, 'new orders to sync');
+      console.log('📦 Total unfulfilled Shopify orders:', unfulfilled.length);
+      
+      const newOrders = unfulfilled.filter(order => {
+        const isNew = !existingShopifyIds.has(Number(order.id));
+        return isNew;
+      });
+      
+      console.log('🆕 Found', newOrders.length, 'new unfulfilled orders to sync');
       
       if (newOrders.length === 0) {
         toast({
           title: "Sync Complete",
-          description: "No new orders found to sync.",
+          description: `No new orders found. ${unfulfilled.length} unfulfilled orders total, ${existingShopifyIds.size} already in database.`,
         });
         setLastSyncTime(new Date());
         return;
@@ -136,7 +146,7 @@ const Printing = () => {
       if (syncedCount > 0) {
         toast({
           title: "Sync Successful",
-          description: `${syncedCount} new orders synced to printing stage.`,
+          description: `${syncedCount} new orders synced to printing stage. Total unfulfilled: ${unfulfilled.length}`,
         });
         
         // Refresh printing orders to show new orders
@@ -156,7 +166,26 @@ const Printing = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [shopifyOrders, isSyncing, isLoadingShopify, refetchPrintingOrders]);
+  }, [shopifyOrders, isSyncing, isLoadingShopify, refetchPrintingOrders, refetchShopify]);
+
+  // Auto-sync when component mounts and every 10 minutes
+  useEffect(() => {
+    // Initial sync after a short delay
+    const initialTimer = setTimeout(() => {
+      syncNewOrders();
+    }, 2000);
+
+    // Set up periodic sync every 10 minutes
+    const intervalTimer = setInterval(() => {
+      console.log('🔄 Auto-syncing orders...');
+      syncNewOrders();
+    }, 10 * 60 * 1000); // 10 minutes
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, []);
 
   // Calculate today's printed orders count from packing stage
   useEffect(() => {
@@ -280,6 +309,10 @@ const Printing = () => {
     refetchPrintingOrders();
   };
 
+  const handleRefresh = () => {
+    refetchPrintingOrders();
+  };
+
   if (isLoadingPrintingOrders || isLoadingPackingOrders) {
     return (
       <div className="flex flex-col h-full">
@@ -306,7 +339,7 @@ const Printing = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
             <p className="text-gray-600 text-sm">
-              Generate shipping labels • Supabase-only data source • Manual sync for new orders
+              Auto-sync enabled • {formattedPrintingOrders.length} orders ready for printing
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -327,10 +360,10 @@ const Printing = () => {
               className="flex items-center space-x-2"
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync New Orders'}</span>
+              <span>{isSyncing ? 'Syncing...' : 'Manual Sync'}</span>
             </Button>
             <Button
-              onClick={refetchPrintingOrders}
+              onClick={handleRefresh}
               variant="outline"
               size="sm"
               className="flex items-center space-x-2"
@@ -369,7 +402,7 @@ const Printing = () => {
                         <>
                           <div className="h-2 w-2 bg-green-500 rounded-full"></div>
                           <span className="text-gray-600">
-                            Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'}
+                            Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 10 minutes
                           </span>
                         </>
                       )}
@@ -388,6 +421,7 @@ const Printing = () => {
               </Card>
             </div>
           )}
+
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -494,7 +528,7 @@ const Printing = () => {
                 <div>
                   <CardTitle className="text-lg">Orders for Printing</CardTitle>
                   <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders in printing stage from Supabase
+                    {filteredOrders.length} orders in printing stage • Auto-synced from Shopify
                   </p>
                 </div>
                 <div className="flex space-x-2">
