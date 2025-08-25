@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Phone, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -253,7 +252,7 @@ const PrintQueue = ({
           </Card>
         )}
 
-        {/* Pagination */}
+        {/* Compact Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-center mt-6">
             <Pagination>
@@ -265,7 +264,7 @@ const PrintQueue = ({
                   />
                 </PaginationItem>
                 
-                {/* Show current page info instead of all page numbers */}
+                {/* Compact page info */}
                 <PaginationItem>
                   <span className="px-3 py-2 text-sm text-gray-700">
                     Page {currentPage} of {totalPages}
