@@ -46,10 +46,21 @@ const PrintQueue = ({
   const endIndex = startIndex + itemsPerPage;
   const paginatedOrders = orders.slice(startIndex, endIndex);
 
-  // Reset to first page when orders change
+  // Reset to valid page when orders change or current page becomes invalid
   useEffect(() => {
-    setCurrentPage(1);
-  }, [orders.length]);
+    if (orders.length === 0) {
+      setCurrentPage(1);
+      return;
+    }
+    
+    const newTotalPages = Math.ceil(orders.length / itemsPerPage);
+    
+    // If current page is now beyond the available pages, reset to the last valid page
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      console.log(`Pagination: Resetting from page ${currentPage} to page ${newTotalPages} (total orders: ${orders.length})`);
+      setCurrentPage(newTotalPages);
+    }
+  }, [orders.length, itemsPerPage, currentPage]);
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -69,12 +80,18 @@ const PrintQueue = ({
   };
 
   const handlePrintComplete = (orderId: string) => {
+    console.log('Print completed for order:', orderId);
+    
     // Remove from selected orders after successful print
     const newSelected = new Set(selectedOrders);
     if (Array.isArray(orderId)) {
-      orderId.forEach(id => newSelected.delete(id));
+      orderId.forEach(id => {
+        newSelected.delete(id);
+        console.log(`Removed order ${id} from selection after printing`);
+      });
     } else {
       newSelected.delete(orderId);
+      console.log(`Removed order ${orderId} from selection after printing`);
     }
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
@@ -91,6 +108,7 @@ const PrintQueue = ({
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
+      console.log(`Pagination: Changing from page ${currentPage} to page ${page}`);
       setCurrentPage(page);
     }
   };
