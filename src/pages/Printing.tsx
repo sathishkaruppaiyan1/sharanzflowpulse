@@ -14,9 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Printing = () => {
   const { orders: rawShopifyOrders = [], loading: isLoading, error, refetch } = useShopifyOrders();
-  // Only fetch orders in printing stage, not packing
-  const { data: printingOrders = [], isPending: isLoadingPrintingOrders } = useOrdersByStage('printing');
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
+  // Only fetch orders in printing stage, not packing - force refetch to ensure fresh data
+  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders, refetch: refetchPackingOrders } = useOrdersByStage('packing');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -26,6 +26,14 @@ const Printing = () => {
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
   const [syncedShopifyOrderIds, setSyncedShopifyOrderIds] = useState<Set<number>>(new Set());
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
+
+  // Force refresh all data when component mounts to clear any stale cache
+  useEffect(() => {
+    console.log('Printing component mounted - force refreshing all order data to clear stale cache');
+    refetch(); // Refresh Shopify orders
+    refetchPrintingOrders(); // Refresh printing stage orders
+    refetchPackingOrders(); // Refresh packing stage orders
+  }, []); // Run only once on mount
 
   // Sort Shopify orders by newest first (created_at descending)
   const shopifyOrders = React.useMemo(() => {
@@ -272,37 +280,11 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Force refresh of all data - both Shopify and Supabase orders
-    refetch();
-    
-    // Force re-execution of the synced orders effect by updating a dependency
-    const fetchSyncedOrders = async () => {
-      try {
-        const { data: allSyncedOrders, error } = await supabase
-          .from('orders')
-          .select('shopify_order_id, stage')
-          .not('shopify_order_id', 'is', null);
-          
-        if (error) {
-          console.error('Error fetching synced orders:', error);
-          return;
-        }
-        
-        // Get ALL synced order IDs to exclude them from Shopify orders display
-        const allSyncedIds = new Set(
-          allSyncedOrders
-            .map(order => order.shopify_order_id)
-            .filter(Boolean)
-        );
-        setAllSyncedShopifyOrderIds(allSyncedIds);
-        console.log('All synced Shopify order IDs to exclude from Shopify list (after print):', Array.from(allSyncedIds));
-      } catch (error) {
-        console.error('Error in fetchSyncedOrders after print:', error);
-      }
-    };
-    
-    // Refresh synced orders data immediately after printing
-    fetchSyncedOrders();
+    // Force refresh all order data to immediately reflect stage changes
+    console.log('Orders printed - force refreshing all data to reflect stage changes');
+    refetch(); // Refresh Shopify orders
+    refetchPrintingOrders(); // Refresh printing stage orders  
+    refetchPackingOrders(); // Refresh packing stage orders
   };
 
   if (isLoading || isLoadingPrintingOrders || isLoadingPackingOrders) {
@@ -366,7 +348,12 @@ const Printing = () => {
               <span>Filters</span>
             </Button>
             <Button
-              onClick={refetch}
+              onClick={() => {
+                console.log('Manual refresh triggered - refreshing all data');
+                refetch();
+                refetchPrintingOrders();
+                refetchPackingOrders();
+              }}
               variant="outline"
               size="sm"
               className="flex items-center space-x-2"
