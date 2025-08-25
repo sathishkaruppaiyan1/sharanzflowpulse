@@ -361,14 +361,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         }
         console.log('Order sync and stage updates completed');
         
-        // Refresh all order queries to update the UI immediately
+        // Refresh all order queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ predicate: (query) => {
-          // Invalidate any query that starts with 'orders'
-          return Array.isArray(query.queryKey) && query.queryKey[0] === 'orders';
-        }});
-        queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
-        console.log('Invalidated all order-related queries for immediate UI refresh');
+        console.log('Invalidated order queries for UI refresh');
         
       } catch (stageError) {
         console.warn('Order sync process failed (but printing succeeded):', stageError);
