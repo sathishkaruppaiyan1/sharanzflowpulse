@@ -47,19 +47,21 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
     throw new Error('Shopify API not configured');
   }
 
-  console.log('Fetching Shopify orders...');
+  console.log('Fetching Shopify orders with new token...');
   const { data, error: functionError } = await supabase.functions.invoke('fetch-shopify-orders');
 
   if (functionError) {
+    console.error('Shopify function error:', functionError);
     throw new Error(functionError.message);
   }
 
   if (data.error) {
+    console.error('Shopify API error:', data.error);
     throw new Error(data.error);
   }
 
   const orders = data.orders || [];
-  console.log(`Fetched ${orders.length} Shopify orders`);
+  console.log(`Successfully fetched ${orders.length} Shopify orders with new token`);
   
   // Enhanced phone number logging and processing
   orders.forEach((order: ShopifyOrder) => {
@@ -100,14 +102,19 @@ export const useShopifyOrders = () => {
     queryKey: ['shopify-orders', apiConfigs?.shopify?.shop_url, apiConfigs?.shopify?.access_token],
     queryFn: () => fetchShopifyOrders(apiConfigs?.shopify),
     enabled: isConfigured,
-    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
-    gcTime: 10 * 60 * 1000, // Cache for 10 minutes
-    refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
+    staleTime: 0, // Always refetch to get latest data after token change
+    gcTime: 2 * 60 * 1000, // Shorter cache time after token change
+    refetchInterval: false, // Disable auto-refetch temporarily to avoid conflicts
     refetchOnWindowFocus: true,
     retry: (failureCount, error) => {
+      console.log(`Shopify API retry attempt ${failureCount + 1}:`, error.message);
       // Don't retry if it's a configuration error
       if (error.message?.includes('not configured')) {
         return false;
+      }
+      // More aggressive retry for token-related errors
+      if (error.message?.includes('Unauthorized') || error.message?.includes('token')) {
+        return failureCount < 1; // Only retry once for auth errors
       }
       return failureCount < 3;
     },
@@ -118,7 +125,10 @@ export const useShopifyOrders = () => {
     orders,
     loading: loading || isRefetching,
     error: error?.message || null,
-    refetch: () => refetch(),
+    refetch: () => {
+      console.log('Manually refetching Shopify orders after token change...');
+      return refetch();
+    },
     isConfigured
   };
 };
