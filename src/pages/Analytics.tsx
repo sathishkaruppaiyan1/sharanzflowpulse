@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Order } from '@/types/database';
 
 const Analytics = () => {
-  const { orders = [], loading: isLoading, error } = useOrders();
+  const { data: orders = [], isLoading, error } = useOrders();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
@@ -85,7 +85,7 @@ const Analytics = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600">{error}</p>
+              <p className="text-sm text-gray-600">{error.message}</p>
             </CardContent>
           </Card>
         </div>

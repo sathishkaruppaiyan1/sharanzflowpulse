@@ -290,7 +290,6 @@ export type Database = {
           shipped_at: string | null
           shipping_address_id: string | null
           shopify_order_id: number | null
-          shopify_synced_at: string | null
           stage: Database["public"]["Enums"]["order_stage"] | null
           total_amount: number | null
           tracking_number: string | null
@@ -309,7 +308,6 @@ export type Database = {
           shipped_at?: string | null
           shipping_address_id?: string | null
           shopify_order_id?: number | null
-          shopify_synced_at?: string | null
           stage?: Database["public"]["Enums"]["order_stage"] | null
           total_amount?: number | null
           tracking_number?: string | null
@@ -328,7 +326,6 @@ export type Database = {
           shipped_at?: string | null
           shipping_address_id?: string | null
           shopify_order_id?: number | null
-          shopify_synced_at?: string | null
           stage?: Database["public"]["Enums"]["order_stage"] | null
           total_amount?: number | null
           tracking_number?: string | null
@@ -471,10 +468,6 @@ export type Database = {
     }
     Functions: {
       sync_shopify_order: {
-        Args: { shopify_order_data: Json }
-        Returns: string
-      }
-      sync_shopify_order_to_db: {
         Args: { shopify_order_data: Json }
         Returns: string
       }

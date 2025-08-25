@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { orders = [] } = useOrders();
+  const { data: orders = [] } = useOrders();
   const { orders: shopifyOrders = [] } = useShopifyOrders();
   const [realtimeData, setRealtimeData] = useState({
     newOrders: 0,
