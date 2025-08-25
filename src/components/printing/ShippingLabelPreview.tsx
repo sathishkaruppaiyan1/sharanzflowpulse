@@ -344,29 +344,30 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       console.log('Print initiated successfully');
 
-      // Create orders in Supabase and move to packing stage after successful print
+      // Move orders to packing stage after successful print (Supabase-only approach)
       try {
-        console.log('Creating/syncing orders to Supabase and moving to packing stage...');
+        console.log('Moving orders to packing stage after successful print...');
         for (const orderData of ordersToProcess) {
-          if (orderData.id) {
+          if (orderData._originalSupabaseOrder) {
             try {
-              console.log('Syncing Shopify order to Supabase:', orderData.id);
-              await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
-              console.log('Successfully synced and moved order to packing:', orderData.id);
+              const supabaseOrderId = orderData._originalSupabaseOrder.id;
+              console.log('Moving Supabase order to packing stage:', supabaseOrderId);
+              await supabaseOrderService.updateOrderStage(supabaseOrderId, 'packing');
+              console.log('Successfully moved order to packing:', supabaseOrderId);
             } catch (orderError) {
-              console.error('Failed to sync order:', orderData.id, orderError);
+              console.error('Failed to move order to packing:', orderData.id, orderError);
               // Continue with other orders even if one fails
             }
           }
         }
-        console.log('Order sync and stage updates completed');
+        console.log('Order stage updates completed');
         
         // Refresh all order queries to update the UI
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         console.log('Invalidated order queries for UI refresh');
         
       } catch (stageError) {
-        console.warn('Order sync process failed (but printing succeeded):', stageError);
+        console.warn('Order stage update process failed (but printing succeeded):', stageError);
         toast({
           title: "Partial Success",
           description: "Labels printed successfully, but some orders may not have been moved to packing stage.",

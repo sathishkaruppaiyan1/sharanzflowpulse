@@ -292,7 +292,7 @@ export const supabaseOrderService = {
     return data as Order[] || [];
   },
 
-  async createOrderFromShopify(shopifyOrder: any): Promise<string> {
+  async createOrderFromShopify(shopifyOrder: any, targetStage: OrderStage = 'packing'): Promise<string> {
     console.log('Creating order in Supabase from Shopify order:', shopifyOrder.id);
     
     try {
@@ -364,19 +364,25 @@ export const supabaseOrderService = {
         shippingAddressId = newAddress.id;
       }
 
-      // Create order
+      // Create order with specified stage
+      const orderData: any = {
+        shopify_order_id: Number(shopifyOrder.id),
+        order_number: shopifyOrder.order_number || shopifyOrder.name,
+        customer_id: customerId,
+        shipping_address_id: shippingAddressId,
+        stage: targetStage,
+        total_amount: parseFloat(shopifyOrder.current_total_price || shopifyOrder.total_amount || '0'),
+        currency: shopifyOrder.currency || 'INR'
+      };
+
+      // Add timestamp based on target stage
+      if (targetStage === 'packing') {
+        orderData.printed_at = new Date().toISOString();
+      }
+
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
-        .insert({
-          shopify_order_id: Number(shopifyOrder.id),
-          order_number: shopifyOrder.order_number || shopifyOrder.name,
-          customer_id: customerId,
-          shipping_address_id: shippingAddressId,
-          stage: 'packing',
-          total_amount: parseFloat(shopifyOrder.current_total_price || shopifyOrder.total_amount || '0'),
-          currency: shopifyOrder.currency || 'INR',
-          printed_at: new Date().toISOString()
-        })
+        .insert(orderData)
         .select('id')
         .single();
 
