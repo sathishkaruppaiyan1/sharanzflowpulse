@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Printer, Filter, RefreshCw, Search, Settings } from 'lucide-react';
 import Header from '@/components/layout/Header';
@@ -30,6 +31,7 @@ const Printing = () => {
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
   // Convert Supabase orders to Shopify-like format for consistent UI
   const formattedPrintingOrders = React.useMemo(() => {
@@ -80,15 +82,15 @@ const Printing = () => {
     });
   }, [printingOrders]);
 
-  // Enhanced sync function to automatically fetch and store new orders
-  const syncNewOrders = useCallback(async () => {
-    if (isSyncing || isLoadingShopify) return;
+  // Enhanced comprehensive sync function for instant updates
+  const syncNewOrders = useCallback(async (showToast = true) => {
+    if (isSyncing) return;
     
     setIsSyncing(true);
     try {
-      console.log('🔄 Starting comprehensive sync of Shopify orders...');
+      console.log('🔄 Starting instant comprehensive sync of ALL Shopify orders...');
       
-      // First, refresh Shopify orders to get latest data
+      // First, refresh Shopify orders to get latest data with force refresh
       await refetchShopify();
       
       // Get all existing Shopify order IDs from Supabase
@@ -102,17 +104,17 @@ const Printing = () => {
       }
       
       const existingShopifyIds = new Set(existingOrders.map(order => order.shopify_order_id));
-      console.log('📋 Found', existingShopifyIds.size, 'existing orders in Supabase');
-      console.log('📦 Total Shopify orders fetched:', shopifyOrders.length);
       
-      // Filter unfulfilled orders that are not yet in database
+      // Filter ALL unfulfilled orders regardless of existing status for comprehensive check
       const unfulfilled = shopifyOrders.filter(order => {
         const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
         return isUnfulfilled;
       });
       
-      console.log('📦 Total unfulfilled Shopify orders:', unfulfilled.length);
+      console.log('📦 Total Shopify unfulfilled orders:', unfulfilled.length);
+      console.log('📋 Existing orders in Supabase:', existingShopifyIds.size);
       
+      // Find orders that are not yet in database
       const newOrders = unfulfilled.filter(order => {
         const isNew = !existingShopifyIds.has(Number(order.id));
         return isNew;
@@ -120,72 +122,106 @@ const Printing = () => {
       
       console.log('🆕 Found', newOrders.length, 'new unfulfilled orders to sync');
       
+      // Update sync stats
+      setSyncStats({
+        total: unfulfilled.length,
+        synced: newOrders.length,
+        inDb: existingShopifyIds.size
+      });
+      
       if (newOrders.length === 0) {
-        toast({
-          title: "Sync Complete",
-          description: `No new orders found. ${unfulfilled.length} unfulfilled orders total, ${existingShopifyIds.size} already in database.`,
-        });
+        if (showToast) {
+          toast({
+            title: "✅ Sync Complete",
+            description: `All ${unfulfilled.length} unfulfilled orders already synced. Database has ${existingShopifyIds.size} orders total.`,
+          });
+        }
         setLastSyncTime(new Date());
         return;
       }
       
-      // Sync each new order to Supabase with 'printing' stage
+      // Sync each new order to Supabase with 'printing' stage - batch process for speed
       let syncedCount = 0;
-      for (const shopifyOrder of newOrders) {
-        try {
-          console.log('⏳ Syncing order:', shopifyOrder.id);
-          // Create order directly in 'printing' stage
-          await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'printing');
-          console.log('✅ Synced to printing stage:', shopifyOrder.id);
-          syncedCount++;
-        } catch (orderError) {
-          console.error('❌ Failed to sync order:', shopifyOrder.id, orderError);
+      const batchSize = 5; // Process 5 orders at a time for faster syncing
+      
+      for (let i = 0; i < newOrders.length; i += batchSize) {
+        const batch = newOrders.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (shopifyOrder) => {
+          try {
+            console.log('⏳ Syncing order:', shopifyOrder.id);
+            await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'printing');
+            console.log('✅ Synced to printing stage:', shopifyOrder.id);
+            syncedCount++;
+          } catch (orderError) {
+            console.error('❌ Failed to sync order:', shopifyOrder.id, orderError);
+          }
+        }));
+        
+        // Small delay between batches to avoid overwhelming the system
+        if (i + batchSize < newOrders.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
       if (syncedCount > 0) {
-        toast({
-          title: "Sync Successful",
-          description: `${syncedCount} new orders synced to printing stage. Total unfulfilled: ${unfulfilled.length}`,
-        });
+        if (showToast) {
+          toast({
+            title: "🎉 Instant Sync Successful",
+            description: `${syncedCount} new orders synced instantly! Total unfulfilled: ${unfulfilled.length}`,
+          });
+        }
         
-        // Refresh printing orders to show new orders
-        refetchPrintingOrders();
+        // Immediately refresh printing orders to show new orders
+        await refetchPrintingOrders();
       }
       
       setLastSyncTime(new Date());
-      console.log('🎉 Sync completed:', syncedCount, 'orders added');
+      console.log('🎉 Instant sync completed:', syncedCount, 'orders added');
       
     } catch (error) {
-      console.error('💥 Sync failed:', error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync new orders. Please try again.",
-        variant: "destructive"
-      });
+      console.error('💥 Instant sync failed:', error);
+      if (showToast) {
+        toast({
+          title: "❌ Sync Failed",
+          description: "Failed to sync new orders instantly. Please try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsSyncing(false);
     }
-  }, [shopifyOrders, isSyncing, isLoadingShopify, refetchPrintingOrders, refetchShopify]);
+  }, [shopifyOrders, isSyncing, refetchPrintingOrders, refetchShopify]);
 
-  // Auto-sync when component mounts and every 10 minutes
+  // Instant sync on component mount and every 2 minutes for real-time updates
   useEffect(() => {
-    // Initial sync after a short delay
+    // Initial instant sync after a short delay
     const initialTimer = setTimeout(() => {
-      syncNewOrders();
-    }, 2000);
+      syncNewOrders(false); // Silent initial sync
+    }, 1000);
 
-    // Set up periodic sync every 10 minutes
+    // Set up frequent sync every 2 minutes for near-instant updates
     const intervalTimer = setInterval(() => {
-      console.log('🔄 Auto-syncing orders...');
-      syncNewOrders();
-    }, 10 * 60 * 1000); // 10 minutes
+      console.log('🔄 Auto-syncing orders for instant updates...');
+      syncNewOrders(false); // Silent auto-sync
+    }, 2 * 60 * 1000); // 2 minutes for more frequent updates
 
     return () => {
       clearTimeout(initialTimer);
       clearInterval(intervalTimer);
     };
-  }, []);
+  }, [syncNewOrders]);
+
+  // Real-time window focus sync for immediate updates when user returns
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      console.log('🎯 Window focused - triggering instant sync');
+      syncNewOrders(false);
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [syncNewOrders]);
 
   // Calculate today's printed orders count from packing stage
   useEffect(() => {
@@ -208,7 +244,7 @@ const Printing = () => {
       return [];
     }
     
-    console.log('=== SUPABASE-ONLY PRINTING ORDER FILTERING ===');
+    console.log('=== INSTANT PRINTING ORDER FILTERING ===');
     console.log('Total orders in printing stage:', formattedPrintingOrders.length);
     
     let readyToPrintOrders = [...formattedPrintingOrders];
@@ -313,6 +349,10 @@ const Printing = () => {
     refetchPrintingOrders();
   };
 
+  const handleInstantSync = () => {
+    syncNewOrders(true); // Show toast for manual sync
+  };
+
   if (isLoadingPrintingOrders || isLoadingPackingOrders) {
     return (
       <div className="flex flex-col h-full">
@@ -321,7 +361,7 @@ const Printing = () => {
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <Printer className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-pulse" />
-              <p className="text-gray-500">Loading printing orders from Supabase...</p>
+              <p className="text-gray-500">Loading printing orders with instant sync...</p>
             </div>
           </div>
         </div>
@@ -337,9 +377,9 @@ const Printing = () => {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Printing Stage</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Printing Stage - Instant Sync</h1>
             <p className="text-gray-600 text-sm">
-              Auto-sync enabled • {formattedPrintingOrders.length} orders ready for printing
+              Real-time sync enabled • {formattedPrintingOrders.length} orders ready for printing
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -353,14 +393,14 @@ const Printing = () => {
               <span>Filters</span>
             </Button>
             <Button
-              onClick={syncNewOrders}
+              onClick={handleInstantSync}
               variant="outline"
               size="sm"
               disabled={isSyncing || isLoadingShopify}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Manual Sync'}</span>
+              <span>{isSyncing ? 'Syncing...' : 'Instant Sync'}</span>
             </Button>
             <Button
               onClick={handleRefresh}
@@ -386,41 +426,48 @@ const Printing = () => {
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto">
-          {/* Sync Status Bar */}
-          {(lastSyncTime || isSyncing) && (
-            <div className="mb-4">
-              <Card>
-                <CardContent className="py-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      {isSyncing ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                          <span className="text-blue-600">Syncing new orders from Shopify...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                          <span className="text-gray-600">
-                            Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 10 minutes
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <Button
-                      onClick={syncNewOrders}
-                      variant="ghost"
-                      size="sm"
-                      disabled={isSyncing}
-                      className="text-xs"
-                    >
-                      Sync Now
-                    </Button>
+          {/* Enhanced Sync Status Bar */}
+          <div className="mb-4">
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="py-3">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-4">
+                    {isSyncing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                        <span className="text-blue-700 font-medium">Syncing new orders instantly from Shopify...</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-gray-700">
+                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 2 minutes
+                        </span>
+                      </>
+                    )}
+                    
+                    {/* Sync Statistics */}
+                    {syncStats.total > 0 && (
+                      <div className="flex items-center space-x-3 text-xs bg-white px-3 py-1 rounded-full border">
+                        <span className="text-blue-600">Shopify: {syncStats.total}</span>
+                        <span className="text-green-600">Database: {syncStats.inDb}</span>
+                        <span className="text-orange-600">New: {syncStats.synced}</span>
+                      </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                  <Button
+                    onClick={handleInstantSync}
+                    variant="ghost"
+                    size="sm"
+                    disabled={isSyncing}
+                    className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700"
+                  >
+                    🚀 Sync Now
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -526,9 +573,9 @@ const Printing = () => {
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">Orders for Printing</CardTitle>
+                  <CardTitle className="text-lg">Orders for Printing - Instant Updates</CardTitle>
                   <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders in printing stage • Auto-synced from Shopify
+                    {filteredOrders.length} orders in printing stage • Real-time sync from Shopify
                   </p>
                 </div>
                 <div className="flex space-x-2">
