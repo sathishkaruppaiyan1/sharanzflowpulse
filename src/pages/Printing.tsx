@@ -93,19 +93,26 @@ const Printing = () => {
       // First, refresh Shopify orders to get latest data with force refresh
       await refetchShopify();
       
-      // Get all existing Shopify order IDs from Supabase
+      // Get all existing Shopify orders with stage info
       const { data: existingOrders, error: fetchError } = await supabase
         .from('orders')
-        .select('shopify_order_id')
+        .select('shopify_order_id, id, stage')
         .not('shopify_order_id', 'is', null);
         
       if (fetchError) {
         throw fetchError;
       }
       
-      const existingShopifyIds = new Set(existingOrders.map(order => order.shopify_order_id));
+      // Build maps for quick lookups
+      const existingByShopifyId = new Map<number, { id: string; stage: string | null }>();
+      existingOrders.forEach((o: any) => {
+        if (o.shopify_order_id) {
+          existingByShopifyId.set(Number(o.shopify_order_id), { id: o.id, stage: o.stage });
+        }
+      });
+      const existingShopifyIds = new Set(existingOrders.map((order: any) => order.shopify_order_id));
       
-      // Filter ALL unfulfilled orders regardless of existing status for comprehensive check
+      // Filter ALL unfulfilled orders for comprehensive check
       const unfulfilled = shopifyOrders.filter(order => {
         const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
         return isUnfulfilled;
@@ -114,66 +121,83 @@ const Printing = () => {
       console.log('📦 Total Shopify unfulfilled orders:', unfulfilled.length);
       console.log('📋 Existing orders in Supabase:', existingShopifyIds.size);
       
-      // Find orders that are not yet in database
-      const newOrders = unfulfilled.filter(order => {
-        const isNew = !existingShopifyIds.has(Number(order.id));
-        return isNew;
+      // Partition orders: brand-new vs existing-but-pending
+      const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
+      const pendingToPrintIds: string[] = [];
+      unfulfilled.forEach(order => {
+        const rec = existingByShopifyId.get(Number(order.id));
+        if (rec && (rec.stage === 'pending' || rec.stage === null)) {
+          pendingToPrintIds.push(rec.id);
+        }
       });
       
-      console.log('🆕 Found', newOrders.length, 'new unfulfilled orders to sync');
+      console.log('🆕 New unfulfilled orders to upsert:', newOrders.length);
+      console.log('📝 Existing orders to promote to printing:', pendingToPrintIds.length);
       
       // Update sync stats
       setSyncStats({
         total: unfulfilled.length,
-        synced: newOrders.length,
+        synced: newOrders.length + pendingToPrintIds.length,
         inDb: existingShopifyIds.size
       });
       
-      if (newOrders.length === 0) {
-        if (showToast) {
-          toast({
-            title: "✅ Sync Complete",
-            description: `All ${unfulfilled.length} unfulfilled orders already synced. Database has ${existingShopifyIds.size} orders total.`,
-          });
-        }
-        setLastSyncTime(new Date());
-        return;
-      }
-      
-      // Sync each new order to Supabase with 'printing' stage - batch process for speed
+      // Process upserts for brand-new orders
       let syncedCount = 0;
       const batchSize = 5; // Process 5 orders at a time for faster syncing
-      
-      for (let i = 0; i < newOrders.length; i += batchSize) {
-        const batch = newOrders.slice(i, i + batchSize);
-        
-        await Promise.all(batch.map(async (shopifyOrder) => {
-          try {
-            console.log('⏳ Syncing order:', shopifyOrder.id);
-            await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'printing');
-            console.log('✅ Synced to printing stage:', shopifyOrder.id);
-            syncedCount++;
-          } catch (orderError) {
-            console.error('❌ Failed to sync order:', shopifyOrder.id, orderError);
+
+      if (newOrders.length > 0) {
+        for (let i = 0; i < newOrders.length; i += batchSize) {
+          const batch = newOrders.slice(i, i + batchSize);
+
+          await Promise.all(batch.map(async (shopifyOrder) => {
+            try {
+              console.log('⏳ Upserting order:', shopifyOrder.id);
+              await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'printing');
+              console.log('✅ Upserted to printing stage:', shopifyOrder.id);
+              syncedCount++;
+            } catch (orderError) {
+              console.error('❌ Failed to upsert order:', shopifyOrder.id, orderError);
+            }
+          }));
+
+          // Small delay between batches to avoid overwhelming the system
+          if (i + batchSize < newOrders.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
-        }));
-        
-        // Small delay between batches to avoid overwhelming the system
-        if (i + batchSize < newOrders.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
-      
-      if (syncedCount > 0) {
+
+      // Promote existing pending orders to printing stage
+      let promotedCount = 0;
+      if (pendingToPrintIds.length > 0) {
+        const stageBatch = 10;
+        for (let i = 0; i < pendingToPrintIds.length; i += stageBatch) {
+          const batchIds = pendingToPrintIds.slice(i, i + stageBatch);
+          await Promise.all(batchIds.map(async (orderId) => {
+            try {
+              await supabaseOrderService.updateOrderStage(orderId, 'printing');
+              promotedCount++;
+            } catch (e) {
+              console.error('❌ Failed to promote order to printing:', orderId, e);
+            }
+          }));
+        }
+      }
+
+      // Notify and refresh if anything changed
+      if (syncedCount > 0 || promotedCount > 0) {
         if (showToast) {
           toast({
-            title: "🎉 Instant Sync Successful",
-            description: `${syncedCount} new orders synced instantly! Total unfulfilled: ${unfulfilled.length}`,
+            title: '🎉 Instant Sync Successful',
+            description: `${syncedCount} new orders added, ${promotedCount} existing orders moved to printing. Total unfulfilled: ${unfulfilled.length}`,
           });
         }
-        
-        // Immediately refresh printing orders to show new orders
         await refetchPrintingOrders();
+      } else if (showToast) {
+        toast({
+          title: '✅ Sync Complete',
+          description: `No changes required. All ${unfulfilled.length} unfulfilled orders are already in printing or later stages.`,
+        });
       }
       
       setLastSyncTime(new Date());
@@ -200,11 +224,11 @@ const Printing = () => {
       syncNewOrders(false); // Silent initial sync
     }, 1000);
 
-    // Set up frequent sync every 2 minutes for near-instant updates
+    // Set up frequent sync every 30 seconds for near-instant updates
     const intervalTimer = setInterval(() => {
       console.log('🔄 Auto-syncing orders for instant updates...');
       syncNewOrders(false); // Silent auto-sync
-    }, 2 * 60 * 1000); // 2 minutes for more frequent updates
+    }, 30 * 1000); // 30 seconds for more frequent updates
 
     return () => {
       clearTimeout(initialTimer);

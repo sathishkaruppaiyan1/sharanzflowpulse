@@ -293,128 +293,31 @@ export const supabaseOrderService = {
   },
 
   async createOrderFromShopify(shopifyOrder: any, targetStage: OrderStage = 'packing'): Promise<string> {
-    console.log('Creating order in Supabase from Shopify order:', shopifyOrder.id);
-    
+    console.log('Creating/Upserting order in Supabase via RPC from Shopify order:', shopifyOrder.id);
+
     try {
-      // Determine the best phone number from Shopify data
-      const phoneNumber = shopifyOrder.shipping_address?.phone || 
-                         shopifyOrder.customer?.phone || 
-                         null;
-      
-      console.log('Phone number priority for order:', shopifyOrder.id, {
-        shippingPhone: shopifyOrder.shipping_address?.phone,
-        customerPhone: shopifyOrder.customer?.phone,
-        finalPhone: phoneNumber
+      // Use idempotent RPC that upserts orders and items server-side to avoid duplicates
+      const { data: orderId, error } = await (supabase as any).rpc('sync_shopify_order_to_db', {
+        shopify_order_data: shopifyOrder
       });
 
-      // First, create or get customer with proper phone number handling
-      let customerId = null;
-      if (shopifyOrder.customer) {
-        const { data: existingCustomer } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('shopify_customer_id', shopifyOrder.customer.id)
-          .single();
+      if (error) throw error;
 
-        if (existingCustomer) {
-          // Update existing customer with phone number if we have a better one
-          if (phoneNumber) {
-            await supabase
-              .from('customers')
-              .update({ phone: phoneNumber })
-              .eq('id', existingCustomer.id);
-          }
-          customerId = existingCustomer.id;
-        } else {
-          const { data: newCustomer, error: customerError } = await supabase
-            .from('customers')
-            .insert({
-              shopify_customer_id: shopifyOrder.customer.id,
-              email: shopifyOrder.customer.email,
-              first_name: shopifyOrder.customer.first_name,
-              last_name: shopifyOrder.customer.last_name,
-              phone: phoneNumber // Use the prioritized phone number
-            })
-            .select('id')
-            .single();
-
-          if (customerError) throw customerError;
-          customerId = newCustomer.id;
-        }
+      // Ensure stage is set appropriately for printing when requested.
+      // On insert the RPC sets stage='printing', but on conflict it doesn't change stage.
+      // We only promote to 'printing' if it's currently 'pending'.
+      if (targetStage === 'printing' && orderId) {
+        await supabase
+          .from('orders')
+          .update({ stage: 'printing' as OrderStage, printed_at: new Date().toISOString() })
+          .eq('id', orderId)
+          .eq('stage', 'pending');
       }
 
-      // Create shipping address
-      let shippingAddressId = null;
-      if (shopifyOrder.shipping_address) {
-        const { data: newAddress, error: addressError } = await supabase
-          .from('addresses')
-          .insert({
-            customer_id: customerId,
-            address_line_1: shopifyOrder.shipping_address.address1,
-            address_line_2: shopifyOrder.shipping_address.address2,
-            city: shopifyOrder.shipping_address.city,
-            state: shopifyOrder.shipping_address.province,
-            postal_code: shopifyOrder.shipping_address.zip,
-            country: shopifyOrder.shipping_address.country
-          })
-          .select('id')
-          .single();
-
-        if (addressError) throw addressError;
-        shippingAddressId = newAddress.id;
-      }
-
-      // Create order with specified stage
-      const orderData: any = {
-        shopify_order_id: Number(shopifyOrder.id),
-        order_number: shopifyOrder.order_number || shopifyOrder.name,
-        customer_id: customerId,
-        shipping_address_id: shippingAddressId,
-        stage: targetStage,
-        total_amount: parseFloat(shopifyOrder.current_total_price || shopifyOrder.total_amount || '0'),
-        currency: shopifyOrder.currency || 'INR'
-      };
-
-      // Add timestamp based on target stage
-      if (targetStage === 'packing') {
-        orderData.printed_at = new Date().toISOString();
-      }
-
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderData)
-        .select('id')
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items with enhanced variation details
-      if (shopifyOrder.line_items) {
-        const orderItems = shopifyOrder.line_items.map((item: any) => ({
-          order_id: newOrder.id,
-          shopify_variant_id: item.variant_id,
-          title: item.title || item.name,
-          sku: item.sku,
-          quantity: item.quantity,
-          price: parseFloat(item.price || '0'),
-          total: parseFloat(item.price || '0') * item.quantity,
-          variant_title: item.variant_title || null,
-          variant_options: item.properties || item.variant_options || {}
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItems);
-
-        if (itemsError) throw itemsError;
-      }
-
-      console.log('Successfully created order in Supabase with variation details:', newOrder.id);
-      console.log('Customer phone number stored:', phoneNumber);
-      return newOrder.id;
-      
+      console.log('Successfully synced (idempotent) order in Supabase:', orderId);
+      return orderId as string;
     } catch (error) {
-      console.error('Error creating order from Shopify:', error);
+      console.error('Error creating/upserting order from Shopify via RPC:', error);
       throw error;
     }
   },
