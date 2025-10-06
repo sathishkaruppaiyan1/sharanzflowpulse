@@ -196,8 +196,8 @@ const Tracking = () => {
       return;
     }
     
-    // Find order by order number or ID - only from orders waiting for tracking
-    const order = trackingOrders.find(o => 
+    // Find order by order number or ID - search in ALL tracking stage orders
+    const order = allTrackingOrders.find(o => 
       o.order_number === cleanInput || 
       o.id === cleanInput ||
       o.order_number === `#${cleanInput}` ||
@@ -213,13 +213,20 @@ const Tracking = () => {
       // Reset duplicate prevention when new order is selected
       setLastProcessedTrackingNumber('');
       setIsProcessingTracking(false);
-      toast.success(`Order ${order.order_number} loaded - ready for tracking assignment`);
+      
+      // Show different message if order already has tracking
+      if (order.tracking_number) {
+        toast.success(`Order ${order.order_number} loaded - Tracking: ${order.tracking_number}`);
+      } else {
+        toast.success(`Order ${order.order_number} loaded - ready for tracking assignment`);
+      }
+      
       console.log('Order found:', order.order_number);
       console.log('Customer phone:', order.customer?.phone);
       console.log('Final phone:', getPhoneNumber(order));
     } else {
       playErrorSound();
-      toast.error('Order not found in tracking queue or already has tracking assigned');
+      toast.error('Order not found in tracking stage');
       setCurrentOrder(null);
       setIsOrderLocked(false);
     }
