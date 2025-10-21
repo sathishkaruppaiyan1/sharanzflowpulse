@@ -7,6 +7,8 @@ export const detectCourierPartner = (trackingNumber: string): CarrierType => {
     return 'frenchexpress';
   } else if (trackingNumber.startsWith('2158')) {
     return 'delhivery';
+  } else if (trackingNumber.startsWith('A')) {
+    return 'dtdc';
   }
   return 'other';
 };
@@ -18,6 +20,8 @@ export const generateTrackingLink = (trackingNumber: string, carrier: CarrierTyp
       return `https://franchexpress.com/courier-tracking/${trackingNumber}`;
     case 'delhivery':
       return `https://www.delhivery.com/track/package/${trackingNumber}`;
+    case 'dtdc':
+      return `https://www.dtdc.in/tracking.asp?Ttype=awb_no&strCnno=${trackingNumber}`;
     default:
       return '';
   }
@@ -30,6 +34,8 @@ export const getCourierDisplayName = (carrier: CarrierType): string => {
       return 'FRANCH EXPRESS';
     case 'delhivery':
       return 'DELHIVERY';
+    case 'dtdc':
+      return 'DTDC';
     default:
       return 'OTHER';
   }
