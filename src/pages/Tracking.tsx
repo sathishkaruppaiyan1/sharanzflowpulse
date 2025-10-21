@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Order } from '@/types/database';
-import { detectCourierPartner } from '@/services/interaktService';
+import { detectCourierPartner, getCourierDisplayName } from '@/services/interakt/carrierUtils';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
@@ -625,20 +625,12 @@ const Tracking = () => {
                         value={trackingNumberInput}
                         onChange={(e) => {
                           setTrackingNumberInput(e.target.value);
-                          if (e.target.value.length > 8) {
-                            const carrier = detectCourierPartner(e.target.value);
-                            let carrierDisplayName = '';
-                            switch (carrier) {
-                              case 'frenchexpress':
-                                carrierDisplayName = 'Franch Express';
-                                break;
-                              case 'delhivery':
-                                carrierDisplayName = 'Delhivery';
-                                break;
-                              default:
-                                carrierDisplayName = 'Other';
-                            }
+                          if (e.target.value.trim()) {
+                            const carrier = detectCourierPartner(e.target.value.trim());
+                            const carrierDisplayName = getCourierDisplayName(carrier);
                             setDetectedCarrier(carrierDisplayName);
+                          } else {
+                            setDetectedCarrier('');
                           }
                         }}
                         onKeyPress={(e) => e.key === 'Enter' && handleTrackingNumberScan()}
@@ -661,9 +653,12 @@ const Tracking = () => {
                       </Button>
                     </div>
                     {detectedCarrier && (
-                      <p className="text-sm text-green-600">
-                        Detected carrier: {detectedCarrier}
-                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
+                          <Truck className="h-3 w-3 mr-1" />
+                          Courier: {detectedCarrier}
+                        </Badge>
+                      </div>
                     )}
                     {(updateTrackingMutation.isPending || isProcessingTracking) && (
                       <p className="text-sm text-blue-600">
