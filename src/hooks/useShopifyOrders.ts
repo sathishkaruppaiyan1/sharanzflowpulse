@@ -43,7 +43,9 @@ export interface ShopifyOrder {
 }
 
 const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
-  if (!apiConfig.enabled || !apiConfig.shop_url || !apiConfig.access_token) {
+    const hasToken = Boolean(apiConfig.access_token)
+  const hasCreds = Boolean(apiConfig.client_id && apiConfig.client_secret)
+  if (!apiConfig.enabled || !apiConfig.shop_url || (!hasToken && !hasCreds)) {
     throw new Error('Shopify API not configured');
   }
 
@@ -84,10 +86,14 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
 export const useShopifyOrders = () => {
   const { apiConfigs } = useApiConfigs();
   
+  const hasAccessToken = Boolean(apiConfigs?.shopify?.access_token)
+  const hasClientCredentials = Boolean(
+    apiConfigs?.shopify?.client_id && apiConfigs?.shopify?.client_secret
+  )
   const isConfigured = Boolean(
-    apiConfigs?.shopify?.enabled && 
-    apiConfigs?.shopify?.shop_url && 
-    apiConfigs?.shopify?.access_token
+    apiConfigs?.shopify?.enabled &&
+    apiConfigs?.shopify?.shop_url &&
+    (hasAccessToken || hasClientCredentials)
   );
 
   const {

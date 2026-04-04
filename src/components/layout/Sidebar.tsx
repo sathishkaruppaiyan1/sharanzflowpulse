@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  Package, 
-  Printer, 
-  PackageCheck, 
-  Truck, 
+import {
+  Package,
+  Printer,
+  PackageCheck,
+  Truck,
   Ship,
   MapPin,
   BarChart3,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useWorkflowSettings } from '@/hooks/useWorkflowSettings';
 
 interface SidebarProps {
   user: { email: string; role: string; name: string };
@@ -23,17 +24,27 @@ interface SidebarProps {
 
 const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const location = useLocation();
+  const { settings } = useWorkflowSettings();
+  const [bypassPacking, setBypassPacking] = useState(false);
 
-  const navigationItems = [
+  useEffect(() => {
+    setBypassPacking(settings.bypassPacking);
+  }, [settings.bypassPacking]);
+
+  const allNavigationItems = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Orders', href: '/orders', icon: Package },
     { name: 'Printing', href: '/printing', icon: Printer },
-    { name: 'Packing', href: '/packing', icon: PackageCheck },
+    { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true },
     { name: 'Tracking', href: '/tracking', icon: Truck },
     { name: 'Shipping', href: '/shipping', icon: Ship },
     { name: 'Delivery', href: '/delivery', icon: MapPin },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
+
+  const navigationItems = allNavigationItems.filter(
+    item => !(item.hiddenWhenBypass && bypassPacking)
+  );
 
   const adminItems = [
     { name: 'Settings', href: '/settings', icon: Settings },

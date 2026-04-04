@@ -43,16 +43,16 @@ serve(async (req) => {
     const requestBody = await req.json()
     console.log('Request body:', requestBody)
 
-    const { shopify_order_id, tracking_number, carrier } = requestBody
+    const { shopify_order_id, tracking_number, carrier, tracking_url } = requestBody
 
     console.log('=== SHOPIFY FULFILLMENT UPDATE START ===')
-    console.log('Request data:', { shopify_order_id, tracking_number, carrier })
+    console.log('Request data:', { shopify_order_id, tracking_number, carrier, tracking_url })
 
     // Validate required fields
-    if (!shopify_order_id || !tracking_number || !carrier) {
-      console.error('Missing required fields:', { shopify_order_id, tracking_number, carrier })
+    if (!shopify_order_id || !tracking_number) {
+      console.error('Missing required fields:', { shopify_order_id, tracking_number })
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: shopify_order_id, tracking_number, carrier' }),
+        JSON.stringify({ error: 'Missing required fields: shopify_order_id, tracking_number' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -102,29 +102,11 @@ serve(async (req) => {
       )
     }
 
-    // Map carrier to Shopify tracking company and URL
-    const getTrackingInfo = (carrier: string, trackingNumber: string) => {
-      switch (carrier.toLowerCase()) {
-        case 'frenchexpress':
-          return {
-            company: 'Franch Express',
-            url: `https://franchexpress.com/courier-tracking/${trackingNumber}`
-          }
-        case 'delhivery':
-          return {
-            company: 'Delhivery',
-            url: `https://www.delhivery.com/track-v2/package/${trackingNumber}`
-          }
-        case 'other':
-        default:
-          return {
-            company: 'Other',
-            url: ''
-          }
-      }
+    // Use carrier name and tracking URL directly from courier_partners (dynamic, no hardcoding)
+    const trackingInfo = {
+      company: carrier || 'Other',
+      url: tracking_url || ''
     }
-
-    const trackingInfo = getTrackingInfo(carrier, tracking_number)
 
     // Clean and prepare shop domain
     let shopDomain = shopifyConfig.shop_url.replace(/^https?:\/\//, '').replace(/\/$/, '')

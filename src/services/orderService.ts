@@ -19,7 +19,7 @@ export interface Order {
     country: string;
   };
   trackingNumber?: string;
-  carrier?: 'frenchexpress' | 'delhivery';
+  carrier?: string;
   notes?: string;
 }
 
@@ -107,7 +107,7 @@ const generateMockOrders = (): Order[] => {
         country: 'India',
       },
       trackingNumber: Math.random() > 0.5 ? `TRK${Math.floor(Math.random() * 1000000000)}` : undefined,
-      carrier: Math.random() > 0.5 ? 'frenchexpress' : 'delhivery',
+      carrier: undefined,
     };
   });
 };

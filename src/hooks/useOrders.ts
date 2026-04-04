@@ -127,19 +127,20 @@ export const useUpdateTracking = () => {
   const { service: parcelPanelService, isConfigured } = useParcelPanelService();
   
   return useMutation({
-    mutationFn: async ({ 
-      orderId, 
-      trackingNumber, 
-      carrier 
-    }: { 
-      orderId: string; 
-      trackingNumber: string; 
-      carrier: string; 
+    mutationFn: async ({
+      orderId,
+      trackingNumber,
+      carrierName,
+      trackingUrl = '',
+    }: {
+      orderId: string;
+      trackingNumber: string;
+      carrierName: string;   // display name from courier_partners
+      trackingUrl?: string;  // full resolved URL
     }) => {
-      console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrier}`);
-      
-      // Use the supabaseOrderService to handle the complete tracking update including Shopify
-      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrier as 'frenchexpress' | 'delhivery' | 'other');
+      console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrierName}`);
+
+      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrierName, trackingUrl);
       
       // Auto-fetch tracking details from Parcel Panel if configured
       if (isConfigured && parcelPanelService) {

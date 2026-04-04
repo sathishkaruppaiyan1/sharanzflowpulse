@@ -5,7 +5,12 @@
       "Bash(npm install)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)",
+      "mcp__63192de0-457f-4033-81c7-f30c699f3ef9__list_projects",
+      "mcp__63192de0-457f-4033-81c7-f30c699f3ef9__deploy_edge_function",
+      "Bash(npx supabase:*)"
     ],
     "deny": [],
     "ask": []

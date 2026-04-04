@@ -10,7 +10,13 @@ export type Order = Database['public']['Tables']['orders']['Row'] & {
 };
 
 export type OrderStage = Database['public']['Enums']['order_stage'];
-export type CarrierType = Database['public']['Enums']['carrier_type'];
+
+/**
+ * CarrierType is no longer a DB enum — it is free text (the courier display
+ * name) stored directly in orders.carrier, coming from the user-managed
+ * courier_partners table.
+ */
+export type CarrierType = string;
 
 export type Customer = Database['public']['Tables']['customers']['Row'];
 export type Address = Database['public']['Tables']['addresses']['Row'];

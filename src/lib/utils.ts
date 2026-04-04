@@ -148,34 +148,20 @@ const CODE128_PATTERNS = {
   ]
 };
 
-// Enhanced barcode generation for better scanning
+// Clean tracking/order number for barcode — no padding, exact value
 export const generateTrackingBarcode = (orderNumber: string) => {
-  // Remove any hash symbols and clean the order number
-  let cleanOrderNumber = orderNumber.replace(/^#/, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  
-  console.log('Barcode generation:', {
-    original: orderNumber,
-    cleaned: cleanOrderNumber
-  });
-  
-  // Ensure minimum length for better scanning
-  if (cleanOrderNumber.length < 6) {
-    cleanOrderNumber = cleanOrderNumber.padStart(6, '0');
-  }
-  
-  // Limit to reasonable length for barcode scanners
-  if (cleanOrderNumber.length > 20) {
-    cleanOrderNumber = cleanOrderNumber.substring(0, 20);
-  }
-  
-  return cleanOrderNumber;
+  // Remove leading # and any non-alphanumeric characters, uppercase
+  const clean = orderNumber.replace(/^#/, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  // Limit to 30 chars max for barcode scanners
+  return clean.length > 30 ? clean.substring(0, 30) : clean;
 };
 
 // Generate Code 128 barcode SVG
-export const generateCode128Barcode = (text: string) => {
-  const cleanText = generateTrackingBarcode(text);
+export const generateCode128Barcode = (text: string, barWidth = 2, barHeight = 50) => {
+  // text is already cleaned — use as-is (no double processing)
+  const cleanText = text.replace(/[^\x20-\x7E]/g, '').substring(0, 30);
   console.log('Generating Code 128 barcode for:', cleanText);
-  
+
   try {
     // Calculate checksum
     let checksum = 104; // Start B value
@@ -184,13 +170,13 @@ export const generateCode128Barcode = (text: string) => {
       checksum += charCode * (i + 1);
     }
     checksum = checksum % 103;
-    
+
     // Build the pattern array
     const patterns = [];
-    
+
     // Start B
     patterns.push(...CODE128_PATTERNS.START_B);
-    
+
     // Data characters
     for (let i = 0; i < cleanText.length; i++) {
       const charCode = cleanText.charCodeAt(i) - 32;
@@ -198,39 +184,37 @@ export const generateCode128Barcode = (text: string) => {
         patterns.push(...CODE128_PATTERNS.CHARS[charCode]);
       }
     }
-    
+
     // Checksum
     if (checksum < CODE128_PATTERNS.CHARS.length) {
       patterns.push(...CODE128_PATTERNS.CHARS[checksum]);
     }
-    
+
     // Stop
     patterns.push(...CODE128_PATTERNS.STOP);
-    
+
     // Generate SVG bars
-    const barWidth = 2;
-    const barHeight = 50;
     let x = 0;
     let bars = '';
-    
+
     for (let i = 0; i < patterns.length; i++) {
       const width = patterns[i] * barWidth;
       const isBlack = i % 2 === 0;
-      
+
       if (isBlack) {
         bars += `<rect x="${x}" y="0" width="${width}" height="${barHeight}" fill="black"/>`;
       }
       x += width;
     }
-    
+
     const totalWidth = x;
-    
+
     return `<svg width="${totalWidth}" height="${barHeight + 20}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${totalWidth}" height="${barHeight + 20}" fill="white"/>
       ${bars}
       <text x="${totalWidth / 2}" y="${barHeight + 15}" text-anchor="middle" font-family="Arial" font-size="12" fill="black">${cleanText}</text>
     </svg>`;
-    
+
   } catch (error) {
     console.error('Error generating Code 128 barcode:', error);
     // Fallback to simple barcode
@@ -240,7 +224,7 @@ export const generateCode128Barcode = (text: string) => {
 
 // Generate HTML barcode with improved scanning compatibility (fallback)
 export const generateBarcodeHTML = (text: string) => {
-  const cleanText = generateTrackingBarcode(text);
+  const cleanText = text.replace(/[^\x20-\x7E]/g, '').substring(0, 30);
   
   console.log('Generating fallback barcode HTML for:', cleanText);
   

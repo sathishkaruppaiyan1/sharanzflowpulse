@@ -113,15 +113,20 @@ export const supabaseOrderService = {
     return data as Order;
   },
 
-  // UPDATED METHOD - Replace your existing updateTracking method with this
-  async updateTracking(orderId: string, trackingNumber: string, carrier: CarrierType): Promise<Order> {
-    console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrier}`);
-    
+  // UPDATED METHOD - carrier is now a free-text display name from courier_partners
+  async updateTracking(
+    orderId: string,
+    trackingNumber: string,
+    carrierName: string,       // display name, e.g. "Delhivery"
+    trackingUrl: string = ''   // full URL with {number} already replaced
+  ): Promise<Order> {
+    console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrierName}`);
+
     const { data, error } = await supabase
       .from('orders')
-      .update({ 
+      .update({
         tracking_number: trackingNumber,
-        carrier,
+        carrier: carrierName,
         stage: 'shipped' as OrderStage,
         shipped_at: new Date().toISOString()
       })
@@ -151,7 +156,7 @@ export const supabaseOrderService = {
     // Send WhatsApp notification via Interakt
     try {
       console.log('📱 Attempting to send WhatsApp notification...');
-      const whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrier);
+      const whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrierName, trackingUrl);
       if (whatsappSuccess) {
         console.log('✅ WhatsApp notification sent successfully');
       } else {
@@ -165,10 +170,7 @@ export const supabaseOrderService = {
     if (order.shopify_order_id) {
       try {
         console.log('🛍️ Attempting to update Shopify order status...');
-        console.log(`🔗 Shopify Order ID: ${order.shopify_order_id}`);
-        console.log(`📦 Tracking Details: ${trackingNumber} via ${carrier}`);
-        
-        await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrier);
+        await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrierName, trackingUrl);
         console.log('✅ Shopify order status updated successfully');
       } catch (shopifyError) {
         console.error('❌ Shopify update failed:', shopifyError);
@@ -184,89 +186,36 @@ export const supabaseOrderService = {
     return order;
   },
 
-  // FIXED METHOD - Use current user session token instead of hardcoded values
-  async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrier: CarrierType): Promise<void> {
-    console.log(`🔄 STARTING Shopify fulfillment update`);
-    console.log(`📋 Order ID: ${shopifyOrderId}`);
-    console.log(`📦 Tracking: ${trackingNumber}`);
-    console.log(`🚚 Carrier: ${carrier}`);
-    
-    try {
-      // Get current session to use valid JWT token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No valid session found. Please log in again.');
-      }
+  async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrierName: string, trackingUrl: string = ''): Promise<void> {
+    console.log(`🔄 Shopify fulfillment update — Order: ${shopifyOrderId}, Tracking: ${trackingNumber}, Carrier: ${carrierName}`);
 
-      const requestPayload = {
+    const { data, error } = await supabase.functions.invoke('update-shopify-fulfillment', {
+      body: {
         shopify_order_id: shopifyOrderId,
         tracking_number: trackingNumber,
-        carrier: carrier
-      };
-
-      console.log('📤 Sending request to edge function:', JSON.stringify(requestPayload, null, 2));
-
-      // Use current user's session token for authentication
-      const response = await fetch(`https://jmqpqgxqhfctyfjtlbbm.supabase.co/functions/v1/update-shopify-fulfillment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptcXBxZ3hxaGZjdHlmanRsYmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE4Nzk5MzksImV4cCI6MjA2NzQ1NTkzOX0.-yFmt-q8qrob0h_nUFt_aYRaU6cw0XSAkyjXVx4bgHE',
-        },
-        body: JSON.stringify(requestPayload)
-      });
-
-      console.log('📥 Raw response status:', response.status);
-      console.log('📥 Raw response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ HTTP error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        carrier: carrierName,
+        tracking_url: trackingUrl
       }
+    });
 
-      const data = await response.json();
-      console.log('📋 Response data:', JSON.stringify(data, null, 2));
-
-      // Check for application errors in the response
-      if (data.error) {
-        console.error('❌ Shopify API error:', data.error);
-        if (data.details) console.error('📋 Error details:', data.details);
-        if (data.shopifyError) console.error('🔍 Shopify error data:', data.shopifyError);
-        throw new Error(`Shopify fulfillment failed: ${data.error}`);
-      }
-
-      // Success case
-      if (data.success) {
-        console.log('✅ Shopify fulfillment updated successfully');
-        if (data.action) console.log('🎯 Action taken:', data.action);
-        if (data.fulfillment) {
-          console.log('📊 Fulfillment details:', {
-            id: data.fulfillment?.fulfillment?.id,
-            status: data.fulfillment?.fulfillment?.status,
-            tracking_number: data.fulfillment?.fulfillment?.tracking_number
-          });
-        }
-        return;
-      }
-
-      // If we get here, the response format is unexpected
-      console.warn('⚠️ Unexpected response format:', data);
-      throw new Error('Unexpected response format from Shopify fulfillment service');
-
-    } catch (error) {
-      console.error('💥 FAILED to update Shopify fulfillment:', error);
-      console.error('🔍 Error type:', error.constructor.name);
-      console.error('📝 Error message:', error.message);
-      
-      // Re-throw with more context
-      throw new Error(`Shopify fulfillment update failed: ${error.message}`);
+    if (error) {
+      console.error('❌ Edge function invocation error:', error);
+      throw new Error(error.message || 'Edge function failed');
     }
+
+    console.log('📋 Edge function response:', data);
+
+    if (data?.error) {
+      console.error('❌ Shopify fulfillment error:', data.error, data.details);
+      throw new Error(`Shopify fulfillment failed: ${data.error}`);
+    }
+
+    if (data?.success || data?.action === 'order_already_fulfilled') {
+      console.log('✅ Shopify fulfillment updated successfully');
+      return;
+    }
+
+    console.warn('⚠️ Unexpected response:', data);
   },
 
   async searchOrders(query: string): Promise<Order[]> {

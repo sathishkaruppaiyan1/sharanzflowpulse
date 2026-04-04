@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink, CheckSquare, Square, ArrowRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
-import BulkStageChangeButton from '@/components/common/BulkStageChangeButton';
-import { useOrdersByStage, useUpdateTracking } from '@/hooks/useOrders';
+import { useOrdersByStage, useUpdateTracking, useBulkUpdateOrderStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Order } from '@/types/database';
-import { detectCourierPartner, getCourierDisplayName } from '@/services/interakt/carrierUtils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Order, OrderStage } from '@/types/database';
+import { useCourierPartners, detectCourierByPrefix, buildTrackingUrl } from '@/hooks/useCourierPartners';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
@@ -21,6 +21,8 @@ import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 const Tracking = () => {
   const { data: allTrackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
   const updateTrackingMutation = useUpdateTracking();
+  const bulkUpdateStageMutation = useBulkUpdateOrderStage();
+  const { data: couriers = [] } = useCourierPartners();
   const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
   
   // Filter orders to only show those without tracking numbers (waiting for tracking assignment)
@@ -45,9 +47,11 @@ const Tracking = () => {
   // Bulk selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [bulkTargetStage, setBulkTargetStage] = useState<OrderStage | ''>('');
 
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
+  const scanDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Helper function to check if input looks like a tracking number
   const looksLikeTrackingNumber = (input: string) => {
@@ -262,21 +266,10 @@ const Tracking = () => {
       return;
     }
     
-    // Auto-detect carrier based on tracking number pattern
-    const carrier = detectCourierPartner(trackingNumber);
-    
-    let carrierDisplayName = '';
-    switch (carrier) {
-      case 'frenchexpress':
-        carrierDisplayName = 'Franch Express';
-        break;
-      case 'delhivery':
-        carrierDisplayName = 'Delhivery';
-        break;
-      default:
-        carrierDisplayName = 'Other';
-    }
-    
+    // Auto-detect courier from user-managed courier_partners list
+    const detectedCourier = detectCourierByPrefix(trackingNumber, couriers);
+    const carrierDisplayName = detectedCourier?.name || 'Unknown Courier';
+
     setDetectedCarrier(carrierDisplayName);
     setWhatsappStatus('pending');
     setShopifyStatus('pending');
@@ -288,10 +281,12 @@ const Tracking = () => {
       console.log('🚀 Starting tracking update process...');
       
       // Update tracking information (this automatically moves order to shipped stage)
+      const detectedCourierForSubmit = detectCourierByPrefix(trackingNumber, couriers);
       await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
-        carrier: carrier
+        carrierName: detectedCourierForSubmit?.name || carrierDisplayName,
+        trackingUrl: buildTrackingUrl(trackingNumber, detectedCourierForSubmit?.tracking_url ?? null)
       });
       
       // Play success sound for successful tracking update
@@ -346,6 +341,7 @@ const Tracking = () => {
   };
 
   const handleResetOrder = () => {
+    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
     setOrderIdInput('');
     setTrackingNumberInput('');
     setCurrentOrder(null);
@@ -380,6 +376,32 @@ const Tracking = () => {
     } else {
       setSelectedOrderIds(new Set());
       setSelectAll(false);
+    }
+  };
+
+  const selectAllOrders = () => {
+    handleSelectAll(true);
+  };
+
+  const clearSelectedOrders = () => {
+    handleSelectAll(false);
+  };
+
+  const handleBulkStageMove = async () => {
+    if (!bulkTargetStage || selectedOrderIds.size === 0) {
+      toast.error('Select orders and choose a stage first');
+      return;
+    }
+
+    try {
+      await bulkUpdateStageMutation.mutateAsync({
+        orderIds: Array.from(selectedOrderIds),
+        stage: bulkTargetStage,
+      });
+      handleBulkOperationSuccess();
+      setBulkTargetStage('');
+    } catch (error) {
+      console.error('Failed to bulk move tracking orders:', error);
     }
   };
 
@@ -426,25 +448,7 @@ const Tracking = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <Header 
-        title="Tracking Assignment" 
-        showSearch={false}
-      >
-        {/* Header Bulk Action Button - Move back to Packing for orders without tracking */}
-        {trackingOrders.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <BulkStageChangeButton
-              orders={trackingOrders}
-              currentStage="tracking"
-              targetStage="packing"
-              selectedOrderIds={selectedOrderIds}
-              onSuccess={handleBulkOperationSuccess}
-              variant="header"
-              direction="previous"
-            />
-          </div>
-        )}
-      </Header>
+      <Header title="Tracking Assignment" showSearch={false} />
       
       <div className="flex-1 p-6 bg-gray-50 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -621,19 +625,40 @@ const Tracking = () => {
                     <div className="flex space-x-2">
                       <Input
                         ref={trackingInputRef}
-                        placeholder="Scan tracking number barcode (not order ID)"
+                        placeholder="Scan tracking number barcode"
                         value={trackingNumberInput}
                         onChange={(e) => {
-                          setTrackingNumberInput(e.target.value);
-                          if (e.target.value.trim()) {
-                            const carrier = detectCourierPartner(e.target.value.trim());
-                            const carrierDisplayName = getCourierDisplayName(carrier);
-                            setDetectedCarrier(carrierDisplayName);
+                          const val = e.target.value;
+                          setTrackingNumberInput(val);
+
+                          // Live courier detection
+                          if (val.trim()) {
+                            const detected = detectCourierByPrefix(val.trim(), couriers);
+                            setDetectedCarrier(detected?.name || '');
                           } else {
                             setDetectedCarrier('');
                           }
+
+                          // Auto-submit debounce — fires 400ms after typing stops
+                          // Barcode scanners type very fast then stop; this handles both
+                          // scanners (no Enter) and manual entry (waits for pause)
+                          if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+                          if (val.trim().length >= 6) {
+                            scanDebounceRef.current = setTimeout(() => {
+                              // Only auto-submit if still focused on tracking input
+                              // and not already processing
+                              if (!isProcessingTracking && val.trim()) {
+                                handleTrackingNumberScan();
+                              }
+                            }, 400);
+                          }
                         }}
-                        onKeyPress={(e) => e.key === 'Enter' && handleTrackingNumberScan()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+                            handleTrackingNumberScan();
+                          }
+                        }}
                         onFocus={() => {
                           setFocusLocked(false);
                           setAutoFocusEnabled(true);
@@ -804,35 +829,10 @@ const Tracking = () => {
                   <CardTitle className="text-lg">Orders Waiting for Tracking Assignment</CardTitle>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {/* Bulk Selection Controls */}
                   {trackingOrders.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-2">
-                        <CheckboxUI
-                          checked={selectAll}
-                          onCheckedChange={handleSelectAll}
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <span className="text-sm text-gray-600">
-                          {selectedOrderIds.size > 0 ? `${selectedOrderIds.size} selected` : 'Select all'}
-                        </span>
-                      </div>
-                      
-                      {/* List Bulk Action Button - Move back to Packing */}
-                      {selectedOrderIds.size > 0 && (
-                        <div className="flex items-center space-x-2">
-                          <BulkStageChangeButton
-                            orders={trackingOrders}
-                            currentStage="tracking"
-                            targetStage="packing"
-                            selectedOrderIds={selectedOrderIds}
-                            onSuccess={handleBulkOperationSuccess}
-                            variant="list"
-                            direction="previous"
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                      {selectedOrderIds.size} selected
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -841,6 +841,68 @@ const Tracking = () => {
               </p>
             </CardHeader>
             <CardContent>
+              {trackingOrders.length > 0 && (
+                <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant={selectAll ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={selectAllOrders}
+                        className="min-w-[110px]"
+                      >
+                        <CheckSquare className="mr-2 h-4 w-4" />
+                        Select all
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearSelectedOrders}
+                        disabled={selectedOrderIds.size === 0}
+                        className="min-w-[120px]"
+                      >
+                        <Square className="mr-2 h-4 w-4" />
+                        Clear selection
+                      </Button>
+                      <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
+                        <CheckboxUI
+                          checked={selectAll}
+                          onCheckedChange={handleSelectAll}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        <span>
+                          {selectedOrderIds.size === 0
+                            ? 'No orders selected'
+                            : `${selectedOrderIds.size} of ${trackingOrders.length} selected`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Select
+                        value={bulkTargetStage}
+                        onValueChange={(value) => setBulkTargetStage(value as OrderStage)}
+                      >
+                        <SelectTrigger className="w-full min-w-[190px] bg-white sm:w-[220px]">
+                          <SelectValue placeholder="Choose stage to move" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="packing">Move to Packing</SelectItem>
+                          <SelectItem value="printing">Move to Printing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={handleBulkStageMove}
+                        disabled={selectedOrderIds.size === 0 || !bulkTargetStage || bulkUpdateStageMutation.isPending}
+                        className="min-w-[150px] bg-blue-600 hover:bg-blue-700"
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        {bulkUpdateStageMutation.isPending ? 'Moving...' : 'Move selected'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <TrackingQueue 
                 orders={trackingOrders} 
                 selectedOrderIds={selectedOrderIds}

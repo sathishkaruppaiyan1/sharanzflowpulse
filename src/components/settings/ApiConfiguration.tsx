@@ -99,11 +99,46 @@ const ApiConfiguration = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="shopify-access-token">Access Token</Label>
+                <Label htmlFor="shopify-client-id">API Key (Client ID)</Label>
+                <Input
+                  id="shopify-client-id"
+                  placeholder="Enter your Shopify API Key"
+                  value={tempConfigs.shopify.client_id}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      shopify: { ...prev.shopify, client_id: e.target.value }
+                    }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Found in your Shopify app → API credentials → API key
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="shopify-client-secret">API Secret Key (Client Secret)</Label>
+                <Input
+                  id="shopify-client-secret"
+                  type="password"
+                  placeholder="Enter your Shopify API Secret Key"
+                  value={tempConfigs.shopify.client_secret}
+                  onChange={(e) =>
+                    setTempConfigs(prev => ({
+                      ...prev,
+                      shopify: { ...prev.shopify, client_secret: e.target.value }
+                    }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Found in your Shopify app → API credentials → API secret key
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="shopify-access-token">Access Token (optional — leave blank to use Client Credentials)</Label>
                 <Input
                   id="shopify-access-token"
                   type="password"
-                  placeholder="Enter your Shopify access token"
+                  placeholder="shpat_xxxx — leave blank if using API Key + Secret"
                   value={tempConfigs.shopify.access_token}
                   onChange={(e) =>
                     setTempConfigs(prev => ({

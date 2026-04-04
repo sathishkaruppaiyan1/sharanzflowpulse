@@ -19,16 +19,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
     order.stage === 'delivered' || order.stage === 'shipped'
   );
 
-  const getCourierDisplayName = (carrier: string | null) => {
-    switch (carrier) {
-      case 'frenchexpress':
-        return 'French Express';
-      case 'delhivery':
-        return 'Delhivery';
-      default:
-        return 'Other';
-    }
-  };
+  const getCourierDisplayName = (carrier: string | null) => carrier || 'N/A';
 
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -169,8 +160,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
-                        order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
+        order.carrier || 'N/A',
         order.tracking_number || 'N/A'
       ].join(','))
     ].join('\n');
@@ -197,8 +187,7 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       ...completedOrders.map(order => [
         order.order_number,
         order.customer?.phone || 'N/A',
-        order.carrier ? (order.carrier === 'frenchexpress' ? 'French Express' : 
-                        order.carrier === 'delhivery' ? 'Delhivery' : 'Other') : 'N/A',
+        order.carrier || 'N/A',
         order.tracking_number || 'N/A'
       ].join('\t'))
     ].join('\n');

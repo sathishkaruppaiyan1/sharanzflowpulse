@@ -1,17 +1,25 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import type { Order, CarrierType } from '@/types/database';
+import type { Order } from '@/types/database';
 import { sendWhatsAppMessage, type InteraktMessageTemplate } from './interaktApiClient';
-import { generateTrackingLink, getCourierDisplayName } from './carrierUtils';
 
-// Send order shipped notification with tracking ID and link
-export const sendOrderShippedNotification = async (order: Order, trackingNumber: string, carrier: CarrierType): Promise<boolean> => {
+/**
+ * Send WhatsApp shipped notification.
+ * @param courierName  Display name of the courier (e.g. "Delhivery")
+ * @param trackingUrl  Full tracking URL (already built with tracking number substituted)
+ */
+export const sendOrderShippedNotification = async (
+  order: Order,
+  trackingNumber: string,
+  courierName: string,
+  trackingUrl: string
+): Promise<boolean> => {
   try {
     console.log('🚀 === Starting WhatsApp Notification Process ===');
     console.log('📦 Order:', order.order_number);
     console.log('👤 Customer phone:', order.customer?.phone);
     console.log('🏷️ Tracking number:', trackingNumber);
-    console.log('🚚 Carrier:', carrier);
+    console.log('🚚 Carrier:', courierName);
 
     // Check if customer has phone number first
     if (!order.customer?.phone) {
@@ -64,9 +72,8 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
     console.log('🔗 Base URL:', interaktConfig.base_url);
     console.log('🔑 API Key length:', interaktConfig.api_key.length);
 
-    // Generate tracking link and courier name
-    const trackingLink = generateTrackingLink(trackingNumber, carrier);
-    const courierName = getCourierDisplayName(carrier);
+    // trackingUrl and courierName are passed in directly from caller
+    const trackingLink = trackingUrl || '';
 
     // Get customer name
     const customerName = order.customer?.first_name && order.customer?.last_name 
@@ -78,38 +85,33 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
       courierName,
       trackingLink,
       orderNumber: order.order_number,
-      templateName: 'order_shipped_template',
-      campaignId: '990ca66f-9714-4a97-9dda-c4d9d9bbe148'
+      templateName: 'order_tracking_information'
     });
 
-    // Prepare message template with exact parameter mapping
-    // Template: "Dear {{1}} This is Black Lovers Your order 📦 has been shipped with {{2}} Courier..."
+    // Template: "Hello {{4}} !
+    // Your order with us is on its way! Here are the tracking details:
+    // Order ID: {{1}}
+    // Tracking ID: {{2}}
+    // COURIER: {{3}}
+    // Thank you for shopping with us! ..."
     const template: InteraktMessageTemplate = {
-      templateName: 'order_shipped_template',
+      templateName: 'order_tracking_information',
       parameters: [
         {
-          name: '1', // {{1}} - customer name
-          value: customerName
-        },
-        {
-          name: '2', // {{2}} - courier name  
-          value: courierName
-        },
-        {
-          name: '3', // {{3}} - order number
+          name: '1', // {{1}} - Order ID
           value: order.order_number
         },
         {
-          name: '4', // {{4}} - tracking number
+          name: '2', // {{2}} - Tracking ID
           value: trackingNumber
         },
         {
-          name: '5', // {{5}} - courier name again
+          name: '3', // {{3}} - Courier name
           value: courierName
         },
         {
-          name: '6', // {{6}} - tracking link
-          value: trackingLink
+          name: '4', // {{4}} - Customer name (greeting)
+          value: customerName
         }
       ]
     };
@@ -131,7 +133,7 @@ export const sendOrderShippedNotification = async (order: Order, trackingNumber:
       console.log('📦 Order:', order.order_number);
       console.log('🚚 Courier:', courierName);
       console.log('🏷️ Tracking:', trackingNumber);
-      console.log('🔗 Campaign ID: 990ca66f-9714-4a97-9dda-c4d9d9bbe148');
+      console.log('📋 Template: order_tracking_information');
     } else {
       console.error('💥 ❌ Failed to send shipped notification for order', order.order_number);
       console.error('🔍 Check above logs for detailed error information');

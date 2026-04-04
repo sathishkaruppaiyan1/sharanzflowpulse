@@ -7,6 +7,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Get access token via OAuth client_credentials grant ──────────────────────
+async function getAccessTokenFromClientCredentials(
+  shopName: string,
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  const url = `https://${shopName}.myshopify.com/admin/oauth/access_token`
+
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+  })
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Shopify OAuth token error (${response.status}): ${text}`)
+  }
+
+  const data = await response.json()
+  if (!data.access_token) {
+    throw new Error('Shopify OAuth response did not include access_token')
+  }
+
+  console.log('Successfully obtained access token via client_credentials')
+  return data.access_token
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -34,140 +68,141 @@ serve(async (req) => {
     const apiConfigs = configData.value as any
     const shopifyConfig = apiConfigs?.shopify
 
-    if (!shopifyConfig?.enabled || !shopifyConfig?.shop_url || !shopifyConfig?.access_token) {
+    if (!shopifyConfig?.enabled || !shopifyConfig?.shop_url) {
       return new Response(
         JSON.stringify({ error: 'Shopify API not configured' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Clean and extract shop name from URL
+    // ── Resolve access token ─────────────────────────────────────────────────
+    // Priority: direct access_token > client_id + client_secret OAuth
     let shopName = shopifyConfig.shop_url
       .replace(/^https?:\/\//, '')
       .replace('.myshopify.com', '')
       .replace(/\/$/, '')
+      .trim()
 
     console.log('Using shop name:', shopName)
 
-    // Enhanced function to fetch ALL orders with comprehensive pagination
+    let accessToken: string
+
+    if (shopifyConfig.access_token?.startsWith('shpat_') ||
+        (shopifyConfig.access_token && !shopifyConfig.client_id)) {
+      // Legacy: use provided access token directly
+      accessToken = shopifyConfig.access_token
+      console.log('Using provided access token')
+    } else if (shopifyConfig.client_id && shopifyConfig.client_secret) {
+      // New: exchange client_id + client_secret for access token
+      console.log('Using client_credentials OAuth flow')
+      accessToken = await getAccessTokenFromClientCredentials(
+        shopName,
+        shopifyConfig.client_id,
+        shopifyConfig.client_secret
+      )
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Shopify credentials not configured. Provide either an Access Token or API Key + Secret.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ── Fetch all orders with pagination ─────────────────────────────────────
     const fetchAllOrders = async () => {
       let allOrders: any[] = []
-      const limit = 250 // Maximum allowed by Shopify
+      const limit = 250
       let hasMoreOrders = true
       let sinceId = null
       let pageCount = 0
-      const maxPages = 50 // Safety limit to prevent infinite loops
+      const maxPages = 50
 
       console.log('Starting comprehensive fetch of ALL Shopify orders...')
 
       while (hasMoreOrders && pageCount < maxPages) {
         pageCount++
-        
-        // Build URL with enhanced parameters to ensure we get all orders
-        let url = `https://${shopName}.myshopify.com/admin/api/2023-10/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
-        
-        // Add since_id for pagination if we have it
+
+        let url = `https://${shopName}.myshopify.com/admin/api/2024-01/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+
         if (sinceId) {
           url += `&since_id=${sinceId}`
         } else {
-          // For the first request, get orders in ascending order by ID to ensure proper pagination
           url += `&order=id+asc`
         }
-        
-        console.log(`Fetching page ${pageCount} with since_id: ${sinceId || 'none'}, current total: ${allOrders.length}`)
+
+        console.log(`Fetching page ${pageCount}, since_id: ${sinceId || 'none'}, total so far: ${allOrders.length}`)
 
         try {
           const shopifyResponse = await fetch(url, {
             headers: {
-              'X-Shopify-Access-Token': shopifyConfig.access_token,
+              'X-Shopify-Access-Token': accessToken,
               'Content-Type': 'application/json',
             },
           })
 
           console.log(`Page ${pageCount} response status:`, shopifyResponse.status)
-          
+
           if (!shopifyResponse.ok) {
             const errorText = await shopifyResponse.text()
             console.error('Shopify API error response:', errorText)
-            
-            // If it's a 429 (rate limit), wait longer and retry
+
             if (shopifyResponse.status === 429) {
               console.log('Rate limited, waiting 5 seconds...')
               await new Promise(resolve => setTimeout(resolve, 5000))
-              continue // Retry the same request
+              continue
             }
-            
+
             throw new Error(`Shopify API error: ${shopifyResponse.status} - ${errorText}`)
           }
 
           const shopifyData = await shopifyResponse.json()
           const orders = shopifyData.orders || []
-          
+
           console.log(`Page ${pageCount}: Fetched ${orders.length} orders`)
-          
+
           if (orders.length === 0) {
-            console.log('No more orders to fetch - reached end')
             hasMoreOrders = false
           } else {
-            // Add orders to our collection
             allOrders = allOrders.concat(orders)
-            
-            // If we got fewer than the limit, we're done
             if (orders.length < limit) {
-              console.log(`Page ${pageCount}: Got fewer orders than limit (${orders.length} < ${limit}) - this is the last page`)
               hasMoreOrders = false
             } else {
-              // Set the since_id to the last order's ID for next iteration
-              const lastOrder = orders[orders.length - 1]
-              sinceId = lastOrder.id
-              console.log(`Page ${pageCount}: Next since_id will be: ${sinceId}`)
+              sinceId = orders[orders.length - 1].id
             }
           }
 
-          // Add delay to respect rate limits (be more conservative)
-          await new Promise(resolve => setTimeout(resolve, 1000)) // 1 second delay
+          await new Promise(resolve => setTimeout(resolve, 500))
 
         } catch (fetchError) {
           console.error(`Error fetching page ${pageCount}:`, fetchError)
-          
-          // If it's a network error, try one more time with longer delay
-          if (fetchError.message.includes('fetch')) {
-            console.log('Network error, waiting 3 seconds and retrying...')
+          if (fetchError.message?.includes('fetch')) {
             await new Promise(resolve => setTimeout(resolve, 3000))
-            pageCount-- // Don't count this as a page attempt
+            pageCount--
             continue
           }
-          
           throw fetchError
         }
       }
 
       if (pageCount >= maxPages) {
-        console.warn(`Reached maximum page limit (${maxPages}), there might be more orders`)
+        console.warn(`Reached maximum page limit (${maxPages})`)
       }
 
-      console.log(`Finished comprehensive fetch. Total pages processed: ${pageCount}, Total orders collected: ${allOrders.length}`)
+      console.log(`Fetch complete. Pages: ${pageCount}, Total orders: ${allOrders.length}`)
       return allOrders
     }
 
-    // Fetch all orders with enhanced pagination
     const allOrders = await fetchAllOrders()
     console.log(`FINAL RESULT - Total orders fetched: ${allOrders.length}`)
-    
-    // Transform Shopify orders to include detailed information
+
     const transformedOrders = allOrders.map((order: any) => {
-      // Extract phone number from multiple sources
-      const customerPhone = order.customer?.phone;
-      const shippingPhone = order.shipping_address?.phone;
-      const orderPhone = shippingPhone || customerPhone || null;
-      
+      const customerPhone = order.customer?.phone
+      const shippingPhone = order.shipping_address?.phone
+      const orderPhone = shippingPhone || customerPhone || null
+
       return {
         id: order.id.toString(),
         order_number: order.name,
-        customer_name: order.customer 
+        customer_name: order.customer
           ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
           : 'Guest',
         customer: order.customer,
@@ -180,34 +215,24 @@ serve(async (req) => {
         shipping_address: order.shipping_address,
         total_weight: order.total_weight,
         current_total_price: order.current_total_price,
-        phone: orderPhone // Add phone at order level for consistency
+        phone: orderPhone,
       }
     })
 
-    console.log(`Returning ${transformedOrders.length} transformed orders with comprehensive data`)
-
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         orders: transformedOrders,
         total_fetched: transformedOrders.length,
-        message: `Successfully fetched ${transformedOrders.length} orders from Shopify`
+        message: `Successfully fetched ${transformedOrders.length} orders from Shopify`,
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Error fetching Shopify orders:', error)
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        details: error.toString()
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: error.message, details: error.toString() }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

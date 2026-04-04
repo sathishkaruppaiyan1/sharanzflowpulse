@@ -279,17 +279,32 @@ const PackingQueue = ({ orders, selectedOrderId, onOrderUpdate, showOrderHeader 
                   <Package className="h-4 w-4" />
                   <span>{packedItems} of {totalItems} items packed</span>
                 </div>
-                
-                <Button 
-                  onClick={() => handleMoveToTracking(order.id, order.order_number)}
-                  disabled={!isReady || updateOrderStage.isPending}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Truck className="h-4 w-4 mr-2" />
-                  Dispatch Order
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+
+                <div className="flex items-center space-x-2">
+                  {/* Force skip to tracking even if not all items packed */}
+                  {!isReady && (
+                    <Button
+                      onClick={() => handleMoveToTracking(order.id, order.order_number)}
+                      disabled={updateOrderStage.isPending}
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-400 text-orange-600 hover:bg-orange-50"
+                    >
+                      <ArrowRight className="h-4 w-4 mr-1" />
+                      Skip to Tracking
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => handleMoveToTracking(order.id, order.order_number)}
+                    disabled={updateOrderStage.isPending}
+                    size="sm"
+                    className={isReady ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 hover:bg-gray-500'}
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    {isReady ? 'Dispatch Order' : 'Force Dispatch'}
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

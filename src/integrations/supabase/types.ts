@@ -278,13 +278,14 @@ export type Database = {
       }
       orders: {
         Row: {
-          carrier: Database["public"]["Enums"]["carrier_type"] | null
+          carrier: string | null
           created_at: string
           currency: string | null
           customer_id: string | null
           delivered_at: string | null
           id: string
           order_number: string
+          notes: string | null
           packed_at: string | null
           printed_at: string | null
           shipped_at: string | null
@@ -293,16 +294,19 @@ export type Database = {
           shopify_synced_at: string | null
           stage: Database["public"]["Enums"]["order_stage"] | null
           total_amount: number | null
+          total_weight: number | null
           tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
         }
         Insert: {
-          carrier?: Database["public"]["Enums"]["carrier_type"] | null
+          carrier?: string | null
           created_at?: string
           currency?: string | null
           customer_id?: string | null
           delivered_at?: string | null
           id?: string
+          notes?: string | null
           order_number: string
           packed_at?: string | null
           printed_at?: string | null
@@ -312,16 +316,19 @@ export type Database = {
           shopify_synced_at?: string | null
           stage?: Database["public"]["Enums"]["order_stage"] | null
           total_amount?: number | null
+          total_weight?: number | null
           tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Update: {
-          carrier?: Database["public"]["Enums"]["carrier_type"] | null
+          carrier?: string | null
           created_at?: string
           currency?: string | null
           customer_id?: string | null
           delivered_at?: string | null
           id?: string
+          notes?: string | null
           order_number?: string
           packed_at?: string | null
           printed_at?: string | null
@@ -331,7 +338,9 @@ export type Database = {
           shopify_synced_at?: string | null
           stage?: Database["public"]["Enums"]["order_stage"] | null
           total_amount?: number | null
+          total_weight?: number | null
           tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -480,7 +489,6 @@ export type Database = {
       }
     }
     Enums: {
-      carrier_type: "frenchexpress" | "delhivery" | "other" | "dtdc"
       order_stage:
         | "pending"
         | "printing"
@@ -616,7 +624,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      carrier_type: ["frenchexpress", "delhivery", "other", "dtdc"],
       order_stage: [
         "pending",
         "printing",

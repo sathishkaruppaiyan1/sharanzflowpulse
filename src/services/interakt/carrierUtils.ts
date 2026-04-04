@@ -1,42 +1,39 @@
+/**
+ * carrierUtils.ts
+ *
+ * Courier helpers — no longer contain hardcoded carrier list.
+ * Couriers are managed dynamically via the courier_partners table.
+ * Use useCourierPartners() hook + detectCourierByPrefix() / buildTrackingUrl()
+ * from src/hooks/useCourierPartners.ts for dynamic lookups.
+ */
 
-import type { CarrierType } from '@/types/database';
+/**
+ * Build a tracking URL from a template.
+ * Template uses {number} as the placeholder, e.g.:
+ *   "https://delhivery.com/track/{number}"
+ */
+export const generateTrackingLink = (
+  trackingNumber: string,
+  trackingUrl: string | null | undefined
+): string => {
+  if (!trackingUrl) return '';
+  return trackingUrl.replace('{number}', trackingNumber);
+};
 
-// Function to detect courier partner based on tracking number
-export const detectCourierPartner = (trackingNumber: string): CarrierType => {
-  if (trackingNumber.startsWith('48')) {
-    return 'frenchexpress';
-  } else if (trackingNumber.startsWith('2158')) {
-    return 'delhivery';
-  } else if (trackingNumber.startsWith('A')) {
-    return 'dtdc';
-  }
+/**
+ * Return the courier display name from orders.carrier.
+ * Since orders.carrier now stores the display name directly, this is a
+ * passthrough — kept for backward-compat call sites.
+ */
+export const getCourierDisplayName = (carrier: string | null | undefined): string => {
+  return carrier || 'Unknown';
+};
+
+/**
+ * @deprecated — prefix detection is now done via detectCourierByPrefix()
+ * in useCourierPartners.ts against the user-managed courier_partners table.
+ * This stub returns 'other' so legacy call sites don't crash.
+ */
+export const detectCourierPartner = (_trackingNumber: string): string => {
   return 'other';
-};
-
-// Function to generate tracking link based on courier partner
-export const generateTrackingLink = (trackingNumber: string, carrier: CarrierType): string => {
-  switch (carrier) {
-    case 'frenchexpress':
-      return `https://franchexpress.com/courier-tracking/${trackingNumber}`;
-    case 'delhivery':
-      return `https://www.delhivery.com/track/package/${trackingNumber}`;
-    case 'dtdc':
-      return `https://www.dtdc.in/tracking.asp?Ttype=awb_no&strCnno=${trackingNumber}`;
-    default:
-      return '';
-  }
-};
-
-// Function to get courier display name
-export const getCourierDisplayName = (carrier: CarrierType): string => {
-  switch (carrier) {
-    case 'frenchexpress':
-      return 'FRANCH EXPRESS';
-    case 'delhivery':
-      return 'DELHIVERY';
-    case 'dtdc':
-      return 'DTDC';
-    default:
-      return 'OTHER';
-  }
 };

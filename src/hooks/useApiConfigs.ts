@@ -6,7 +6,9 @@ export interface ApiConfigs {
   shopify: {
     enabled: boolean;
     shop_url: string;
-    access_token: string;
+    access_token: string;   // legacy — still supported
+    client_id: string;      // OAuth client credentials
+    client_secret: string;  // OAuth client credentials
     webhook_secret: string;
   };
   interakt: {
@@ -26,6 +28,8 @@ const defaultConfigs: ApiConfigs = {
     enabled: false,
     shop_url: '',
     access_token: '',
+    client_id: '',
+    client_secret: '',
     webhook_secret: ''
   },
   interakt: {

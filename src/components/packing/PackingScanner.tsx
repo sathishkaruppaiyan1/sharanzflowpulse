@@ -147,9 +147,19 @@ const PackingScanner = ({ orders, onItemPacked, onOrderSelected }: PackingScanne
   }, []);
 
   const findOrderByNumber = useCallback((orderNumber: string) => {
-    return orders.find(order => 
-      order.order_number?.toLowerCase() === orderNumber.toLowerCase()
-    );
+    const cleanInput = orderNumber.trim().toLowerCase();
+
+    return orders.find((order) => {
+      const currentOrderNumber = order.order_number?.toLowerCase() || '';
+      const normalizedOrderNumber = currentOrderNumber.replace(/^#/, '');
+      const normalizedInput = cleanInput.replace(/^#/, '');
+
+      return (
+        currentOrderNumber === cleanInput ||
+        currentOrderNumber === `#${normalizedInput}` ||
+        normalizedOrderNumber === normalizedInput
+      );
+    });
   }, [orders]);
 
   const findItemBySKU = useCallback((sku: string, order: any) => {

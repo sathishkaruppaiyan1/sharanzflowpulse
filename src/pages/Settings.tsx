@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import Header from '@/components/layout/Header';
 import SystemConfiguration from '@/components/settings/SystemConfiguration';
 import ApiConfiguration from '@/components/settings/ApiConfiguration';
+import CourierSettings from '@/components/settings/CourierSettings';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -39,9 +40,10 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="system" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="system">System</TabsTrigger>
               <TabsTrigger value="api">API</TabsTrigger>
+              <TabsTrigger value="couriers">Couriers</TabsTrigger>
               <TabsTrigger value="password">Password</TabsTrigger>
               <TabsTrigger value="logs">Logs</TabsTrigger>
             </TabsList>
@@ -53,7 +55,11 @@ const Settings = () => {
             <TabsContent value="api" className="space-y-6">
               <ApiConfiguration />
             </TabsContent>
-            
+
+            <TabsContent value="couriers" className="space-y-6">
+              <CourierSettings />
+            </TabsContent>
+
             <TabsContent value="password" className="space-y-6">
               <Card className="shadow-lg border-0 bg-white">
                 <CardHeader className="text-center pb-4">
