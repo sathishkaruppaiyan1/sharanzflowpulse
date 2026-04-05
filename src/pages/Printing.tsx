@@ -651,31 +651,11 @@ const Printing = () => {
           {/* Orders Section */}
           <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">Orders for Printing - Instant Updates</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {filteredOrders.length} orders in printing stage • Real-time sync from Shopify
-                  </p>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900"
-                    onClick={() => handleSelectAll()}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900"
-                    onClick={handleUnselectAll}
-                  >
-                    Unselect All
-                  </Button>
-                </div>
+              <div>
+                <CardTitle className="text-lg">Orders for Printing - Instant Updates</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {filteredOrders.length} orders in printing stage • Real-time sync from Shopify
+                </p>
               </div>
             </CardHeader>
             <CardContent>
@@ -686,7 +666,6 @@ const Printing = () => {
                 selectedOrderIds={selectedOrderIds}
                 onSelectAll={handleSelectAll}
                 onUnselectAll={handleUnselectAll}
-                itemsPerPage={10}
               />
             </CardContent>
           </Card>

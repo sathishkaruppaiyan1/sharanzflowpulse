@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import ShippingLabelPreview from './ShippingLabelPreview';
 import { normalizeItemForDisplay } from '@/utils/productVariationUtils';
 
@@ -26,140 +27,117 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
-  itemsPerPage = 10
+  itemsPerPage: defaultItemsPerPage = 10
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
   const [previewOrder, setPreviewOrder] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(defaultItemsPerPage);
 
-  // Update local state when external selectedOrderIds changes
   useEffect(() => {
     setSelectedOrders(selectedOrderIds);
   }, [selectedOrderIds]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(orders.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  const totalPages = Math.ceil(orders.length / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const endIndex = startIndex + perPage;
   const paginatedOrders = orders.slice(startIndex, endIndex);
 
-  // Handle pagination when orders change - more robust approach
   useEffect(() => {
-    if (orders.length === 0) {
-      setCurrentPage(1);
-      return;
-    }
+    if (orders.length === 0) { setCurrentPage(1); return; }
+    const newTotalPages = Math.ceil(orders.length / perPage);
+    if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages));
+  }, [orders.length, perPage, currentPage]);
 
-    const newTotalPages = Math.ceil(orders.length / itemsPerPage);
-    
-    // Only adjust current page if it's beyond the available pages
-    if (currentPage > newTotalPages) {
-      setCurrentPage(Math.max(1, newTotalPages));
-    }
-  }, [orders.length, itemsPerPage, currentPage]);
-
-  // Additional effect to handle when current page becomes empty
   useEffect(() => {
     if (paginatedOrders.length === 0 && orders.length > 0 && currentPage > 1) {
-      // If current page is empty but we have orders, go to previous page
       setCurrentPage(prev => Math.max(1, prev - 1));
     }
   }, [paginatedOrders.length, orders.length, currentPage]);
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
-    if (checked) {
-      newSelected.add(orderId);
-    } else {
-      newSelected.delete(orderId);
-    }
+    if (checked) { newSelected.add(orderId); } else { newSelected.delete(orderId); }
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
   };
 
   const handlePrintSingle = (order: any) => {
-    console.log('Opening print preview for order:', order.id);
     setPreviewOrder(order);
     setShowPreview(true);
   };
 
   const handlePrintComplete = (orderId: string) => {
-    console.log('Print completed for order:', orderId);
-    
-    // Remove from selected orders after successful print
     const newSelected = new Set(selectedOrders);
-    if (Array.isArray(orderId)) {
-      orderId.forEach(id => newSelected.delete(id));
-    } else {
-      newSelected.delete(orderId);
-    }
+    if (Array.isArray(orderId)) { orderId.forEach(id => newSelected.delete(id)); } else { newSelected.delete(orderId); }
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
-
-    // More prominent notification for stage movement
-    toast({
-      title: "🎉 Order Moved to Packing!", 
-      description: "Label printed successfully. Order has been moved to packing stage and is ready for fulfillment."
-    });
-    console.log('Moving order to packing stage:', orderId);
-
-    // Handle pagination after order removal with a small delay to allow state updates
+    toast({ title: "🎉 Order Moved to Packing!", description: "Label printed successfully. Order has been moved to packing stage." });
     setTimeout(() => {
-      const remainingOrders = orders.length;
-      const newTotalPages = Math.ceil(remainingOrders / itemsPerPage);
-      
-      // If current page becomes invalid after order removal, adjust it
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
-      } else if (remainingOrders === 0) {
-        setCurrentPage(1);
-      }
+      const newTotalPages = Math.ceil(orders.length / perPage);
+      if (currentPage > newTotalPages && newTotalPages > 0) setCurrentPage(newTotalPages);
+      else if (orders.length === 0) setCurrentPage(1);
     }, 100);
   };
 
   const isPrinting = (orderId: string) => printingOrders.has(orderId);
+  const handlePageChange = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
+  // Select / unselect only the current page
   const handleSelectCurrentPage = () => {
-    onSelectAll?.(paginatedOrders);
+    const newSelected = new Set(selectedOrders);
+    paginatedOrders.forEach((o: any) => newSelected.add(o.id));
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
   };
 
   const handleUnselectCurrentPage = () => {
-    onUnselectAll?.();
+    const newSelected = new Set(selectedOrders);
+    paginatedOrders.forEach((o: any) => newSelected.delete(o.id));
+    setSelectedOrders(newSelected);
+    onSelectedCountChange?.(newSelected.size, newSelected);
   };
+
+  const allCurrentPageSelected = paginatedOrders.length > 0 && paginatedOrders.every((o: any) => selectedOrders.has(o.id));
 
   return (
     <>
+      {/* Toolbar: per-page selector + page select/unselect */}
+      {orders.length > 0 && (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-muted-foreground">Show</span>
+            <Select value={String(perPage)} onValueChange={(v) => { setPerPage(Number(v)); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[72px] h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">per page</span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={allCurrentPageSelected ? handleUnselectCurrentPage : handleSelectCurrentPage}>
+              {allCurrentPageSelected ? `Unselect Page (${paginatedOrders.length})` : `Select Page (${paginatedOrders.length})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         {paginatedOrders.map((order) => {
-          // Get product items with variations and debug logging
-          const rawItems = isShopifyOrders 
-            ? (order.line_items || [])
-            : (order.order_items || []);
-            
-          console.log(`Processing order ${order.id} items:`, rawItems);
-          
-          const productItems = rawItems.map(item => {
-            const normalized = normalizeItemForDisplay(item);
-            console.log(`Normalized item for order ${order.id}:`, {
-              original: item,
-              normalized: normalized,
-              variationText: normalized.variationText
-            });
-            return normalized;
-          });
+          const rawItems = isShopifyOrders ? (order.line_items || []) : (order.order_items || []);
+          const productItems = rawItems.map((item: any) => normalizeItemForDisplay(item));
 
           return (
             <div key={order.id} className="bg-white border border-gray-200 rounded-md p-3">
               <div className="grid grid-cols-12 gap-3 items-start">
-                {/* Checkbox and Order Info */}
                 <div className="col-span-2 flex items-start space-x-2">
                   <Checkbox
                     checked={selectedOrders.has(order.id)}
@@ -168,43 +146,36 @@ const PrintQueue = ({
                   />
                   <div>
                     <h3 className="font-semibold text-sm">#{order.order_number || order.name}</h3>
-                    <p className="text-gray-600 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {order.customer_name || `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() || 'Guest'}
                     </p>
                   </div>
                 </div>
 
-                {/* Products with Variations */}
                 <div className="col-span-4">
-                  <h4 className="text-xs font-medium text-gray-500 mb-1">Products:</h4>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Products:</h4>
                   <div className="space-y-1">
                     {productItems.map((item: any, index: number) => (
-                      <div key={index} className="text-xs text-gray-900">
+                      <div key={index} className="text-xs text-foreground">
                         <div className="font-medium">{item.displayName}</div>
-                        <div className="text-blue-600 ml-1 text-xs font-medium">
-                          {item.variationText}
-                        </div>
+                        <div className="text-primary ml-1 text-xs font-medium">{item.variationText}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="col-span-2">
-                  <h4 className="text-xs font-medium text-gray-500 mb-1">Details:</h4>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Details:</h4>
                   <div className="space-y-0.5 text-xs">
-                    <div className="text-gray-900">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
-                    <div className="font-medium text-gray-900">₹{order.total_amount || order.current_total_price}</div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString('en-IN')}
-                    </div>
+                    <div className="text-foreground">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                    <div className="font-medium text-foreground">₹{order.total_amount || order.current_total_price}</div>
+                    <div className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
                   </div>
                 </div>
 
-                {/* Address */}
                 <div className="col-span-3">
-                  <h4 className="text-xs font-medium text-gray-500 mb-1">Address:</h4>
-                  <div className="text-xs text-gray-900">
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1">Address:</h4>
+                  <div className="text-xs text-foreground">
                     {order.shipping_address ? (
                       <>
                         <div>{order.shipping_address.address1 || order.shipping_address.address_line_1}</div>
@@ -214,19 +185,18 @@ const PrintQueue = ({
                         <div>{order.shipping_address.city}, {order.shipping_address.province || order.shipping_address.state}</div>
                         <div>{order.shipping_address.zip || order.shipping_address.postal_code} {order.shipping_address.country}</div>
                         {order.shipping_address.phone && (
-                          <div className="flex items-center mt-0.5 text-red-600">
+                          <div className="flex items-center mt-0.5 text-destructive">
                             <Phone className="h-2.5 w-2.5 mr-1" />
                             <span>{order.shipping_address.phone}</span>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="text-gray-500">Address not available</div>
+                      <div className="text-muted-foreground">Address not available</div>
                     )}
                   </div>
                 </div>
 
-                {/* Print Button */}
                 <div className="col-span-1 flex justify-end">
                   <Button 
                     onClick={() => handlePrintSingle(order)}
@@ -247,7 +217,7 @@ const PrintQueue = ({
         {orders.length === 0 && (
           <Card className="text-center py-8">
             <CardContent>
-              <div className="text-gray-500">No orders found matching your criteria</div>
+              <div className="text-muted-foreground">No orders found matching your criteria</div>
             </CardContent>
           </Card>
         )}
@@ -263,14 +233,11 @@ const PrintQueue = ({
                     className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
-                
-                {/* Compact page info */}
                 <PaginationItem>
-                  <span className="px-3 py-2 text-sm text-gray-700">
+                  <span className="px-3 py-2 text-sm text-muted-foreground">
                     Page {currentPage} of {totalPages}
                   </span>
                 </PaginationItem>
-                
                 <PaginationItem>
                   <PaginationNext 
                     onClick={() => handlePageChange(currentPage + 1)}
