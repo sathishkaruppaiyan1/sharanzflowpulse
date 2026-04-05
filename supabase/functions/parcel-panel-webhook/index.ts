@@ -236,13 +236,13 @@ serve(async (req) => {
   } catch (error) {
     console.error('=== WEBHOOK ERROR ===')
     console.error('Error processing webhook:', error)
-    console.error('Error message:', error.message)
-    console.error('Error stack:', error.stack)
+    console.error('Error message:', (error as Error).message)
+    console.error('Error stack:', (error as Error).stack)
     
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error', 
-        details: error.message 
+        details: (error as Error).message 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
