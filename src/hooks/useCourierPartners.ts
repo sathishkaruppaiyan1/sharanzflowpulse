@@ -41,7 +41,7 @@ export const useAddCourierPartner = () => {
     mutationFn: async (
       payload: Omit<CourierPartner, 'id' | 'created_at' | 'updated_at'>
     ) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('courier_partners')
         .insert(payload)
         .select()
@@ -66,7 +66,7 @@ export const useUpdateCourierPartner = () => {
       id,
       ...payload
     }: Partial<CourierPartner> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('courier_partners')
         .update({ ...payload, updated_at: new Date().toISOString() })
         .eq('id', id)
@@ -89,7 +89,7 @@ export const useDeleteCourierPartner = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('courier_partners')
         .delete()
         .eq('id', id);
