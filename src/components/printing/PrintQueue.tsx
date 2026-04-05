@@ -108,6 +108,17 @@ const PrintQueue = ({
       {orders.length > 0 && (
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
+            <Button
+              variant={allCurrentPageSelected ? "default" : "outline"}
+              size="sm"
+              className="text-xs"
+              onClick={allCurrentPageSelected ? handleUnselectCurrentPage : handleSelectCurrentPage}
+            >
+              {allCurrentPageSelected ? `Unselect All (${paginatedOrders.length})` : `Select All (${paginatedOrders.length})`}
+            </Button>
+          </div>
+
+          <div className="flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">Show</span>
             <Select value={String(perPage)} onValueChange={(v) => { setPerPage(Number(v)); setCurrentPage(1); }}>
               <SelectTrigger className="w-[72px] h-8 text-sm">
@@ -120,12 +131,6 @@ const PrintQueue = ({
               </SelectContent>
             </Select>
             <span className="text-sm text-muted-foreground">per page</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="text-xs" onClick={allCurrentPageSelected ? handleUnselectCurrentPage : handleSelectCurrentPage}>
-              {allCurrentPageSelected ? `Unselect Page (${paginatedOrders.length})` : `Select Page (${paginatedOrders.length})`}
-            </Button>
           </div>
         </div>
       )}
