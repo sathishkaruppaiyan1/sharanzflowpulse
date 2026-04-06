@@ -141,13 +141,17 @@ const Printing = () => {
       console.log('📋 Existing Shopify orders in Supabase:', existingShopifyIds.size);
 
       const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
-      const pendingToPrintIds: string[] = [];
+      const promoteToPrintIds: string[] = [];
       const stalePrintingOrders: Array<{ id: string; nextStage: string }> = [];
+
+      // Stages that are "later" than printing — don't demote these back
+      const laterStages = new Set(['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed']);
 
       unfulfilled.forEach(order => {
         const rec = existingByShopifyId.get(Number(order.id));
-        if (rec && (rec.stage === 'pending' || rec.stage === null)) {
-          pendingToPrintIds.push(rec.id);
+        if (rec && rec.stage !== 'printing' && !laterStages.has(rec.stage)) {
+          // Promote any early-stage order (pending, new, null, etc.) to printing
+          promoteToPrintIds.push(rec.id);
         }
       });
 
@@ -167,12 +171,12 @@ const Printing = () => {
       });
 
       console.log('🆕 New unfulfilled orders to upsert:', newOrders.length);
-      console.log('📝 Existing orders to promote to printing:', pendingToPrintIds.length);
+      console.log('📝 Existing orders to promote to printing:', promoteToPrintIds.length);
       console.log('🧹 Printing orders no longer unfulfilled in Shopify:', stalePrintingOrders.length);
 
       setSyncStats({
         total: unfulfilled.length,
-        synced: newOrders.length + pendingToPrintIds.length,
+        synced: newOrders.length + promoteToPrintIds.length,
         inDb: existingShopifyIds.size
       });
 
@@ -201,10 +205,10 @@ const Printing = () => {
       }
 
       let promotedCount = 0;
-      if (pendingToPrintIds.length > 0) {
+      if (promoteToPrintIds.length > 0) {
         const stageBatch = 10;
-        for (let i = 0; i < pendingToPrintIds.length; i += stageBatch) {
-          const batchIds = pendingToPrintIds.slice(i, i + stageBatch);
+        for (let i = 0; i < promoteToPrintIds.length; i += stageBatch) {
+          const batchIds = promoteToPrintIds.slice(i, i + stageBatch);
           await Promise.all(batchIds.map(async (orderId) => {
             try {
               await supabaseOrderService.updateOrderStage(orderId, 'printing');
