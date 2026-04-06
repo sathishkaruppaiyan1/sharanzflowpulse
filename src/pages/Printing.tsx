@@ -456,7 +456,7 @@ const Printing = () => {
     syncNewOrders(true); // Show toast for manual sync
   };
 
-  if (isLoadingPrintingOrders || isLoadingPackingOrders) {
+  if (isLoadingShopify && shopifyOrders.length === 0) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Printing Stage" showSearch={false} />
