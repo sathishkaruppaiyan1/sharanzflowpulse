@@ -143,9 +143,6 @@ const Printing = () => {
       }
       const existingOrders = allExistingOrders;
 
-      if (fetchError) {
-        throw fetchError;
-      }
 
       const existingByShopifyId = new Map<number, any>();
       existingOrders.forEach((order: any) => {
