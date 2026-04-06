@@ -15,9 +15,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 const Printing = () => {
+  const realtimeQueryOptions = React.useMemo(() => ({
+    staleTime: 5 * 1000,
+    refetchInterval: 10 * 1000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always' as const,
+    refetchOnMount: 'always' as const,
+    refetchOnReconnect: 'always' as const,
+  }), []);
+
   // Supabase-only approach: Fetch orders in 'printing' stage only
-  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
+  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing', realtimeQueryOptions);
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing', realtimeQueryOptions);
   
   // Keep Shopify orders hook for syncing and live fulfillment visibility
   const {
@@ -25,7 +34,10 @@ const Printing = () => {
     loading: isLoadingShopify,
     refetch: refetchShopify,
     isConfigured: isShopifyConfigured,
-  } = useShopifyOrders();
+  } = useShopifyOrders({
+    ...realtimeQueryOptions,
+    gcTime: 2 * 60 * 1000,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -273,34 +285,51 @@ const Printing = () => {
     }
   }, [shopifyOrders, isSyncing, refetchPrintingOrders, refetchShopify]);
 
-  // Instant sync on component mount and every 2 minutes for real-time updates
+  // Immediate sync on mount and every 10 seconds for near-instant Shopify updates
   useEffect(() => {
-    // Initial instant sync after a short delay
-    const initialTimer = setTimeout(() => {
-      syncNewOrders(false); // Silent initial sync
-    }, 1000);
+    syncNewOrders(false);
 
-    // Set up frequent sync every 30 seconds for near-instant updates
     const intervalTimer = setInterval(() => {
       console.log('🔄 Auto-syncing orders for instant updates...');
-      syncNewOrders(false); // Silent auto-sync
-    }, 30 * 1000); // 30 seconds for more frequent updates
+      syncNewOrders(false);
+    }, 10 * 1000);
 
     return () => {
-      clearTimeout(initialTimer);
       clearInterval(intervalTimer);
     };
   }, [syncNewOrders]);
 
-  // Real-time window focus sync for immediate updates when user returns
+  // Sync immediately when the tab becomes active again
   useEffect(() => {
-    const handleWindowFocus = () => {
-      console.log('🎯 Window focused - triggering instant sync');
+    const triggerImmediateSync = () => {
       syncNewOrders(false);
     };
 
+    const handleWindowFocus = () => {
+      console.log('🎯 Window focused - triggering instant sync');
+      triggerImmediateSync();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      console.log('👀 Tab visible - triggering instant sync');
+      triggerImmediateSync();
+    };
+
+    const handleOnline = () => {
+      console.log('🌐 Network restored - triggering instant sync');
+      triggerImmediateSync();
+    };
+
     window.addEventListener('focus', handleWindowFocus);
-    return () => window.removeEventListener('focus', handleWindowFocus);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [syncNewOrders]);
 
   // Calculate today's printed orders count from packing stage
@@ -521,7 +550,7 @@ const Printing = () => {
                       <>
                         <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                         <span className="text-gray-700">
-                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 2 minutes
+                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 10 seconds
                         </span>
                       </>
                     )}

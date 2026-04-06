@@ -6,7 +6,16 @@ import { toast } from 'sonner';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useParcelPanelService } from '@/services/parcelPanelService';
 
-export const useOrdersByStage = (stages: string | string[]) => {
+type StageQueryOptions = {
+  staleTime?: number;
+  refetchInterval?: number | false;
+  refetchIntervalInBackground?: boolean;
+  refetchOnWindowFocus?: boolean | 'always';
+  refetchOnMount?: boolean | 'always';
+  refetchOnReconnect?: boolean | 'always';
+};
+
+export const useOrdersByStage = (stages: string | string[], options: StageQueryOptions = {}) => {
   const stageArray = Array.isArray(stages) ? stages : [stages];
   
   return useQuery({
@@ -54,6 +63,12 @@ export const useOrdersByStage = (stages: string | string[]) => {
       
       return (data as Order[]) || [];
     },
+    staleTime: options.staleTime,
+    refetchInterval: options.refetchInterval,
+    refetchIntervalInBackground: options.refetchIntervalInBackground,
+    refetchOnWindowFocus: options.refetchOnWindowFocus,
+    refetchOnMount: options.refetchOnMount,
+    refetchOnReconnect: options.refetchOnReconnect,
   });
 };
 
