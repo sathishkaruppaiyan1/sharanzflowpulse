@@ -124,10 +124,24 @@ const Printing = () => {
       const shopifyResult = await refetchShopify();
       const latestShopifyOrders = shopifyResult.data ?? shopifyOrders;
 
-      const { data: existingOrders, error: fetchError } = await supabase
-        .from('orders')
-        .select('shopify_order_id, id, stage, tracking_number, printed_at, packed_at, shipped_at')
-        .not('shopify_order_id', 'is', null);
+      // Fetch ALL existing orders (handle Supabase 1000-row limit)
+      let allExistingOrders: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: batch, error: batchError } = await supabase
+          .from('orders')
+          .select('shopify_order_id, id, stage, tracking_number, printed_at, packed_at, shipped_at')
+          .not('shopify_order_id', 'is', null)
+          .range(from, from + pageSize - 1);
+
+        if (batchError) throw batchError;
+        if (!batch || batch.length === 0) break;
+        allExistingOrders = allExistingOrders.concat(batch);
+        if (batch.length < pageSize) break;
+        from += pageSize;
+      }
+      const existingOrders = allExistingOrders;
 
       if (fetchError) {
         throw fetchError;
