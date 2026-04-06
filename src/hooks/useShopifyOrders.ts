@@ -71,23 +71,13 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   }
 
   const orders = data.orders || [];
-  console.log(`Fetched ${orders.length} Shopify orders`);
+  console.log(`✅ Fetched ${orders.length} Shopify orders`);
   
-  // Enhanced phone number logging and processing
+  // Ensure phone number is available at order level
   orders.forEach((order: ShopifyOrder) => {
-    const shippingPhone = order.shipping_address?.phone;
-    const customerPhone = order.customer?.phone;
-    
-    console.log(`Shopify Order ${order.order_number}:`);
-    console.log(`  - shipping_address.phone: ${shippingPhone || 'null'}`);
-    console.log(`  - customer.phone: ${customerPhone || 'null'}`);
-    
-    // Ensure phone number is available at order level for consistency
     if (!order.phone) {
-      order.phone = shippingPhone || customerPhone || null;
+      order.phone = order.shipping_address?.phone || order.customer?.phone || null;
     }
-    
-    console.log(`  - order.phone (computed): ${order.phone || 'null'}`);
   });
 
   return orders;
