@@ -50,17 +50,48 @@ const Printing = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
-  // Build a set of Shopify order IDs that have already been processed (printed/packed/shipped)
-  // These should NOT appear in the printing queue
-  const processedShopifyIds = React.useMemo(() => {
-    const processed = new Set<string>();
-    // Orders in packing/tracking/shipped/delivered stages with real progress are already processed
-    // We check printingOrders too but those SHOULD show (they're actively in printing)
-    return processed;
+  // Fetch processed order IDs (already printed/packed/shipped) to exclude from printing queue
+  const [processedShopifyIds, setProcessedShopifyIds] = React.useState<Set<string>>(new Set());
+  
+  const fetchProcessedIds = React.useCallback(async () => {
+    try {
+      // Fetch orders in packing+ stages to exclude from printing view
+      const { data } = await supabase
+        .from('orders')
+        .select('shopify_order_id')
+        .not('shopify_order_id', 'is', null)
+        .in('stage', ['packing', 'tracking', 'shipped', 'delivered']);
+      
+      const ids = new Set<string>();
+      data?.forEach((order: any) => {
+        if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
+      });
+      
+      // Also exclude orders with printed_at set (regardless of stage)
+      const { data: printedData } = await supabase
+        .from('orders')
+        .select('shopify_order_id')
+        .not('shopify_order_id', 'is', null)
+        .not('printed_at', 'is', null);
+      
+      printedData?.forEach((order: any) => {
+        if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
+      });
+      
+      setProcessedShopifyIds(ids);
+      console.log('📋 Total processed/printed orders to exclude:', ids.size);
+    } catch (err) {
+      console.error('Error fetching processed IDs:', err);
+    }
   }, []);
 
+  React.useEffect(() => {
+    fetchProcessedIds();
+    const interval = setInterval(fetchProcessedIds, 15000);
+    return () => clearInterval(interval);
+  }, [fetchProcessedIds]);
+
   // Use Shopify unfulfilled orders as the PRIMARY source for printing queue
-  // Exclude orders that have already been printed (exist in DB with printed_at set)
   const formattedPrintingOrders = React.useMemo(() => {
     if (!isShopifyConfigured || isLoadingShopify) {
       // Fallback: show DB printing orders if Shopify is not ready
@@ -111,49 +142,14 @@ const Printing = () => {
     }
 
     // Primary approach: Show Shopify unfulfilled orders directly
-    // Filter out orders that have already been printed (in packing/tracking/shipped stages)
-    const printedOrderShopifyIds = new Set<string>();
-    
-    // Fetch all orders that have been printed (have printed_at) to exclude from printing queue
-    // This is a lightweight query - just IDs
-    const [processedIds, setProcessedIds] = React.useState<Set<string>>(new Set());
-    
-    const fetchProcessedIds = React.useCallback(async () => {
-      try {
-        const { data } = await supabase
-          .from('orders')
-          .select('shopify_order_id')
-          .not('shopify_order_id', 'is', null)
-          .not('printed_at', 'is', null);
-        
-        const ids = new Set<string>();
-        data?.forEach((order: any) => {
-          if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
-        });
-        
-        // Also add orders in packing+ stages even without printed_at
-        const { data: stageData } = await supabase
-          .from('orders')
-          .select('shopify_order_id')
-          .not('shopify_order_id', 'is', null)
-          .in('stage', ['packing', 'tracking', 'shipped', 'delivered']);
-        
-        stageData?.forEach((order: any) => {
-          if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
-        });
-        
-        setProcessedIds(ids);
-        console.log('📋 Total processed/printed orders to exclude:', ids.size);
-      } catch (err) {
-        console.error('Error fetching processed IDs:', err);
-      }
-    }, []);
+    // Filter out orders already printed/packed/shipped
+    const unfulfilled = shopifyOrders.filter(order => {
+      if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
+      if (processedShopifyIds.has(String(order.id))) return false;
+      return true;
+    });
 
-    React.useEffect(() => {
-      fetchProcessedIds();
-      const interval = setInterval(fetchProcessedIds, 15000);
-      return () => clearInterval(interval);
-    }, [fetchProcessedIds]);
+    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length, '(excluded', processedShopifyIds.size, 'already processed)');
 
     return unfulfilled
       .map(order => ({
@@ -163,7 +159,7 @@ const Printing = () => {
         _isSupabaseOrder: false,
       }))
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [shopifyOrders, printingOrders, packingOrders, isLoadingShopify, isShopifyConfigured]);
+  }, [shopifyOrders, printingOrders, packingOrders, isLoadingShopify, isShopifyConfigured, processedShopifyIds]);
 
   // Enhanced comprehensive sync function for instant updates
   const syncNewOrders = useCallback(async (showToast = true) => {
