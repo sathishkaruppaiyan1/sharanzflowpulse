@@ -42,6 +42,16 @@ export interface ShopifyOrder {
   current_total_price?: string;
 }
 
+type ShopifyOrderQueryOptions = {
+  staleTime?: number;
+  gcTime?: number;
+  refetchInterval?: number | false;
+  refetchIntervalInBackground?: boolean;
+  refetchOnWindowFocus?: boolean | 'always';
+  refetchOnMount?: boolean | 'always';
+  refetchOnReconnect?: boolean | 'always';
+};
+
 const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
     const hasToken = Boolean(apiConfig.access_token)
   const hasCreds = Boolean(apiConfig.client_id && apiConfig.client_secret)
@@ -83,7 +93,7 @@ const fetchShopifyOrders = async (apiConfig: any): Promise<ShopifyOrder[]> => {
   return orders;
 };
 
-export const useShopifyOrders = () => {
+export const useShopifyOrders = (options: ShopifyOrderQueryOptions = {}) => {
   const { apiConfigs } = useApiConfigs();
   
   const hasAccessToken = Boolean(apiConfigs?.shopify?.access_token)
@@ -106,10 +116,13 @@ export const useShopifyOrders = () => {
     queryKey: ['shopify-orders', apiConfigs?.shopify?.shop_url, apiConfigs?.shopify?.access_token],
     queryFn: () => fetchShopifyOrders(apiConfigs?.shopify),
     enabled: isConfigured,
-    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
-    gcTime: 10 * 60 * 1000, // Cache for 10 minutes
-    refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
-    refetchOnWindowFocus: true,
+    staleTime: options.staleTime ?? 2 * 60 * 1000,
+    gcTime: options.gcTime ?? 10 * 60 * 1000,
+    refetchInterval: options.refetchInterval ?? 5 * 60 * 1000,
+    refetchIntervalInBackground: options.refetchIntervalInBackground,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? true,
+    refetchOnMount: options.refetchOnMount,
+    refetchOnReconnect: options.refetchOnReconnect,
     retry: (failureCount, error) => {
       // Don't retry if it's a configuration error
       if (error.message?.includes('not configured')) {
