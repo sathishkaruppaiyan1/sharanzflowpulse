@@ -486,8 +486,7 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh processed IDs and printing orders
-    fetchProcessedIds();
+    // Refresh printing orders
     refetchPrintingOrders();
   };
 
