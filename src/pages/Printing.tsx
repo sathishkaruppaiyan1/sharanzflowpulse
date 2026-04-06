@@ -448,6 +448,7 @@ const Printing = () => {
   };
 
   const handleRefresh = () => {
+    refetchShopify();
     refetchPrintingOrders();
   };
 
