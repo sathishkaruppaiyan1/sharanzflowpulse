@@ -141,13 +141,17 @@ const Printing = () => {
       console.log('📋 Existing Shopify orders in Supabase:', existingShopifyIds.size);
 
       const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
-      const pendingToPrintIds: string[] = [];
+      const promoteToPrintIds: string[] = [];
       const stalePrintingOrders: Array<{ id: string; nextStage: string }> = [];
+
+      // Stages that are "later" than printing — don't demote these back
+      const laterStages = new Set(['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed']);
 
       unfulfilled.forEach(order => {
         const rec = existingByShopifyId.get(Number(order.id));
-        if (rec && (rec.stage === 'pending' || rec.stage === null)) {
-          pendingToPrintIds.push(rec.id);
+        if (rec && rec.stage !== 'printing' && !laterStages.has(rec.stage)) {
+          // Promote any early-stage order (pending, new, null, etc.) to printing
+          promoteToPrintIds.push(rec.id);
         }
       });
 
