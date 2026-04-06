@@ -15,18 +15,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 const Printing = () => {
-  const realtimeQueryOptions = React.useMemo(() => ({
-    staleTime: 5 * 1000,
-    refetchInterval: 10 * 1000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: 'always' as const,
-    refetchOnMount: 'always' as const,
-    refetchOnReconnect: 'always' as const,
-  }), []);
-
   // Supabase-only approach: Fetch orders in 'printing' stage only
-  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing', realtimeQueryOptions);
-  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing', realtimeQueryOptions);
+  const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
+  const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
   
   // Keep Shopify orders hook for syncing and live fulfillment visibility
   const {
@@ -34,10 +25,7 @@ const Printing = () => {
     loading: isLoadingShopify,
     refetch: refetchShopify,
     isConfigured: isShopifyConfigured,
-  } = useShopifyOrders({
-    ...realtimeQueryOptions,
-    gcTime: 2 * 60 * 1000,
-  });
+  } = useShopifyOrders();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -50,76 +38,68 @@ const Printing = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
-  // No exclusion needed — show ALL Shopify unfulfilled orders in printing queue
-  // Shopify API already filters for unfulfilled status
+  const liveUnfulfilledShopifyIds = React.useMemo(
+    () => new Set(shopifyOrders.map((order) => String(order.id))),
+    [shopifyOrders]
+  );
 
-  // Use Shopify unfulfilled orders as the PRIMARY source for printing queue
+  // Convert Supabase orders to Shopify-like format for consistent UI
+  // and hide orders that Shopify no longer marks as unfulfilled
   const formattedPrintingOrders = React.useMemo(() => {
-    if (!isShopifyConfigured || isLoadingShopify) {
-      // Fallback: show DB printing orders if Shopify is not ready
-      return printingOrders
-        .map(order => ({
-          id: order.shopify_order_id?.toString() || order.id,
-          shopify_order_id: order.shopify_order_id?.toString() || null,
-          order_number: order.order_number,
-          name: order.order_number,
-          created_at: order.created_at,
-          fulfillment_status: 'unfulfilled',
-          current_total_price: order.total_amount?.toString() || '0',
-          currency: order.currency || 'INR',
-          customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
-          total_amount: order.total_amount?.toString() || '0',
-          financial_status: 'paid',
-          total_weight: 0,
-          customer: order.customer ? {
-            first_name: order.customer.first_name,
-            last_name: order.customer.last_name,
-            phone: order.customer.phone,
-            email: order.customer.email,
-            id: order.customer.id
-          } : null,
-          shipping_address: order.shipping_address ? {
-            address1: order.shipping_address.address_line_1,
-            address2: order.shipping_address.address_line_2,
-            city: order.shipping_address.city,
-            province: order.shipping_address.state,
-            zip: order.shipping_address.postal_code,
-            country: order.shipping_address.country,
-            phone: order.customer?.phone
-          } : null,
-          line_items: order.order_items?.map(item => ({
-            title: item.title,
-            name: item.title,
-            variant_title: item.variant_title,
-            quantity: item.quantity,
-            price: item.price,
-            product_id: item.product_id,
-            variant_id: item.shopify_variant_id,
-            sku: item.sku
-          })) || [],
-          _isSupabaseOrder: true,
-          _originalSupabaseOrder: order
-        }))
-        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    }
-
-    // Show ALL Shopify unfulfilled orders directly
-    const unfulfilled = shopifyOrders.filter(order => {
-      if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
-      return true;
-    });
-
-    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length);
-
-    return unfulfilled
+    return printingOrders
       .map(order => ({
-        ...order,
-        id: String(order.id),
-        shopify_order_id: String(order.id),
-        _isSupabaseOrder: false,
+        id: order.shopify_order_id?.toString() || order.id,
+        shopify_order_id: order.shopify_order_id?.toString() || null,
+        order_number: order.order_number,
+        name: order.order_number,
+        created_at: order.created_at,
+        fulfillment_status: 'unfulfilled',
+        current_total_price: order.total_amount?.toString() || '0',
+        currency: order.currency || 'INR',
+        customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
+        total_amount: order.total_amount?.toString() || '0',
+        financial_status: 'paid',
+        total_weight: 0,
+        customer: order.customer ? {
+          first_name: order.customer.first_name,
+          last_name: order.customer.last_name,
+          phone: order.customer.phone,
+          email: order.customer.email,
+          id: order.customer.id
+        } : null,
+        shipping_address: order.shipping_address ? {
+          address1: order.shipping_address.address_line_1,
+          address2: order.shipping_address.address_line_2,
+          city: order.shipping_address.city,
+          province: order.shipping_address.state,
+          zip: order.shipping_address.postal_code,
+          country: order.shipping_address.country,
+          phone: order.customer?.phone
+        } : null,
+        line_items: order.order_items?.map(item => ({
+          title: item.title,
+          name: item.title,
+          variant_title: item.variant_title,
+          quantity: item.quantity,
+          price: item.price,
+          product_id: item.product_id,
+          variant_id: item.shopify_variant_id,
+          sku: item.sku
+        })) || [],
+        _isSupabaseOrder: true,
+        _originalSupabaseOrder: order
       }))
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [shopifyOrders, printingOrders, isLoadingShopify, isShopifyConfigured]);
+      .filter((order) => {
+        if (!isShopifyConfigured || isLoadingShopify) return true;
+        if (!order.shopify_order_id) return true;
+        return liveUnfulfilledShopifyIds.has(order.shopify_order_id);
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+  }, [printingOrders, isLoadingShopify, isShopifyConfigured, liveUnfulfilledShopifyIds]);
 
   // Enhanced comprehensive sync function for instant updates
   const syncNewOrders = useCallback(async (showToast = true) => {
@@ -132,25 +112,14 @@ const Printing = () => {
       const shopifyResult = await refetchShopify();
       const latestShopifyOrders = shopifyResult.data ?? shopifyOrders;
 
-      // Fetch ALL existing orders (handle Supabase 1000-row limit)
-      let allExistingOrders: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      while (true) {
-        const { data: batch, error: batchError } = await supabase
-          .from('orders')
-          .select('shopify_order_id, id, stage, tracking_number, printed_at, packed_at, shipped_at')
-          .not('shopify_order_id', 'is', null)
-          .range(from, from + pageSize - 1);
+      const { data: existingOrders, error: fetchError } = await supabase
+        .from('orders')
+        .select('shopify_order_id, id, stage, tracking_number, printed_at, packed_at, shipped_at')
+        .not('shopify_order_id', 'is', null);
 
-        if (batchError) throw batchError;
-        if (!batch || batch.length === 0) break;
-        allExistingOrders = allExistingOrders.concat(batch);
-        if (batch.length < pageSize) break;
-        from += pageSize;
+      if (fetchError) {
+        throw fetchError;
       }
-      const existingOrders = allExistingOrders;
-
 
       const existingByShopifyId = new Map<number, any>();
       existingOrders.forEach((order: any) => {
@@ -175,26 +144,9 @@ const Printing = () => {
       const pendingToPrintIds: string[] = [];
       const stalePrintingOrders: Array<{ id: string; nextStage: string }> = [];
 
-      // Promote orders to printing if they are unfulfilled in Shopify but stuck in wrong stages
-      // This handles: pending, null, and also orders in packing/tracking that haven't actually progressed
       unfulfilled.forEach(order => {
         const rec = existingByShopifyId.get(Number(order.id));
-        if (!rec) return;
-        
-        // Already in printing - skip
-        if (rec.stage === 'printing') return;
-        
-        // Pending or null - always promote to printing
-        if (rec.stage === 'pending' || rec.stage === null) {
-          pendingToPrintIds.push(rec.id);
-          return;
-        }
-        
-        // Orders in packing/tracking without actual progress should go back to printing
-        // If order has no printed_at, packed_at, tracking_number, or shipped_at, it's stuck
-        const hasRealProgress = rec.printed_at || rec.packed_at || rec.tracking_number || rec.shipped_at;
-        if (!hasRealProgress && rec.stage !== 'printing') {
-          console.log(`🔄 Resetting stuck order ${rec.id} from '${rec.stage}' back to printing`);
+        if (rec && (rec.stage === 'pending' || rec.stage === null)) {
           pendingToPrintIds.push(rec.id);
         }
       });
@@ -321,51 +273,34 @@ const Printing = () => {
     }
   }, [shopifyOrders, isSyncing, refetchPrintingOrders, refetchShopify]);
 
-  // Immediate sync on mount and every 10 seconds for near-instant Shopify updates
+  // Instant sync on component mount and every 2 minutes for real-time updates
   useEffect(() => {
-    syncNewOrders(false);
+    // Initial instant sync after a short delay
+    const initialTimer = setTimeout(() => {
+      syncNewOrders(false); // Silent initial sync
+    }, 1000);
 
+    // Set up frequent sync every 30 seconds for near-instant updates
     const intervalTimer = setInterval(() => {
       console.log('🔄 Auto-syncing orders for instant updates...');
-      syncNewOrders(false);
-    }, 10 * 1000);
+      syncNewOrders(false); // Silent auto-sync
+    }, 30 * 1000); // 30 seconds for more frequent updates
 
     return () => {
+      clearTimeout(initialTimer);
       clearInterval(intervalTimer);
     };
   }, [syncNewOrders]);
 
-  // Sync immediately when the tab becomes active again
+  // Real-time window focus sync for immediate updates when user returns
   useEffect(() => {
-    const triggerImmediateSync = () => {
+    const handleWindowFocus = () => {
+      console.log('🎯 Window focused - triggering instant sync');
       syncNewOrders(false);
     };
 
-    const handleWindowFocus = () => {
-      console.log('🎯 Window focused - triggering instant sync');
-      triggerImmediateSync();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-      console.log('👀 Tab visible - triggering instant sync');
-      triggerImmediateSync();
-    };
-
-    const handleOnline = () => {
-      console.log('🌐 Network restored - triggering instant sync');
-      triggerImmediateSync();
-    };
-
     window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    return () => window.removeEventListener('focus', handleWindowFocus);
   }, [syncNewOrders]);
 
   // Calculate today's printed orders count from packing stage
@@ -486,7 +421,7 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh printing orders
+    // Refresh the printing orders to show updated stages
     refetchPrintingOrders();
   };
 
@@ -586,7 +521,7 @@ const Printing = () => {
                       <>
                         <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                         <span className="text-gray-700">
-                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 10 seconds
+                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 2 minutes
                         </span>
                       </>
                     )}

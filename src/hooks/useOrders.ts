@@ -6,16 +6,7 @@ import { toast } from 'sonner';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useParcelPanelService } from '@/services/parcelPanelService';
 
-type StageQueryOptions = {
-  staleTime?: number;
-  refetchInterval?: number | false;
-  refetchIntervalInBackground?: boolean;
-  refetchOnWindowFocus?: boolean | 'always';
-  refetchOnMount?: boolean | 'always';
-  refetchOnReconnect?: boolean | 'always';
-};
-
-export const useOrdersByStage = (stages: string | string[], options: StageQueryOptions = {}) => {
+export const useOrdersByStage = (stages: string | string[]) => {
   const stageArray = Array.isArray(stages) ? stages : [stages];
   
   return useQuery({
@@ -39,16 +30,30 @@ export const useOrdersByStage = (stages: string | string[], options: StageQueryO
         throw error;
       }
 
-      console.log(`✅ Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
+      console.log(`Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
+      console.log('Successfully fetched', data?.length || 0, 'orders for stage', stageArray.join(', '));
+
+      // Debug log for each order
+      data?.forEach(order => {
+        console.log(`\n--- Order ${order.order_number} Debug ---`);
+        console.log('Stage:', order.stage);
+        console.log('Order items count:', order.order_items?.length || 0);
+        console.log('Customer phone:', order.customer?.phone);
+        console.log('Shipping address exists:', !!order.shipping_address);
+        
+        order.order_items?.forEach(item => {
+          console.log(`  Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
+        });
+        
+        const totalQty = order.order_items?.length || 0;
+        const packedQty = order.order_items?.filter(item => item.packed).length || 0;
+        console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
+      });
+
+      console.log('Total unique orders fetched:', data?.length || 0);
       
       return (data as Order[]) || [];
     },
-    staleTime: options.staleTime,
-    refetchInterval: options.refetchInterval,
-    refetchIntervalInBackground: options.refetchIntervalInBackground,
-    refetchOnWindowFocus: options.refetchOnWindowFocus,
-    refetchOnMount: options.refetchOnMount,
-    refetchOnReconnect: options.refetchOnReconnect,
   });
 };
 
