@@ -15,11 +15,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 const Printing = () => {
-  // Supabase-only approach: Fetch orders in 'printing' stage only
+  // Keep DB queries for stage tracking and printed counts
   const { data: printingOrders = [], isPending: isLoadingPrintingOrders, refetch: refetchPrintingOrders } = useOrdersByStage('printing');
   const { data: packingOrders = [], isPending: isLoadingPackingOrders } = useOrdersByStage('packing');
   
-  // Keep Shopify orders hook for syncing and live fulfillment visibility
+  // Shopify orders = source of truth for unfulfilled orders
   const {
     orders: shopifyOrders = [],
     loading: isLoadingShopify,
@@ -37,29 +37,55 @@ const Printing = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
+  const [laterStageShopifyIds, setLaterStageShopifyIds] = useState<Set<string>>(new Set());
 
-  const liveUnfulfilledShopifyIds = React.useMemo(
-    () => new Set(shopifyOrders.map((order) => String(order.id))),
-    [shopifyOrders]
-  );
+  // Fetch orders already in later stages to exclude from printing view
+  useEffect(() => {
+    const fetchLaterStageIds = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('shopify_order_id, stage')
+          .not('shopify_order_id', 'is', null)
+          .in('stage', ['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed'] as any);
 
-  // Convert Supabase orders to Shopify-like format for consistent UI
-  // and hide orders that Shopify no longer marks as unfulfilled
+        if (!error && data) {
+          const ids = new Set(data.map((o: any) => String(o.shopify_order_id)));
+          setLaterStageShopifyIds(ids);
+          console.log('📋 Orders in later stages (excluded from printing):', ids.size);
+        }
+      } catch (e) {
+        console.error('Failed to fetch later stage IDs:', e);
+      }
+    };
+    fetchLaterStageIds();
+  }, [printingOrders, packingOrders]);
+
+  // Show ALL unfulfilled Shopify orders directly, excluding those in later stages
   const formattedPrintingOrders = React.useMemo(() => {
-    return printingOrders
+    const unfulfilled = shopifyOrders.filter(order => 
+      !order.fulfillment_status || order.fulfillment_status === 'unfulfilled'
+    );
+
+    console.log('=== PRINTING ORDER SOURCE ===');
+    console.log('Total Shopify unfulfilled:', unfulfilled.length);
+    console.log('Orders in later stages (excluded):', laterStageShopifyIds.size);
+
+    const result = unfulfilled
+      .filter(order => !laterStageShopifyIds.has(String(order.id)))
       .map(order => ({
-        id: order.shopify_order_id?.toString() || order.id,
-        shopify_order_id: order.shopify_order_id?.toString() || null,
+        id: order.id.toString(),
+        shopify_order_id: order.id.toString(),
         order_number: order.order_number,
         name: order.order_number,
         created_at: order.created_at,
         fulfillment_status: 'unfulfilled',
-        current_total_price: order.total_amount?.toString() || '0',
+        current_total_price: order.current_total_price || order.total_amount,
         currency: order.currency || 'INR',
-        customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
-        total_amount: order.total_amount?.toString() || '0',
-        financial_status: 'paid',
-        total_weight: 0,
+        customer_name: order.customer_name,
+        total_amount: order.total_amount,
+        financial_status: order.financial_status || 'paid',
+        total_weight: order.total_weight || 0,
         customer: order.customer ? {
           first_name: order.customer.first_name,
           last_name: order.customer.last_name,
@@ -68,38 +94,30 @@ const Printing = () => {
           id: order.customer.id
         } : null,
         shipping_address: order.shipping_address ? {
-          address1: order.shipping_address.address_line_1,
-          address2: order.shipping_address.address_line_2,
+          address1: order.shipping_address.address1,
+          address2: order.shipping_address.address2,
           city: order.shipping_address.city,
-          province: order.shipping_address.state,
-          zip: order.shipping_address.postal_code,
+          province: order.shipping_address.province,
+          zip: order.shipping_address.zip,
           country: order.shipping_address.country,
-          phone: order.customer?.phone
+          phone: order.shipping_address.phone
         } : null,
-        line_items: order.order_items?.map(item => ({
+        line_items: order.line_items?.map(item => ({
           title: item.title,
-          name: item.title,
+          name: item.name || item.title,
           variant_title: item.variant_title,
           quantity: item.quantity,
           price: item.price,
-          product_id: item.product_id,
-          variant_id: item.shopify_variant_id,
+          variant_id: item.variant_id,
           sku: item.sku
         })) || [],
-        _isSupabaseOrder: true,
-        _originalSupabaseOrder: order
+        _isShopifyDirect: true,
       }))
-      .filter((order) => {
-        if (!isShopifyConfigured || isLoadingShopify) return true;
-        if (!order.shopify_order_id) return true;
-        return liveUnfulfilledShopifyIds.has(order.shopify_order_id);
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        return dateB - dateA;
-      });
-  }, [printingOrders, isLoadingShopify, isShopifyConfigured, liveUnfulfilledShopifyIds]);
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+
+    console.log('Final printing orders to show:', result.length);
+    return result;
+  }, [shopifyOrders, laterStageShopifyIds]);
 
   // Enhanced comprehensive sync function for instant updates
   const syncNewOrders = useCallback(async (showToast = true) => {
