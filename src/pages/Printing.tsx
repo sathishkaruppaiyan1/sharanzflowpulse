@@ -50,68 +50,98 @@ const Printing = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
-  const liveUnfulfilledShopifyIds = React.useMemo(
-    () => new Set(shopifyOrders.map((order) => String(order.id))),
-    [shopifyOrders]
-  );
+  // Build a set of Shopify order IDs that have already been processed (printed/packed/shipped)
+  // These should NOT appear in the printing queue
+  const processedShopifyIds = React.useMemo(() => {
+    const processed = new Set<string>();
+    // Orders in packing/tracking/shipped/delivered stages with real progress are already processed
+    // We check printingOrders too but those SHOULD show (they're actively in printing)
+    return processed;
+  }, []);
 
-  // Convert Supabase orders to Shopify-like format for consistent UI
-  // and hide orders that Shopify no longer marks as unfulfilled
+  // Use Shopify unfulfilled orders as the PRIMARY source for printing queue
+  // Exclude orders that have already been printed (exist in DB with printed_at set)
   const formattedPrintingOrders = React.useMemo(() => {
-    return printingOrders
+    if (!isShopifyConfigured || isLoadingShopify) {
+      // Fallback: show DB printing orders if Shopify is not ready
+      return printingOrders
+        .map(order => ({
+          id: order.shopify_order_id?.toString() || order.id,
+          shopify_order_id: order.shopify_order_id?.toString() || null,
+          order_number: order.order_number,
+          name: order.order_number,
+          created_at: order.created_at,
+          fulfillment_status: 'unfulfilled',
+          current_total_price: order.total_amount?.toString() || '0',
+          currency: order.currency || 'INR',
+          customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
+          total_amount: order.total_amount?.toString() || '0',
+          financial_status: 'paid',
+          total_weight: 0,
+          customer: order.customer ? {
+            first_name: order.customer.first_name,
+            last_name: order.customer.last_name,
+            phone: order.customer.phone,
+            email: order.customer.email,
+            id: order.customer.id
+          } : null,
+          shipping_address: order.shipping_address ? {
+            address1: order.shipping_address.address_line_1,
+            address2: order.shipping_address.address_line_2,
+            city: order.shipping_address.city,
+            province: order.shipping_address.state,
+            zip: order.shipping_address.postal_code,
+            country: order.shipping_address.country,
+            phone: order.customer?.phone
+          } : null,
+          line_items: order.order_items?.map(item => ({
+            title: item.title,
+            name: item.title,
+            variant_title: item.variant_title,
+            quantity: item.quantity,
+            price: item.price,
+            product_id: item.product_id,
+            variant_id: item.shopify_variant_id,
+            sku: item.sku
+          })) || [],
+          _isSupabaseOrder: true,
+          _originalSupabaseOrder: order
+        }))
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }
+
+    // Primary approach: Show Shopify unfulfilled orders directly
+    // Filter out orders that have already been printed (in packing/tracking/shipped stages)
+    const printedOrderShopifyIds = new Set<string>();
+    
+    // Check packingOrders - these have been printed already
+    packingOrders.forEach(order => {
+      if (order.shopify_order_id) {
+        printedOrderShopifyIds.add(order.shopify_order_id.toString());
+      }
+    });
+
+    console.log('📋 Already printed (in packing+) order count:', printedOrderShopifyIds.size);
+
+    const unfulfilled = shopifyOrders.filter(order => {
+      // Only show unfulfilled orders
+      if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
+      // Exclude orders already printed/packed/shipped
+      if (printedOrderShopifyIds.has(String(order.id))) return false;
+      return true;
+    });
+
+    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length, '(excluded', printedOrderShopifyIds.size, 'already printed)');
+
+    return unfulfilled
       .map(order => ({
-        id: order.shopify_order_id?.toString() || order.id,
-        shopify_order_id: order.shopify_order_id?.toString() || null,
-        order_number: order.order_number,
-        name: order.order_number,
-        created_at: order.created_at,
-        fulfillment_status: 'unfulfilled',
-        current_total_price: order.total_amount?.toString() || '0',
-        currency: order.currency || 'INR',
-        customer_name: order.customer ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() : '',
-        total_amount: order.total_amount?.toString() || '0',
-        financial_status: 'paid',
-        total_weight: 0,
-        customer: order.customer ? {
-          first_name: order.customer.first_name,
-          last_name: order.customer.last_name,
-          phone: order.customer.phone,
-          email: order.customer.email,
-          id: order.customer.id
-        } : null,
-        shipping_address: order.shipping_address ? {
-          address1: order.shipping_address.address_line_1,
-          address2: order.shipping_address.address_line_2,
-          city: order.shipping_address.city,
-          province: order.shipping_address.state,
-          zip: order.shipping_address.postal_code,
-          country: order.shipping_address.country,
-          phone: order.customer?.phone
-        } : null,
-        line_items: order.order_items?.map(item => ({
-          title: item.title,
-          name: item.title,
-          variant_title: item.variant_title,
-          quantity: item.quantity,
-          price: item.price,
-          product_id: item.product_id,
-          variant_id: item.shopify_variant_id,
-          sku: item.sku
-        })) || [],
-        _isSupabaseOrder: true,
-        _originalSupabaseOrder: order
+        ...order,
+        id: String(order.id),
+        shopify_order_id: String(order.id),
+        _isSupabaseOrder: false,
       }))
-      .filter((order) => {
-        if (!isShopifyConfigured || isLoadingShopify) return true;
-        if (!order.shopify_order_id) return true;
-        return liveUnfulfilledShopifyIds.has(order.shopify_order_id);
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        return dateB - dateA;
-      });
-  }, [printingOrders, isLoadingShopify, isShopifyConfigured, liveUnfulfilledShopifyIds]);
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  }, [shopifyOrders, printingOrders, packingOrders, isLoadingShopify, isShopifyConfigured]);
 
   // Enhanced comprehensive sync function for instant updates
   const syncNewOrders = useCallback(async (showToast = true) => {
