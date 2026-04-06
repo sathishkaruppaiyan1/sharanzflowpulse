@@ -114,24 +114,46 @@ const Printing = () => {
     // Filter out orders that have already been printed (in packing/tracking/shipped stages)
     const printedOrderShopifyIds = new Set<string>();
     
-    // Check packingOrders - these have been printed already
-    packingOrders.forEach(order => {
-      if (order.shopify_order_id) {
-        printedOrderShopifyIds.add(order.shopify_order_id.toString());
+    // Fetch all orders that have been printed (have printed_at) to exclude from printing queue
+    // This is a lightweight query - just IDs
+    const [processedIds, setProcessedIds] = React.useState<Set<string>>(new Set());
+    
+    const fetchProcessedIds = React.useCallback(async () => {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('shopify_order_id')
+          .not('shopify_order_id', 'is', null)
+          .not('printed_at', 'is', null);
+        
+        const ids = new Set<string>();
+        data?.forEach((order: any) => {
+          if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
+        });
+        
+        // Also add orders in packing+ stages even without printed_at
+        const { data: stageData } = await supabase
+          .from('orders')
+          .select('shopify_order_id')
+          .not('shopify_order_id', 'is', null)
+          .in('stage', ['packing', 'tracking', 'shipped', 'delivered']);
+        
+        stageData?.forEach((order: any) => {
+          if (order.shopify_order_id) ids.add(String(order.shopify_order_id));
+        });
+        
+        setProcessedIds(ids);
+        console.log('📋 Total processed/printed orders to exclude:', ids.size);
+      } catch (err) {
+        console.error('Error fetching processed IDs:', err);
       }
-    });
+    }, []);
 
-    console.log('📋 Already printed (in packing+) order count:', printedOrderShopifyIds.size);
-
-    const unfulfilled = shopifyOrders.filter(order => {
-      // Only show unfulfilled orders
-      if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
-      // Exclude orders already printed/packed/shipped
-      if (printedOrderShopifyIds.has(String(order.id))) return false;
-      return true;
-    });
-
-    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length, '(excluded', printedOrderShopifyIds.size, 'already printed)');
+    React.useEffect(() => {
+      fetchProcessedIds();
+      const interval = setInterval(fetchProcessedIds, 15000);
+      return () => clearInterval(interval);
+    }, [fetchProcessedIds]);
 
     return unfulfilled
       .map(order => ({
