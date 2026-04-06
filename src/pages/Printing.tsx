@@ -171,12 +171,12 @@ const Printing = () => {
       });
 
       console.log('🆕 New unfulfilled orders to upsert:', newOrders.length);
-      console.log('📝 Existing orders to promote to printing:', pendingToPrintIds.length);
+      console.log('📝 Existing orders to promote to printing:', promoteToPrintIds.length);
       console.log('🧹 Printing orders no longer unfulfilled in Shopify:', stalePrintingOrders.length);
 
       setSyncStats({
         total: unfulfilled.length,
-        synced: newOrders.length + pendingToPrintIds.length,
+        synced: newOrders.length + promoteToPrintIds.length,
         inDb: existingShopifyIds.size
       });
 
