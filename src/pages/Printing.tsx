@@ -156,9 +156,26 @@ const Printing = () => {
       const pendingToPrintIds: string[] = [];
       const stalePrintingOrders: Array<{ id: string; nextStage: string }> = [];
 
+      // Promote orders to printing if they are unfulfilled in Shopify but stuck in wrong stages
+      // This handles: pending, null, and also orders in packing/tracking that haven't actually progressed
       unfulfilled.forEach(order => {
         const rec = existingByShopifyId.get(Number(order.id));
-        if (rec && (rec.stage === 'pending' || rec.stage === null)) {
+        if (!rec) return;
+        
+        // Already in printing - skip
+        if (rec.stage === 'printing') return;
+        
+        // Pending or null - always promote to printing
+        if (rec.stage === 'pending' || rec.stage === null) {
+          pendingToPrintIds.push(rec.id);
+          return;
+        }
+        
+        // Orders in packing/tracking without actual progress should go back to printing
+        // If order has no printed_at, packed_at, tracking_number, or shipped_at, it's stuck
+        const hasRealProgress = rec.printed_at || rec.packed_at || rec.tracking_number || rec.shipped_at;
+        if (!hasRealProgress && rec.stage !== 'printing') {
+          console.log(`🔄 Resetting stuck order ${rec.id} from '${rec.stage}' back to printing`);
           pendingToPrintIds.push(rec.id);
         }
       });
