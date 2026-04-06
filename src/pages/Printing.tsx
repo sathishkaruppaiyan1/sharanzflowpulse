@@ -342,47 +342,31 @@ const Printing = () => {
 
   // Simplified filtering for Supabase-only orders
   const getBaseFilteredOrders = useCallback(() => {
-    if (isLoadingPrintingOrders) {
+    if (isLoadingShopify && shopifyOrders.length === 0) {
       return [];
     }
     
-    console.log('=== INSTANT PRINTING ORDER FILTERING ===');
-    console.log('Total orders in printing stage:', formattedPrintingOrders.length);
-    
     let readyToPrintOrders = [...formattedPrintingOrders];
 
-    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       readyToPrintOrders = readyToPrintOrders.filter(order => {
-        // Search in order number/ID
         if (order.order_number?.toLowerCase().includes(query)) return true;
         if (order.id?.toString().toLowerCase().includes(query)) return true;
-        
-        // Search in customer phone
         if (order.shipping_address?.phone?.toLowerCase().includes(query)) return true;
-        
-        // Search in product names
         if (order.line_items?.some((item: any) => 
           (item.title || item.name)?.toLowerCase().includes(query)
         )) return true;
-        
         return false;
       });
-      console.log(`Search filtered orders: ${readyToPrintOrders.length} match "${query}"`);
     }
     
-    console.log('Final orders ready for printing:', readyToPrintOrders.length);
     return readyToPrintOrders;
-  }, [formattedPrintingOrders, searchQuery, isLoadingPrintingOrders]);
+  }, [formattedPrintingOrders, searchQuery, isLoadingShopify, shopifyOrders.length]);
 
-  // Initialize filtered orders with default sorting only
   useEffect(() => {
-    if (isLoadingPrintingOrders) {
-      return;
-    }
-      
     const baseOrders = getBaseFilteredOrders();
+    setFilteredOrders(baseOrders);
     // Orders are already sorted in formattedPrintingOrders
     setFilteredOrders(baseOrders);
   }, [getBaseFilteredOrders, isLoadingPrintingOrders]);
