@@ -103,15 +103,13 @@ const Printing = () => {
         .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     }
 
-    // Primary approach: Show Shopify unfulfilled orders directly
-    // Filter out orders already printed/packed/shipped
+    // Show ALL Shopify unfulfilled orders directly
     const unfulfilled = shopifyOrders.filter(order => {
       if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
-      if (processedShopifyIds.has(String(order.id))) return false;
       return true;
     });
 
-    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length, '(excluded', processedShopifyIds.size, 'already processed)');
+    console.log('📦 Shopify unfulfilled for printing:', unfulfilled.length);
 
     return unfulfilled
       .map(order => ({
@@ -121,7 +119,7 @@ const Printing = () => {
         _isSupabaseOrder: false,
       }))
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }, [shopifyOrders, printingOrders, packingOrders, isLoadingShopify, isShopifyConfigured, processedShopifyIds]);
+  }, [shopifyOrders, printingOrders, isLoadingShopify, isShopifyConfigured]);
 
   // Enhanced comprehensive sync function for instant updates
   const syncNewOrders = useCallback(async (showToast = true) => {
