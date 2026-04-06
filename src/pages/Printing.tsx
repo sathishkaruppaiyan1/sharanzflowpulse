@@ -50,7 +50,7 @@ const Printing = () => {
           .in('stage', ['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed'] as any);
 
         if (!error && data) {
-          const ids = new Set(data.map((o: any) => String(o.shopify_order_id)));
+          const ids = new Set<string>(data.map((o: any) => String(o.shopify_order_id)));
           setLaterStageShopifyIds(ids);
           console.log('📋 Orders in later stages (excluded from printing):', ids.size);
         }
