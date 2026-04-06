@@ -205,10 +205,10 @@ const Printing = () => {
       }
 
       let promotedCount = 0;
-      if (pendingToPrintIds.length > 0) {
+      if (promoteToPrintIds.length > 0) {
         const stageBatch = 10;
-        for (let i = 0; i < pendingToPrintIds.length; i += stageBatch) {
-          const batchIds = pendingToPrintIds.slice(i, i + stageBatch);
+        for (let i = 0; i < promoteToPrintIds.length; i += stageBatch) {
+          const batchIds = promoteToPrintIds.slice(i, i + stageBatch);
           await Promise.all(batchIds.map(async (orderId) => {
             try {
               await supabaseOrderService.updateOrderStage(orderId, 'printing');
