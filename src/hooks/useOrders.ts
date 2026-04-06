@@ -39,27 +39,7 @@ export const useOrdersByStage = (stages: string | string[], options: StageQueryO
         throw error;
       }
 
-      console.log(`Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
-      console.log('Successfully fetched', data?.length || 0, 'orders for stage', stageArray.join(', '));
-
-      // Debug log for each order
-      data?.forEach(order => {
-        console.log(`\n--- Order ${order.order_number} Debug ---`);
-        console.log('Stage:', order.stage);
-        console.log('Order items count:', order.order_items?.length || 0);
-        console.log('Customer phone:', order.customer?.phone);
-        console.log('Shipping address exists:', !!order.shipping_address);
-        
-        order.order_items?.forEach(item => {
-          console.log(`  Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
-        });
-        
-        const totalQty = order.order_items?.length || 0;
-        const packedQty = order.order_items?.filter(item => item.packed).length || 0;
-        console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
-      });
-
-      console.log('Total unique orders fetched:', data?.length || 0);
+      console.log(`✅ Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
       
       return (data as Order[]) || [];
     },
