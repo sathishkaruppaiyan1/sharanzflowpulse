@@ -581,7 +581,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               <div className="flex gap-6 mb-5">
                 <div className="flex-1">
                   <div className="font-bold text-sm mb-1 text-gray-700">From</div>
-                  <div className="font-bold text-sm">Blacklovers</div>
+                  <div className="font-bold text-sm">{fromAddress.store_name || 'Store Name'}</div>
+                  {fromAddress.address1 && <div className="text-xs">{fromAddress.address1}</div>}
+                  {fromAddress.address2 && <div className="text-xs">{fromAddress.address2}</div>}
+                  {(fromAddress.city || fromAddress.state) && <div className="text-xs">{[fromAddress.city, fromAddress.state].filter(Boolean).join(', ')} {fromAddress.zip}</div>}
+                  {fromAddress.phone && <div className="text-xs text-blue-600">Phone: {fromAddress.phone}</div>}
+                  {fromAddress.email && <div className="text-xs">{fromAddress.email}</div>}
                 </div>
                 <div className="flex-2" style={{ flex: 2 }}>
                   <div className="font-bold text-sm mb-1 text-gray-700">To</div>
