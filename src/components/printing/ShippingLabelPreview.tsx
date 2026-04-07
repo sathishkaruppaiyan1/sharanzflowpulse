@@ -598,7 +598,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                     <div>{toAddress.state}</div>
                     <div>{toAddress.country}</div>
                     <div>{toAddress.zip}</div>
-                    <div className="text-blue-600">Phone: {toAddress.phone}</div>
+                    <div className="text-blue-600 font-extrabold" style={{ fontSize: '15px' }}>Phone: {toAddress.phone}</div>
                   </div>
                 </div>
               </div>
@@ -642,9 +642,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </table>
 
               {/* Barcode Footer */}
-              <div className="text-center border-t border-gray-100 pt-4">
-                {renderBarcode(trackingNumber)}
-                <div className="font-bold text-sm mt-1">{trackingNumber}</div>
+              <div className="text-center border-t border-gray-100 pt-3">
+                <div style={{ transform: 'scaleX(0.75) scaleY(0.7)', transformOrigin: 'center' }}>
+                  {renderBarcode(trackingNumber)}
+                </div>
+                <div className="font-bold text-xs mt-0.5">{trackingNumber}</div>
               </div>
             </div>
           )}
