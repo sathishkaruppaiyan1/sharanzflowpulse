@@ -413,6 +413,16 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         for (const orderData of ordersToProcess) {
           if (orderData._originalSupabaseOrder) {
             await supabaseOrderService.updateOrderStage(orderData._originalSupabaseOrder.id, targetStage);
+          } else {
+            // Shopify order not yet in Supabase – sync it first, then update stage
+            try {
+              const newOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
+              if (newOrderId) {
+                await supabaseOrderService.updateOrderStage(newOrderId, targetStage);
+              }
+            } catch (syncErr) {
+              console.error('Failed to sync & move Shopify order:', syncErr);
+            }
           }
         }
         queryClient.invalidateQueries({ queryKey: ['orders'] });
