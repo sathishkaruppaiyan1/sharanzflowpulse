@@ -243,19 +243,14 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       const weight = item.grams ? `${(item.grams / 1000).toFixed(1)} kg` : `${totalWeight}`;
       return `
         <tr>
-          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;color:#555;">${idx + 1}</td>
-          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">
-            <div style="width:40px;height:40px;background:#f5f5f5;border:1px solid #ddd;display:inline-block;"></div>
+          <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:center;color:#555;font-size:11px;">${idx + 1}</td>
+          <td style="padding:4px 6px;border-bottom:1px solid #eee;">
+            <div style="font-weight:bold;font-size:11px;">${formatProductWithVariation(item)}</div>
+            ${item.variant_title ? `<div style="font-size:9px;color:#777;">${item.variant_title.replace(/ \/ /g, ', ')}</div>` : ''}
           </td>
-          <td style="padding:8px;border-bottom:1px solid #eee;">
-            <div style="font-size:11px;color:#555;">₹${parseFloat(item.price || '0').toFixed(2)}</div>
-            <div style="font-weight:bold;font-size:12px;">${formatProductWithVariation(item)}</div>
-            <div style="font-size:10px;color:#777;">
-              ${item.variant_title ? `Measurements: ${item.variant_title.replace(/ \/ /g, ', ')}` : ''}
-            </div>
-          </td>
-          <td style="padding:8px;border-bottom:1px solid #eee;text-align:center;">${item.quantity || 1}</td>
-          <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${weight}</td>
+          <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:center;font-size:11px;">${item.quantity || 1}</td>
+          <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px;">₹${parseFloat(item.price || '0').toFixed(2)}</td>
+          <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right;font-size:11px;">${weight}</td>
         </tr>
       `;
     }).join('');
@@ -268,68 +263,62 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     </svg>`;
 
     return `
-      <div style="width:100%;background:#fff;font-family:Arial,sans-serif;color:#000;padding:8mm 10mm;box-sizing:border-box;${pageBreak}">
+      <div style="width:100%;max-height:200mm;overflow:hidden;background:#fff;font-family:Arial,sans-serif;color:#000;padding:5mm 8mm;box-sizing:border-box;${pageBreak}">
         <!-- Header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div style="display:flex;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
             ${logoSVG}
-            <span style="font-size:22px;font-weight:bold;color:#222;">Packing slip</span>
+            <span style="font-size:20px;font-weight:bold;color:#222;">Packing slip</span>
           </div>
-          <div style="text-align:right;font-size:12px;line-height:1.8;padding-right:2mm;">
-            <div><strong>Order No.:</strong> ${orderNumber}</div>
-            <div><strong>Order Date:</strong> ${orderDate}</div>
-            <div><strong>Shipping Method:</strong> Standard Shipping</div>
+          <div style="text-align:right;font-size:11px;line-height:1.6;">
+            <div><strong>Order:</strong> ${orderNumber}</div>
+            <div><strong>Date:</strong> ${orderDate}</div>
           </div>
         </div>
 
         <!-- From / To -->
-        <div style="display:flex;gap:16px;margin-bottom:16px;">
-          <div style="flex:1;padding-left:2mm;">
-            <div style="font-weight:bold;font-size:13px;margin-bottom:6px;color:#333;">From</div>
-            <div style="font-size:11px;line-height:1.6;">
-              <div style="font-weight:bold;font-size:12px;">${fromAddress.store_name || 'Store Name'}</div>
+        <div style="display:flex;gap:12px;margin-bottom:10px;">
+          <div style="flex:1;">
+            <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#333;">From</div>
+            <div style="font-size:10px;line-height:1.5;">
+              <div style="font-weight:bold;">${fromAddress.store_name || 'Store Name'}</div>
               ${fromAddress.address1 ? `<div>${fromAddress.address1}</div>` : ''}
-              ${fromAddress.address2 ? `<div>${fromAddress.address2}</div>` : ''}
               ${fromAddress.city || fromAddress.state ? `<div>${[fromAddress.city, fromAddress.state, fromAddress.zip].filter(Boolean).join(', ')}</div>` : ''}
               ${fromAddress.phone ? `<div>Ph: ${fromAddress.phone}</div>` : ''}
-              ${fromAddress.email ? `<div>${fromAddress.email}</div>` : ''}
             </div>
           </div>
-          <div style="flex:2;padding-right:2mm;">
-            <div style="font-weight:bold;font-size:13px;margin-bottom:6px;color:#333;">To</div>
-            <div style="font-weight:bold;font-size:14px;margin-bottom:2px;">${addr.name}</div>
-            <div style="font-size:14px;font-weight:bold;color:#222;line-height:1.6;">
-              ${addr.address1}${addr.address2 ? '<br>' + addr.address2 : ''}
-              <br>${addr.city}
-              <br>${addr.state}
+          <div style="flex:2;">
+            <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#333;">To</div>
+            <div style="font-weight:bold;font-size:13px;margin-bottom:2px;">${addr.name}</div>
+            <div style="font-size:12px;font-weight:bold;color:#222;line-height:1.5;">
+              ${addr.address1}${addr.address2 ? ', ' + addr.address2 : ''}
+              <br>${addr.city}, ${addr.state} ${addr.zip}
               <br>${addr.country}
-              <br>${addr.zip}
-              <br>Email: —
               <br><span style="color:#1a73e8;">Phone: ${addr.phone}</span>
             </div>
           </div>
         </div>
 
         <!-- Products Table -->
-        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
           <thead>
             <tr style="border-top:1px solid #ccc;border-bottom:1px solid #ccc;">
-              <th style="padding:8px;text-align:center;font-size:11px;font-weight:bold;">S.No</th>
-              <th style="padding:8px;text-align:center;font-size:11px;font-weight:bold;">Image</th>
-              <th style="padding:8px;text-align:left;font-size:11px;font-weight:bold;">Product</th>
-              <th style="padding:8px;text-align:center;font-size:11px;font-weight:bold;">Quantity</th>
-              <th style="padding:8px;text-align:right;font-size:11px;font-weight:bold;">Total weight</th>
+              <th style="padding:4px 6px;text-align:center;font-size:10px;font-weight:bold;">#</th>
+              <th style="padding:4px 6px;text-align:left;font-size:10px;font-weight:bold;">Product</th>
+              <th style="padding:4px 6px;text-align:center;font-size:10px;font-weight:bold;">Qty</th>
+              <th style="padding:4px 6px;text-align:right;font-size:10px;font-weight:bold;">Price</th>
+              <th style="padding:4px 6px;text-align:right;font-size:10px;font-weight:bold;">Weight</th>
             </tr>
           </thead>
           <tbody>
-            ${productRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#777;">No items</td></tr>`}
+            ${productRows || `<tr><td colspan="5" style="padding:8px;text-align:center;color:#777;">No items</td></tr>`}
           </tbody>
         </table>
 
         <!-- Barcode Footer -->
-        <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid #eee;">
+        <div style="text-align:center;padding-top:6px;border-top:1px solid #eee;">
           <div style="display:inline-block;max-width:80%;overflow:hidden;transform:scaleX(0.85);transform-origin:center;">${barcodeSVG}</div>
-          <div style="font-size:12px;font-weight:bold;margin-top:4px;letter-spacing:2px;">${trackingNumber}</div>
+          <div style="font-size:11px;font-weight:bold;margin-top:2px;letter-spacing:2px;">${trackingNumber}</div>
         </div>
       </div>
     `;
@@ -349,6 +338,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     return new Promise((resolve, reject) => {
       const pageSize = selectedTemplate === 'a5-packing-slip' ? 'A5' : '4in 6in';
 
+      const isA5 = selectedTemplate === 'a5-packing-slip';
       const htmlDocument = `<!DOCTYPE html>
 <html>
   <head>
@@ -357,8 +347,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: Arial, sans-serif; background: white; }
       @media print {
+        html, body { height: auto; }
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        @page { margin: ${selectedTemplate === 'a5-packing-slip' ? '8mm' : '0'}; size: ${pageSize}; }
+        @page { margin: ${isA5 ? '5mm' : '0'}; size: ${pageSize}; }
       }
     </style>
   </head>
