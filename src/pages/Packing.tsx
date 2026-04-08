@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, Scan, CheckSquare, Settings, Shirt, Truck } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import PackingQueue from '@/components/packing/PackingQueue';
@@ -10,6 +10,8 @@ import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StageChangeControls from '@/components/common/StageChangeControls';
@@ -26,6 +28,37 @@ const Packing = () => {
   // Bulk selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  const totalPages = Math.ceil(packingOrders.length / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const paginatedOrders = packingOrders.slice(startIndex, startIndex + perPage);
+
+  useEffect(() => {
+    if (packingOrders.length === 0) { setCurrentPage(1); return; }
+    const newTotalPages = Math.ceil(packingOrders.length / perPage);
+    if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages));
+  }, [packingOrders.length, perPage, currentPage]);
+
+  const handlePageChange = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
+
+  const allCurrentPageSelected = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedOrderIds.has(o.id));
+
+  const handleSelectCurrentPage = () => {
+    const newSelectedIds = new Set(selectedOrderIds);
+    paginatedOrders.forEach((o) => newSelectedIds.add(o.id));
+    setSelectedOrderIds(newSelectedIds);
+  };
+
+  const handleUnselectCurrentPage = () => {
+    const newSelectedIds = new Set(selectedOrderIds);
+    paginatedOrders.forEach((o) => newSelectedIds.delete(o.id));
+    setSelectedOrderIds(newSelectedIds);
+    setSelectAll(false);
+  };
 
   const handleItemPacked = (orderId: string, itemId: string) => {
     console.log('Item packed:', { orderId, itemId });
@@ -358,41 +391,24 @@ const Packing = () => {
                   <CardTitle className="text-lg">Orders Ready for Packing</CardTitle>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {/* Bulk Selection Controls */}
-                  {packingOrders.length > 0 && (
+                  {selectedOrderIds.size > 0 && (
                     <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-2">
-                        <CheckboxUI
-                          checked={selectAll}
-                          onCheckedChange={handleSelectAll}
-                          className="data-[state=checked]:bg-blue-600"
-                        />
-                        <span className="text-sm text-gray-600">
-                          {selectedOrderIds.size > 0 ? `${selectedOrderIds.size} selected` : 'Select all'}
-                        </span>
-                      </div>
-                      
-                      {/* List Bulk Action Buttons */}
-                      {selectedOrderIds.size > 0 && (
-                        <div className="flex items-center space-x-2">
-                          <BulkStageChangeButton
-                            orders={packingOrders}
-                            currentStage="packing"
-                            targetStage="printing"
-                            selectedOrderIds={selectedOrderIds}
-                            onSuccess={handleBulkOperationSuccess}
-                            variant="list"
-                          />
-                          <BulkStageChangeButton
-                            orders={packingOrders}
-                            currentStage="packing"
-                            targetStage="tracking"
-                            selectedOrderIds={selectedOrderIds}
-                            onSuccess={handleBulkOperationSuccess}
-                            variant="list"
-                          />
-                        </div>
-                      )}
+                      <BulkStageChangeButton
+                        orders={packingOrders}
+                        currentStage="packing"
+                        targetStage="printing"
+                        selectedOrderIds={selectedOrderIds}
+                        onSuccess={handleBulkOperationSuccess}
+                        variant="list"
+                      />
+                      <BulkStageChangeButton
+                        orders={packingOrders}
+                        currentStage="packing"
+                        targetStage="tracking"
+                        selectedOrderIds={selectedOrderIds}
+                        onSuccess={handleBulkOperationSuccess}
+                        variant="list"
+                      />
                     </div>
                   )}
                 </div>
@@ -402,8 +418,41 @@ const Packing = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Pagination toolbar */}
+              {packingOrders.length > 0 && (
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant={allCurrentPageSelected ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs"
+                      onClick={allCurrentPageSelected ? handleUnselectCurrentPage : handleSelectCurrentPage}
+                    >
+                      {allCurrentPageSelected ? `Unselect All (${paginatedOrders.length})` : `Select All (${paginatedOrders.length})`}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Showing {startIndex + 1}–{Math.min(startIndex + perPage, packingOrders.length)} of {packingOrders.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">Show</span>
+                    <Select value={String(perPage)} onValueChange={(v) => { setPerPage(Number(v)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[72px] h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">per page</span>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-3">
-                {packingOrders.map((order) => {
+                {paginatedOrders.map((order) => {
                   const packedItems = order.order_items?.filter((item: any) => item.packed).length || 0;
                   const totalItems = order.order_items?.length || 0;
                   const isComplete = packedItems === totalItems;
@@ -509,6 +558,32 @@ const Packing = () => {
                   </div>
                 )}
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-6">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="px-3 py-2 text-sm text-muted-foreground">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
