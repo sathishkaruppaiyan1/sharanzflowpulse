@@ -268,7 +268,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     </svg>`;
 
     return `
-      <div style="width:100%;min-height:210mm;background:#fff;font-family:Arial,sans-serif;color:#000;padding:8mm 10mm;box-sizing:border-box;${pageBreak}">
+      <div style="width:100%;background:#fff;font-family:Arial,sans-serif;color:#000;padding:8mm 10mm;box-sizing:border-box;${pageBreak}">
         <!-- Header -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div style="display:flex;align-items:center;gap:12px;">
@@ -375,25 +375,24 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       printWindow.document.write(htmlDocument);
       printWindow.document.close();
 
-      // Wait for all resources to load before printing
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.focus();
-          printWindow.print();
-          setTimeout(() => {
-            printWindow.close();
-            resolve();
-          }, 1000);
-        }, 400);
+      // Close print window and resolve as soon as the user finishes the print dialog
+      const closeAndResolve = () => {
+        if (!printWindow.closed) printWindow.close();
+        resolve();
       };
+
+      const triggerPrint = () => {
+        // Listen for afterprint — fires when user prints or cancels the dialog
+        printWindow.addEventListener('afterprint', closeAndResolve);
+        printWindow.focus();
+        printWindow.print();
+      };
+
+      printWindow.onload = () => setTimeout(triggerPrint, 400);
 
       // Fallback if onload doesn't fire
       setTimeout(() => {
-        if (!printWindow.closed) {
-          printWindow.focus();
-          printWindow.print();
-          setTimeout(() => { printWindow.close(); resolve(); }, 1000);
-        }
+        if (!printWindow.closed) triggerPrint();
       }, 2000);
     });
   };
@@ -436,7 +435,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       }
 
       toast({ title: 'Success', description: `${ordersToProcess.length} label(s) printed and moved to ${bypassPacking ? 'tracking' : 'packing'}!` });
-      setTimeout(() => onClose(), 1500);
+      onClose();
     } catch (error: any) {
       toast({ title: 'Printing Failed', description: `Error: ${error.message}`, variant: 'destructive' });
     }
