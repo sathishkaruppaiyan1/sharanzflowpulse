@@ -18,6 +18,7 @@ interface PrintQueueProps {
   onSelectAll?: (currentPageOrders?: any[]) => void;
   onUnselectAll?: () => void;
   itemsPerPage?: number;
+  onAfterPrint?: () => void;
 }
 
 const PrintQueue = ({ 
@@ -27,7 +28,8 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
-  itemsPerPage: defaultItemsPerPage = 10
+  itemsPerPage: defaultItemsPerPage = 10,
+  onAfterPrint
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
