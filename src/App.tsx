@@ -18,7 +18,6 @@ import Users from './pages/Users';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Shipping from './pages/Shipping';
-import Delivery from './pages/Delivery';
 
 const queryClient = new QueryClient();
 
@@ -102,7 +101,6 @@ const App = () => {
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/tracking" element={<Tracking />} />
                 <Route path="/shipping" element={<Shipping />} />
-                <Route path="/delivery" element={<Delivery />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />

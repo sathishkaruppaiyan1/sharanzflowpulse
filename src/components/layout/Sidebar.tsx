@@ -7,7 +7,6 @@ import {
   PackageCheck,
   Truck,
   Ship,
-  MapPin,
   BarChart3,
   Settings,
   Home,
@@ -38,7 +37,6 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
     { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true },
     { name: 'Tracking', href: '/tracking', icon: Truck },
     { name: 'Shipping', href: '/shipping', icon: Ship },
-    { name: 'Delivery', href: '/delivery', icon: MapPin },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 

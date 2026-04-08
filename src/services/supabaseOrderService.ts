@@ -252,13 +252,24 @@ export const supabaseOrderService = {
 
       if (error) throw error;
 
-      // Ensure stage is set appropriately for printing when requested.
-      // On insert the RPC sets stage='printing', but on conflict it doesn't change stage.
-      // We only promote to 'printing' if it's currently 'pending'.
       if (targetStage === 'printing' && orderId) {
+        // Before promoting, check current stage — never demote orders already past printing
+        const { data: current } = await supabase
+          .from('orders')
+          .select('stage')
+          .eq('id', orderId)
+          .single();
+
+        const advancedStages = ['packing', 'tracking', 'shipped', 'delivered'];
+        if (current && advancedStages.includes(current.stage || '')) {
+          console.log(`Skipping stage update for order ${orderId} — already in ${current.stage}`);
+          return orderId as string;
+        }
+
+        // Only promote from pending → printing
         await supabase
           .from('orders')
-          .update({ stage: 'printing' as OrderStage, printed_at: new Date().toISOString() })
+          .update({ stage: 'printing' as OrderStage })
           .eq('id', orderId)
           .eq('stage', 'pending');
       }
@@ -273,16 +284,21 @@ export const supabaseOrderService = {
 
   async syncShopifyOrderToSupabase(shopifyOrder: any): Promise<string> {
     console.log('Syncing Shopify order to Supabase:', shopifyOrder.id);
-    
+
     // Check if order already exists
     const { data: existingOrder } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, stage')
       .eq('shopify_order_id', shopifyOrder.id)
       .single();
 
     if (existingOrder) {
-      // Update existing order to packing stage
+      // Never demote orders already past printing
+      const advancedStages = ['packing', 'tracking', 'shipped', 'delivered'];
+      if (advancedStages.includes(existingOrder.stage || '')) {
+        console.log(`Skipping sync for order ${existingOrder.id} — already in ${existingOrder.stage}`);
+        return existingOrder.id;
+      }
       await this.updateOrderStage(existingOrder.id, 'packing');
       return existingOrder.id;
     } else {

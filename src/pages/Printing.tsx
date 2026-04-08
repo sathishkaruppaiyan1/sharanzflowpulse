@@ -112,15 +112,23 @@ const Printing = () => {
       });
       const existingShopifyIds = new Set(existingOrders.map((order: any) => order.shopify_order_id));
       
-      // Filter ALL unfulfilled orders for comprehensive check
+      // Filter unfulfilled orders, excluding any already past printing stage
+      const advancedStages = new Set(['packing', 'tracking', 'shipped', 'delivered']);
       const unfulfilled = shopifyOrders.filter(order => {
         const isUnfulfilled = order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === null;
-        return isUnfulfilled;
+        if (!isUnfulfilled) return false;
+
+        // Skip orders already in packing or later stages — they must never reappear in printing
+        const rec = existingByShopifyId.get(Number(order.id));
+        if (rec && advancedStages.has(rec.stage || '')) {
+          return false;
+        }
+        return true;
       });
-      
-      console.log('📦 Total Shopify unfulfilled orders:', unfulfilled.length);
+
+      console.log('📦 Shopify unfulfilled (excluding advanced stages):', unfulfilled.length);
       console.log('📋 Existing orders in Supabase:', existingShopifyIds.size);
-      
+
       // Partition orders: brand-new vs existing-but-pending
       const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
       const pendingToPrintIds: string[] = [];
@@ -217,35 +225,39 @@ const Printing = () => {
     }
   }, [shopifyOrders, isSyncing, refetchPrintingOrders, refetchShopify]);
 
-  // Instant sync on component mount and every 2 minutes for real-time updates
+  // Stable ref so intervals/listeners always call the latest syncNewOrders
+  const syncRef = React.useRef(syncNewOrders);
+  React.useEffect(() => { syncRef.current = syncNewOrders; }, [syncNewOrders]);
+
+  // Sync on mount + every 2 minutes (stable effect — no dependency on syncNewOrders)
   useEffect(() => {
-    // Initial instant sync after a short delay
     const initialTimer = setTimeout(() => {
-      syncNewOrders(false); // Silent initial sync
+      syncRef.current(false);
     }, 1000);
 
-    // Set up frequent sync every 30 seconds for near-instant updates
     const intervalTimer = setInterval(() => {
-      console.log('🔄 Auto-syncing orders for instant updates...');
-      syncNewOrders(false); // Silent auto-sync
-    }, 30 * 1000); // 30 seconds for more frequent updates
+      syncRef.current(false);
+    }, 2 * 60 * 1000); // 2 minutes
 
     return () => {
       clearTimeout(initialTimer);
       clearInterval(intervalTimer);
     };
-  }, [syncNewOrders]);
+  }, []); // stable — never re-registers
 
-  // Real-time window focus sync for immediate updates when user returns
+  // Window focus sync (debounced — at most once per 30s)
   useEffect(() => {
+    let lastFocusSync = 0;
     const handleWindowFocus = () => {
-      console.log('🎯 Window focused - triggering instant sync');
-      syncNewOrders(false);
+      const now = Date.now();
+      if (now - lastFocusSync < 30_000) return; // skip if synced recently
+      lastFocusSync = now;
+      syncRef.current(false);
     };
 
     window.addEventListener('focus', handleWindowFocus);
     return () => window.removeEventListener('focus', handleWindowFocus);
-  }, [syncNewOrders]);
+  }, []);
 
   // Calculate today's printed orders count from packing stage
   useEffect(() => {
@@ -465,7 +477,7 @@ const Printing = () => {
                       <>
                         <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                         <span className="text-gray-700">
-                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 2 minutes
+                          Last sync: {lastSyncTime?.toLocaleTimeString() || 'Never'} • Auto-sync every 2 min
                         </span>
                       </>
                     )}
