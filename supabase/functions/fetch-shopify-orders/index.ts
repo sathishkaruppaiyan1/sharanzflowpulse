@@ -121,7 +121,7 @@ serve(async (req) => {
       while (hasMoreOrders && pageCount < maxPages) {
         pageCount++
 
-        let url = `https://${shopName}.myshopify.com/admin/api/2024-01/orders.json?status=any&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
+        let url = `https://${shopName}.myshopify.com/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=${limit}&fields=id,name,created_at,updated_at,customer,line_items,shipping_address,total_price,current_total_price,currency,financial_status,fulfillment_status,total_weight`
 
         if (sinceId) {
           url += `&since_id=${sinceId}`
@@ -174,7 +174,7 @@ serve(async (req) => {
 
         } catch (fetchError) {
           console.error(`Error fetching page ${pageCount}:`, fetchError)
-          if (fetchError.message?.includes('fetch')) {
+          if ((fetchError as Error).message?.includes('fetch')) {
             await new Promise(resolve => setTimeout(resolve, 3000))
             pageCount--
             continue
@@ -231,7 +231,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error fetching Shopify orders:', error)
     return new Response(
-      JSON.stringify({ error: error.message, details: error.toString() }),
+      JSON.stringify({ error: (error as Error).message, details: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

@@ -189,7 +189,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        details: error.message || 'Unknown error',
+        details: (error as Error).message || 'Unknown error',
         code: 500
       }),
       { 

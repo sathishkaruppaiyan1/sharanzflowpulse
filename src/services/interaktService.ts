@@ -27,9 +27,10 @@ export const interaktService = {
   sendOrderShippedNotification: async (
     order: import('@/types/database').Order, 
     trackingNumber: string, 
-    carrier: import('@/types/database').CarrierType
+    carrier: string,
+    trackingUrl: string = ''
   ) => {
     const { sendOrderShippedNotification } = await import('./interakt/orderNotificationService');
-    return sendOrderShippedNotification(order, trackingNumber, carrier);
+    return sendOrderShippedNotification(order, trackingNumber, carrier, trackingUrl);
   }
 };

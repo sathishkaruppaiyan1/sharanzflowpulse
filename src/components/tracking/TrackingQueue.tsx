@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, Truck, MapPin, ExternalLink, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Checkbox as CheckboxUI } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
@@ -19,6 +21,18 @@ interface TrackingQueueProps {
 const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: TrackingQueueProps) => {
   const updateOrderStageMutation = useUpdateOrderStage();
   const [openDialogs, setOpenDialogs] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  const totalPages = Math.ceil(orders.length / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const paginatedOrders = orders.slice(startIndex, startIndex + perPage);
+
+  useEffect(() => {
+    if (orders.length === 0) { setCurrentPage(1); return; }
+    const newTotalPages = Math.ceil(orders.length / perPage);
+    if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages));
+  }, [orders.length, perPage, currentPage]);
 
   const handleMarkShipped = (orderId: string) => {
     updateOrderStageMutation.mutate({ orderId, stage: 'shipped' });
@@ -26,6 +40,26 @@ const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: 
 
   const handleDialogChange = (orderId: string, open: boolean) => {
     setOpenDialogs((prev) => ({ ...prev, [orderId]: open }));
+  };
+
+  const handlePageChange = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
+
+  const allCurrentPageSelected = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedOrderIds.has(o.id));
+
+  const handleSelectCurrentPage = () => {
+    if (onOrderSelect) {
+      paginatedOrders.forEach((o) => {
+        if (!selectedOrderIds.has(o.id)) onOrderSelect(o.id, true);
+      });
+    }
+  };
+
+  const handleUnselectCurrentPage = () => {
+    if (onOrderSelect) {
+      paginatedOrders.forEach((o) => {
+        if (selectedOrderIds.has(o.id)) onOrderSelect(o.id, false);
+      });
+    }
   };
 
   if (orders.length === 0) {
@@ -44,7 +78,39 @@ const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: 
 
   return (
     <div className="space-y-4">
-      {orders.map((order) => {
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          {onOrderSelect && (
+            <Button
+              variant={allCurrentPageSelected ? "default" : "outline"}
+              size="sm"
+              className="text-xs"
+              onClick={allCurrentPageSelected ? handleUnselectCurrentPage : handleSelectCurrentPage}
+            >
+              {allCurrentPageSelected ? `Unselect All (${paginatedOrders.length})` : `Select All (${paginatedOrders.length})`}
+            </Button>
+          )}
+          <span className="text-sm text-muted-foreground">
+            Showing {startIndex + 1}–{Math.min(startIndex + perPage, orders.length)} of {orders.length}
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-muted-foreground">Show</span>
+          <Select value={String(perPage)} onValueChange={(v) => { setPerPage(Number(v)); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[72px] h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">per page</span>
+        </div>
+      </div>
+
+      {paginatedOrders.map((order) => {
         const phoneNumber = order.customer?.phone || null;
 
         return (
@@ -170,6 +236,32 @@ const TrackingQueue = ({ orders, selectedOrderIds = new Set(), onOrderSelect }: 
           </Card>
         );
       })}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-6">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="px-3 py-2 text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 };

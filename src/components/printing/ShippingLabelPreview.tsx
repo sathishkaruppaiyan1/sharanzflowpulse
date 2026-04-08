@@ -212,8 +212,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   const createA5LabelHTML = (orderData: any, isLast: boolean = false) => {
     const orderNumber = orderData.order_number || orderData.name || `#${orderData.id}`;
     const trackingNumber = generateTrackingBarcode(orderNumber);
-    // barWidth=3, barHeight=80 → thick bars, easy to scan on printed A5
-    const barcodeSVG = generateCode128Barcode(trackingNumber, 3, 80);
+    // barWidth=2, barHeight=50 → reduced size but still readable on printed A5
+    const barcodeSVG = generateCode128Barcode(trackingNumber, 2, 50);
     const orderDate = orderData.created_at
       ? new Date(orderData.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -327,9 +327,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         </table>
 
         <!-- Barcode Footer -->
-        <div style="text-align:center;margin-top:16px;padding-top:10px;border-top:1px solid #eee;">
-          <div style="display:inline-block;max-width:100%;overflow:hidden;">${barcodeSVG}</div>
-          <div style="font-size:14px;font-weight:bold;margin-top:6px;letter-spacing:2px;">${trackingNumber}</div>
+        <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid #eee;">
+          <div style="display:inline-block;max-width:80%;overflow:hidden;transform:scaleX(0.85);transform-origin:center;">${barcodeSVG}</div>
+          <div style="font-size:12px;font-weight:bold;margin-top:4px;letter-spacing:2px;">${trackingNumber}</div>
         </div>
       </div>
     `;
@@ -413,6 +413,16 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         for (const orderData of ordersToProcess) {
           if (orderData._originalSupabaseOrder) {
             await supabaseOrderService.updateOrderStage(orderData._originalSupabaseOrder.id, targetStage);
+          } else {
+            // Shopify order not yet in Supabase – sync it first, then update stage
+            try {
+              const newOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
+              if (newOrderId) {
+                await supabaseOrderService.updateOrderStage(newOrderId, targetStage);
+              }
+            } catch (syncErr) {
+              console.error('Failed to sync & move Shopify order:', syncErr);
+            }
           }
         }
         queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -581,7 +591,12 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               <div className="flex gap-6 mb-5">
                 <div className="flex-1">
                   <div className="font-bold text-sm mb-1 text-gray-700">From</div>
-                  <div className="font-bold text-sm">Blacklovers</div>
+                  <div className="font-bold text-sm">{fromAddress.store_name || 'Store Name'}</div>
+                  {fromAddress.address1 && <div className="text-xs">{fromAddress.address1}</div>}
+                  {fromAddress.address2 && <div className="text-xs">{fromAddress.address2}</div>}
+                  {(fromAddress.city || fromAddress.state) && <div className="text-xs">{[fromAddress.city, fromAddress.state].filter(Boolean).join(', ')} {fromAddress.zip}</div>}
+                  {fromAddress.phone && <div className="text-xs text-blue-600">Phone: {fromAddress.phone}</div>}
+                  {fromAddress.email && <div className="text-xs">{fromAddress.email}</div>}
                 </div>
                 <div className="flex-2" style={{ flex: 2 }}>
                   <div className="font-bold text-sm mb-1 text-gray-700">To</div>
@@ -593,7 +608,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                     <div>{toAddress.state}</div>
                     <div>{toAddress.country}</div>
                     <div>{toAddress.zip}</div>
-                    <div className="text-blue-600">Phone: {toAddress.phone}</div>
+                    <div className="text-blue-600 font-extrabold" style={{ fontSize: '15px' }}>Phone: {toAddress.phone}</div>
                   </div>
                 </div>
               </div>
@@ -637,9 +652,11 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               </table>
 
               {/* Barcode Footer */}
-              <div className="text-center border-t border-gray-100 pt-4">
-                {renderBarcode(trackingNumber)}
-                <div className="font-bold text-sm mt-1">{trackingNumber}</div>
+              <div className="text-center border-t border-gray-100 pt-3">
+                <div style={{ transform: 'scaleX(0.75) scaleY(0.7)', transformOrigin: 'center' }}>
+                  {renderBarcode(trackingNumber)}
+                </div>
+                <div className="font-bold text-xs mt-0.5">{trackingNumber}</div>
               </div>
             </div>
           )}

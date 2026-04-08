@@ -57,7 +57,8 @@ const CompletedOrdersList = ({ orders }: CompletedOrdersListProps) => {
       const success = await sendOrderShippedNotification(
         order, 
         order.tracking_number, 
-        order.carrier as any
+        order.carrier as any,
+        ''
       );
 
       if (success) {
