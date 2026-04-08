@@ -18,6 +18,7 @@ interface PrintQueueProps {
   onSelectAll?: (currentPageOrders?: any[]) => void;
   onUnselectAll?: () => void;
   itemsPerPage?: number;
+  onAfterPrint?: () => void;
 }
 
 const PrintQueue = ({ 
@@ -27,7 +28,8 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
-  itemsPerPage: defaultItemsPerPage = 10
+  itemsPerPage: defaultItemsPerPage = 10,
+  onAfterPrint
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
   const [printingOrders, setPrintingOrders] = useState<Set<string>>(new Set());
@@ -74,6 +76,7 @@ const PrintQueue = ({
     if (Array.isArray(orderId)) { orderId.forEach(id => newSelected.delete(id)); } else { newSelected.delete(orderId); }
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
+    onAfterPrint?.();
     toast({ title: "🎉 Order Moved to Packing!", description: "Label printed successfully. Order has been moved to packing stage." });
     setTimeout(() => {
       const newTotalPages = Math.ceil(orders.length / perPage);

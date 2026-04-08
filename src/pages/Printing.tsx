@@ -40,26 +40,27 @@ const Printing = () => {
   const [laterStageShopifyIds, setLaterStageShopifyIds] = useState<Set<string>>(new Set());
 
   // Fetch orders already in later stages to exclude from printing view
-  useEffect(() => {
-    const fetchLaterStageIds = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('shopify_order_id, stage')
-          .not('shopify_order_id', 'is', null)
-          .in('stage', ['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed'] as any);
+  const fetchLaterStageIds = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('shopify_order_id, stage')
+        .not('shopify_order_id', 'is', null)
+        .in('stage', ['packing', 'tracking', 'shipping', 'shipped', 'delivered', 'completed'] as any);
 
-        if (!error && data) {
-          const ids = new Set<string>(data.map((o: any) => String(o.shopify_order_id)));
-          setLaterStageShopifyIds(ids);
-          console.log('📋 Orders in later stages (excluded from printing):', ids.size);
-        }
-      } catch (e) {
-        console.error('Failed to fetch later stage IDs:', e);
+      if (!error && data) {
+        const ids = new Set<string>(data.map((o: any) => String(o.shopify_order_id)));
+        setLaterStageShopifyIds(ids);
+        console.log('📋 Orders in later stages (excluded from printing):', ids.size);
       }
-    };
+    } catch (e) {
+      console.error('Failed to fetch later stage IDs:', e);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchLaterStageIds();
-  }, [printingOrders, packingOrders]);
+  }, [printingOrders, packingOrders, fetchLaterStageIds]);
 
   // Show ALL unfulfilled Shopify orders directly, excluding those in later stages
   const formattedPrintingOrders = React.useMemo(() => {
@@ -427,8 +428,9 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh the printing orders to show updated stages
+    // Refresh the printing orders and later stage IDs to remove printed orders from view
     refetchPrintingOrders();
+    fetchLaterStageIds();
   };
 
   const handleRefresh = () => {
@@ -673,6 +675,7 @@ const Printing = () => {
                 selectedOrderIds={selectedOrderIds}
                 onSelectAll={handleSelectAll}
                 onUnselectAll={handleUnselectAll}
+                onAfterPrint={fetchLaterStageIds}
               />
             </CardContent>
           </Card>
