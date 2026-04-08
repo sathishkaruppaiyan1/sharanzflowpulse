@@ -76,6 +76,7 @@ const PrintQueue = ({
     if (Array.isArray(orderId)) { orderId.forEach(id => newSelected.delete(id)); } else { newSelected.delete(orderId); }
     setSelectedOrders(newSelected);
     onSelectedCountChange?.(newSelected.size, newSelected);
+    onAfterPrint?.();
     toast({ title: "🎉 Order Moved to Packing!", description: "Label printed successfully. Order has been moved to packing stage." });
     setTimeout(() => {
       const newTotalPages = Math.ceil(orders.length / perPage);
