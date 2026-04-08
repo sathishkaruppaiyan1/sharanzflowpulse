@@ -212,8 +212,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   const createA5LabelHTML = (orderData: any, isLast: boolean = false) => {
     const orderNumber = orderData.order_number || orderData.name || `#${orderData.id}`;
     const trackingNumber = generateTrackingBarcode(orderNumber);
-    // barWidth=3, barHeight=80 → thick bars, easy to scan on printed A5
-    const barcodeSVG = generateCode128Barcode(trackingNumber, 3, 80);
+    // barWidth=2, barHeight=50 → reduced size but still readable on printed A5
+    const barcodeSVG = generateCode128Barcode(trackingNumber, 2, 50);
     const orderDate = orderData.created_at
       ? new Date(orderData.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -327,9 +327,9 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         </table>
 
         <!-- Barcode Footer -->
-        <div style="text-align:center;margin-top:16px;padding-top:10px;border-top:1px solid #eee;">
-          <div style="display:inline-block;max-width:100%;overflow:hidden;">${barcodeSVG}</div>
-          <div style="font-size:14px;font-weight:bold;margin-top:6px;letter-spacing:2px;">${trackingNumber}</div>
+        <div style="text-align:center;margin-top:12px;padding-top:8px;border-top:1px solid #eee;">
+          <div style="display:inline-block;max-width:80%;overflow:hidden;transform:scaleX(0.85);transform-origin:center;">${barcodeSVG}</div>
+          <div style="font-size:12px;font-weight:bold;margin-top:4px;letter-spacing:2px;">${trackingNumber}</div>
         </div>
       </div>
     `;
