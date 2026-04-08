@@ -428,8 +428,9 @@ const Printing = () => {
     setSelectedOrderIds(new Set());
     setSelectedCount(0);
     
-    // Refresh the printing orders to show updated stages
+    // Refresh the printing orders and later stage IDs to remove printed orders from view
     refetchPrintingOrders();
+    fetchLaterStageIds();
   };
 
   const handleRefresh = () => {
@@ -674,6 +675,7 @@ const Printing = () => {
                 selectedOrderIds={selectedOrderIds}
                 onSelectAll={handleSelectAll}
                 onUnselectAll={handleUnselectAll}
+                onAfterPrint={fetchLaterStageIds}
               />
             </CardContent>
           </Card>
