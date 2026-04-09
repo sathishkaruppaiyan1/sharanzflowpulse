@@ -543,6 +543,7 @@ const Tracking = () => {
                         {shopifyStatus === 'success' && (
                           <p className="text-sm text-green-600 mt-1">
                             Shopify fulfillment updated successfully
+                          </p>
                         )}
                       </div>
                     </div>
