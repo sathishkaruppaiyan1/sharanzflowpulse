@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
+import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 import { ParcelPanelService } from '@/services/parcelPanelService';
 
 export const supabaseOrderService = {
@@ -154,36 +155,18 @@ export const supabaseOrderService = {
     let shopifySuccess = false;
     let shopifyErrorMsg: string | undefined;
 
-    // Send WhatsApp notification via Interakt (through edge function to avoid CORS)
+    // Send WhatsApp notification via Interakt (direct call — same as Shipping page)
     try {
       console.log('📱 Attempting to send WhatsApp notification...');
       if (!order.customer?.phone) {
         whatsappErrorMsg = 'No phone number available';
         console.log('❌ No phone number available for WhatsApp notification');
       } else {
-        const { data: whatsappResult, error: whatsappInvokeError } = await supabase.functions.invoke('send-whatsapp-notification', {
-          body: {
-            order_number: order.order_number,
-            customer_phone: order.customer.phone,
-            customer_name: order.customer?.first_name
-              ? `${order.customer.first_name} ${order.customer.last_name || ''}`.trim()
-              : 'Customer',
-            tracking_number: trackingNumber,
-            carrier_name: carrierName,
-            tracking_url: trackingUrl
-          }
-        });
-
-        if (whatsappInvokeError) {
-          whatsappErrorMsg = whatsappInvokeError.message || 'Edge function failed';
-          console.error('❌ WhatsApp edge function error:', whatsappInvokeError);
-        } else if (whatsappResult?.error) {
-          whatsappErrorMsg = whatsappResult.error;
-          console.error('❌ WhatsApp notification failed:', whatsappResult.error);
-        } else {
-          whatsappSuccess = true;
-          console.log('✅ WhatsApp notification sent successfully');
+        whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrierName, trackingUrl);
+        if (!whatsappSuccess) {
+          whatsappErrorMsg = 'Interakt API returned failure';
         }
+        console.log(whatsappSuccess ? '✅ WhatsApp notification sent successfully' : '❌ WhatsApp notification failed');
       }
     } catch (whatsappErr: unknown) {
       const errMsg = whatsappErr instanceof Error ? whatsappErr.message : String(whatsappErr);
