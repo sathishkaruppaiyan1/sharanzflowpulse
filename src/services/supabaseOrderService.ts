@@ -119,7 +119,7 @@ export const supabaseOrderService = {
     trackingNumber: string,
     carrierName: string,       // display name, e.g. "Delhivery"
     trackingUrl: string = ''   // full URL with {number} already replaced
-  ): Promise<Order> {
+  ): Promise<Order & { _whatsappSuccess?: boolean; _shopifySuccess?: boolean }> {
     console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrierName}`);
 
     const { data, error } = await supabase
@@ -147,21 +147,17 @@ export const supabaseOrderService = {
       throw error;
     }
 
-    const order = data as Order;
+    const order = data as Order & { _whatsappSuccess?: boolean; _shopifySuccess?: boolean };
     console.log(`✅ Successfully updated tracking for order ${order.order_number}`);
 
-    // Auto-fetch tracking details from Parcel Panel (will be handled by the tracking update hook)
-    console.log('🔄 Tracking details auto-fetch will be handled by the tracking update hook');
+    let whatsappSuccess = false;
+    let shopifySuccess = false;
 
     // Send WhatsApp notification via Interakt
     try {
       console.log('📱 Attempting to send WhatsApp notification...');
-      const whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrierName, trackingUrl);
-      if (whatsappSuccess) {
-        console.log('✅ WhatsApp notification sent successfully');
-      } else {
-        console.log('❌ WhatsApp notification failed');
-      }
+      whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrierName, trackingUrl);
+      console.log(whatsappSuccess ? '✅ WhatsApp notification sent successfully' : '❌ WhatsApp notification failed');
     } catch (whatsappError) {
       console.error('📱 WhatsApp notification error:', whatsappError);
     }
@@ -171,17 +167,19 @@ export const supabaseOrderService = {
       try {
         console.log('🛍️ Attempting to update Shopify order status...');
         await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrierName, trackingUrl);
+        shopifySuccess = true;
         console.log('✅ Shopify order status updated successfully');
       } catch (shopifyError) {
         console.error('❌ Shopify update failed:', shopifyError);
-        console.error('🔍 Shopify error details:', shopifyError.message);
-        
-        // Don't throw here - we want the order to be updated even if Shopify fails
         console.warn('⚠️ Order tracking updated locally but Shopify sync failed.');
       }
     } else {
       console.log('⚠️ No Shopify order ID found, skipping Shopify update');
     }
+
+    // Attach results to the order object for the caller
+    order._whatsappSuccess = whatsappSuccess;
+    order._shopifySuccess = shopifySuccess;
 
     return order;
   },

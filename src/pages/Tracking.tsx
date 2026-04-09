@@ -282,7 +282,7 @@ const Tracking = () => {
       
       // Update tracking information (this automatically moves order to shipped stage)
       const detectedCourierForSubmit = detectCourierByPrefix(trackingNumber, couriers);
-      await updateTrackingMutation.mutateAsync({
+      const result = await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
         carrierName: detectedCourierForSubmit?.name || carrierDisplayName,
@@ -292,26 +292,19 @@ const Tracking = () => {
       // Play success sound for successful tracking update
       playCompleteSound();
       
-      // The mutation already handles WhatsApp notification and Shopify sync
-      // So we just need to update the status indicators based on the order
-      const phoneNumber = getPhoneNumber(currentOrder);
-      
-      if (phoneNumber) {
-        setWhatsappStatus('success');
-        console.log('✅ WhatsApp notification sent successfully');
-      } else {
-        setWhatsappStatus('failed');
-        console.log('❌ No phone number available for WhatsApp notification');
-      }
-      
-      // Set Shopify status based on whether order has Shopify ID
-      if (currentOrder.shopify_order_id) {
-        setShopifyStatus('success');
-        console.log('✅ Shopify update completed (or attempted)');
-      } else {
-        setShopifyStatus('failed');
-        console.log('⚠️ No Shopify order ID found, skipping Shopify update');
-      }
+      // Use actual results from the service
+      console.log('📋 Tracking update results:', {
+        whatsapp: result._whatsappSuccess,
+        shopify: result._shopifySuccess,
+        hasPhone: !!getPhoneNumber(currentOrder),
+        hasShopifyId: !!currentOrder.shopify_order_id
+      });
+
+      setWhatsappStatus(result._whatsappSuccess ? 'success' : 'failed');
+      setShopifyStatus(
+        !currentOrder.shopify_order_id ? 'failed' :
+        result._shopifySuccess ? 'success' : 'failed'
+      );
       
       toast.success(`Order ${currentOrder.order_number} tracking assigned and moved to shipped!`);
       
@@ -544,7 +537,12 @@ const Tracking = () => {
                         )}
                         {shopifyStatus === 'failed' && (
                           <p className="text-sm text-red-600 mt-1">
-                            Could not update Shopify order - order may not be from Shopify
+                            Could not update Shopify - check edge function logs for details
+                          </p>
+                        )}
+                        {shopifyStatus === 'success' && (
+                          <p className="text-sm text-green-600 mt-1">
+                            Shopify fulfillment updated successfully
                           </p>
                         )}
                       </div>
