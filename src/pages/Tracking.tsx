@@ -532,7 +532,12 @@ const Tracking = () => {
                         )}
                         {shopifyStatus === 'failed' && (
                           <p className="text-sm text-red-600 mt-1">
-                            Could not update Shopify order - order may not be from Shopify
+                            Could not update Shopify - check edge function logs for details
+                          </p>
+                        )}
+                        {shopifyStatus === 'success' && (
+                          <p className="text-sm text-green-600 mt-1">
+                            Shopify fulfillment updated successfully
                           </p>
                         )}
                       </div>

@@ -317,7 +317,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
         <!-- Barcode Footer -->
         <div style="text-align:center;padding-top:6px;border-top:1px solid #eee;">
-          <div style="display:inline-block;max-width:80%;overflow:hidden;transform:scaleX(0.85);transform-origin:center;">${barcodeSVG}</div>
+          <div style="display:inline-block;overflow:hidden;">${barcodeSVG}</div>
           <div style="font-size:11px;font-weight:bold;margin-top:2px;letter-spacing:2px;">${trackingNumber}</div>
         </div>
       </div>

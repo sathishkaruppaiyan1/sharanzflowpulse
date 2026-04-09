@@ -5,7 +5,7 @@ import { ParcelPanelService } from '@/services/parcelPanelService';
 export const supabaseOrderService = {
   async fetchOrders(): Promise<Order[]> {
     console.log('Fetching all orders with order items and variation details...');
-    
+
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -30,7 +30,7 @@ export const supabaseOrderService = {
 
   async fetchOrdersByStage(stage: OrderStage): Promise<Order[]> {
     console.log(`Fetching orders for stage: ${stage} with variation details`);
-    
+
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -51,7 +51,7 @@ export const supabaseOrderService = {
     }
 
     console.log(`Fetched ${data?.length || 0} orders for stage ${stage}`);
-    
+
     // Debug phone numbers and variation data for each order
     data?.forEach(order => {
       console.log(`Order ${order.order_number} debug:`, {
@@ -68,15 +68,15 @@ export const supabaseOrderService = {
         }))
       });
     });
-    
+
     return data as Order[] || [];
   },
 
   async updateOrderStage(orderId: string, stage: OrderStage): Promise<Order> {
     console.log(`Updating order ${orderId} to stage ${stage}`);
-    
+
     const updateData: any = { stage };
-    
+
     // Add timestamp fields based on stage
     if (stage === 'packing') {
       updateData.printed_at = new Date().toISOString();
@@ -148,9 +148,6 @@ export const supabaseOrderService = {
 
     const order = data as Order;
     console.log(`✅ Successfully updated tracking for order ${order.order_number}`);
-
-    // Auto-fetch tracking details from Parcel Panel (will be handled by the tracking update hook)
-    console.log('🔄 Tracking details auto-fetch will be handled by the tracking update hook');
 
     let whatsappSuccess = false;
     let whatsappErrorMsg: string | undefined;
@@ -338,7 +335,7 @@ export const supabaseOrderService = {
 
   async updateOrderItemPacked(itemId: string, packed: boolean): Promise<void> {
     console.log(`Updating order item ${itemId} packed status to ${packed}`);
-    
+
     const { error } = await supabase
       .from('order_items')
       .update({ packed })
