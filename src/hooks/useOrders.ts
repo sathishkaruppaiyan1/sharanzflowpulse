@@ -125,7 +125,7 @@ export const useUpdateOrderStage = () => {
 export const useUpdateTracking = () => {
   const queryClient = useQueryClient();
   const { service: parcelPanelService, isConfigured } = useParcelPanelService();
-  
+
   return useMutation({
     mutationFn: async ({
       orderId,
@@ -140,8 +140,8 @@ export const useUpdateTracking = () => {
     }) => {
       console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrierName}`);
 
-      const updatedOrder = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrierName, trackingUrl);
-      
+      const result = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrierName, trackingUrl);
+
       // Auto-fetch tracking details from Parcel Panel if configured
       if (isConfigured && parcelPanelService) {
         try {
@@ -150,18 +150,24 @@ export const useUpdateTracking = () => {
           console.log('✅ Tracking details auto-fetched and stored');
         } catch (error) {
           console.error('❌ Error auto-fetching tracking details:', error);
-          // Don't block the main process if this fails
         }
-      } else {
-        console.log('⚠️ Parcel Panel not configured, skipping auto-fetch');
       }
-      
-      console.log(`✅ Successfully updated tracking for order ${orderId} with Shopify integration`);
-      return updatedOrder;
+
+      console.log(`✅ Successfully updated tracking for order ${orderId}`);
+      return result;
     },
-    onSuccess: (data) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success(`🎉 Tracking added for order ${data.order_number} and synced to Shopify!`);
+      const msgs: string[] = [];
+      if (!result.whatsappSuccess) msgs.push(`WhatsApp: ${result.whatsappError || 'failed'}`);
+      if (!result.shopifySuccess) msgs.push(`Shopify: ${result.shopifyError || 'failed'}`);
+
+      if (msgs.length === 0) {
+        toast.success(`Tracking added for order ${result.order.order_number} — WhatsApp & Shopify synced!`);
+      } else {
+        toast.success(`Tracking added for order ${result.order.order_number}`);
+        msgs.forEach(msg => toast.warning(msg));
+      }
     },
     onError: (error) => {
       console.error('❌ Error updating tracking:', error);

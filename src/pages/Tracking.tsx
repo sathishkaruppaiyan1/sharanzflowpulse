@@ -279,42 +279,30 @@ const Tracking = () => {
     
     try {
       console.log('🚀 Starting tracking update process...');
-      
+
       // Update tracking information (this automatically moves order to shipped stage)
       const detectedCourierForSubmit = detectCourierByPrefix(trackingNumber, couriers);
-      await updateTrackingMutation.mutateAsync({
+      const result = await updateTrackingMutation.mutateAsync({
         orderId: currentOrder.id,
         trackingNumber: trackingNumber,
         carrierName: detectedCourierForSubmit?.name || carrierDisplayName,
         trackingUrl: buildTrackingUrl(trackingNumber, detectedCourierForSubmit?.tracking_url ?? null)
       });
-      
+
       // Play success sound for successful tracking update
       playCompleteSound();
-      
-      // The mutation already handles WhatsApp notification and Shopify sync
-      // So we just need to update the status indicators based on the order
-      const phoneNumber = getPhoneNumber(currentOrder);
-      
-      if (phoneNumber) {
-        setWhatsappStatus('success');
-        console.log('✅ WhatsApp notification sent successfully');
-      } else {
-        setWhatsappStatus('failed');
-        console.log('❌ No phone number available for WhatsApp notification');
+
+      // Use actual API results for status indicators
+      setWhatsappStatus(result.whatsappSuccess ? 'success' : 'failed');
+      setShopifyStatus(result.shopifySuccess ? 'success' : 'failed');
+
+      if (!result.whatsappSuccess) {
+        console.log('❌ WhatsApp failed:', result.whatsappError);
       }
-      
-      // Set Shopify status based on whether order has Shopify ID
-      if (currentOrder.shopify_order_id) {
-        setShopifyStatus('success');
-        console.log('✅ Shopify update completed (or attempted)');
-      } else {
-        setShopifyStatus('failed');
-        console.log('⚠️ No Shopify order ID found, skipping Shopify update');
+      if (!result.shopifySuccess) {
+        console.log('❌ Shopify failed:', result.shopifyError);
       }
-      
-      toast.success(`Order ${currentOrder.order_number} tracking assigned and moved to shipped!`);
-      
+
       // Reset form after successful update
       setOrderIdInput('');
       setTrackingNumberInput('');
@@ -323,13 +311,13 @@ const Tracking = () => {
       setIsOrderLocked(false);
       setIsProcessingTracking(false);
       setLastProcessedTrackingNumber('');
-      
+
       // Reset status indicators after a delay
       setTimeout(() => {
         setWhatsappStatus(null);
         setShopifyStatus(null);
       }, 5000);
-      
+
     } catch (error) {
       console.error('❌ Error updating tracking:', error);
       playErrorSound();
