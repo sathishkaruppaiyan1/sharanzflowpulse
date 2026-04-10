@@ -11,7 +11,9 @@
       "mcp__63192de0-457f-4033-81c7-f30c699f3ef9__list_projects",
       "mcp__63192de0-457f-4033-81c7-f30c699f3ef9__deploy_edge_function",
       "Bash(npx supabase:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__get_logs"
     ],
     "deny": [],
     "ask": []
