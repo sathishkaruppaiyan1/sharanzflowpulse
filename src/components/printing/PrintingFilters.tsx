@@ -156,16 +156,11 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
       console.log('After date filter:', filtered.length);
     }
 
-    // Apply sorting
+    // Apply sorting (by numeric order_number)
     filtered.sort((a, b) => {
-      const dateA = new Date(a.created_at || 0).getTime();
-      const dateB = new Date(b.created_at || 0).getTime();
-      
-      if (filters.sortOrder === 'newest') {
-        return dateB - dateA;
-      } else {
-        return dateA - dateB;
-      }
+      const an = parseInt(String(a.order_number || a.name || '').replace(/\D/g, ''), 10) || 0;
+      const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
+      return filters.sortOrder === 'newest' ? bn - an : an - bn;
     });
 
     console.log('Final filtered orders:', filtered.length);
@@ -186,9 +181,9 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
     // Apply cleared filters immediately
     let filtered = [...orders];
     filtered.sort((a, b) => {
-      const dateA = new Date(a.created_at || 0).getTime();
-      const dateB = new Date(b.created_at || 0).getTime();
-      return dateB - dateA;
+      const an = parseInt(String(a.order_number || a.name || '').replace(/\D/g, ''), 10) || 0;
+      const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
+      return bn - an;
     });
     onFilterChange(filtered);
   };
@@ -296,8 +291,8 @@ const PrintingFilters = ({ orders, onFilterChange }: PrintingFiltersProps) => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="newest">Order # (High to Low)</SelectItem>
+              <SelectItem value="oldest">Order # (Low to High)</SelectItem>
             </SelectContent>
           </Select>
         </div>

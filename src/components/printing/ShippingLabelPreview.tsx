@@ -132,7 +132,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
     const productFontSize = getProductFontSize(lineItems.length);
     const lineHeight = getLineHeight(productFontSize);
-    const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
+    const pageBreak = !isLast ? 'page-break-after: always;' : '';
+    const pageLabel = orderData._totalPages && orderData._totalPages > 1
+      ? ` (Page ${orderData._pageIndex}/${orderData._totalPages})`
+      : '';
 
     // Use edited address if available (for single-order print)
     const addr = !isBulkPrint ? toAddress : (() => {
@@ -184,7 +187,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           <div style="flex:1;margin-left:5px;padding-right:6px;">
             <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">COURIER DETAILS:</div>
             <div style="padding:6px 4px;background:#fff;font-size:10px;height:60px;">
-              <div style="margin-bottom:2px;">Order: <strong>${orderNumber}</strong></div>
+              <div style="margin-bottom:2px;">Order: <strong>${orderNumber}</strong>${pageLabel}</div>
               <div style="margin-bottom:2px;">Weight: ${totalWeight}</div>
               <div style="margin-bottom:2px;">Items: ${totalItems}</div>
               <div>Total: &#8377;${orderData.total_amount || orderData.current_total_price}</div>
@@ -221,7 +224,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     const lineItems = orderData.line_items || [];
     const totalItems = lineItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
     const totalWeight = orderData.total_weight ? `${orderData.total_weight / 1000}kg` : '0.5kg';
-    const pageBreak = isBulkPrint && !isLast ? 'page-break-after: always;' : '';
+    const pageBreak = !isLast ? 'page-break-after: always;' : '';
+    const pageLabel = orderData._totalPages && orderData._totalPages > 1
+      ? ` (Page ${orderData._pageIndex}/${orderData._totalPages})`
+      : '';
 
     const addr = !isBulkPrint ? toAddress : (() => {
       const sa = orderData.shipping_address || {};
@@ -271,7 +277,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             <span style="font-size:20px;font-weight:bold;color:#222;">Packing slip</span>
           </div>
           <div style="text-align:right;font-size:11px;line-height:1.6;">
-            <div><strong>Order:</strong> ${orderNumber}</div>
+            <div><strong>Order:</strong> ${orderNumber}${pageLabel}</div>
             <div><strong>Date:</strong> ${orderDate}</div>
           </div>
         </div>
@@ -288,13 +294,14 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
           <div style="flex:2;">
-            <div style="font-weight:bold;font-size:11px;margin-bottom:4px;color:#333;">To</div>
-            <div style="font-weight:bold;font-size:13px;margin-bottom:2px;">${addr.name}</div>
-            <div style="font-size:12px;font-weight:bold;color:#222;line-height:1.5;">
+            <div style="font-weight:bold;font-size:12px;margin-bottom:4px;color:#333;">To</div>
+            <div style="font-weight:bold;font-size:17px;margin-bottom:3px;">${addr.name}</div>
+            <div style="font-size:15px;font-weight:bold;color:#222;line-height:1.55;">
               ${addr.address1}${addr.address2 ? ', ' + addr.address2 : ''}
               <br>${addr.city}, ${addr.state} ${addr.zip}
               <br>${addr.country}
-              <br><span style="color:#1a73e8;">Phone: ${addr.phone}</span>
+              <br><span style="color:#1a73e8;font-size:19px;font-weight:900;">Phone: ${addr.phone}</span>
+              ${(orderData.customer?.email || orderData.email) ? `<br><span style="font-size:14px;font-weight:bold;color:#333;">Email: ${orderData.customer?.email || orderData.email}</span>` : ''}
             </div>
           </div>
         </div>
@@ -390,17 +397,52 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   const handlePrint = async () => {
     try {
-      const labelsHTML = ordersToProcess.map((orderData, index) => {
-        const isLast = index === ordersToProcess.length - 1;
-        return createLabelHTML(orderData, isLast);
+      // 1. Sort orders descending by numeric order_number (newest first) so print sequence is predictable
+      const sortedOrders = [...ordersToProcess].sort((a, b) => {
+        const an = parseInt(String(a.order_number || a.name || '').replace(/\D/g, ''), 10) || 0;
+        const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
+        return bn - an;
+      });
+
+      // 2. Split each order into pages of at most 10 line items so multi-product
+      //    orders don't get crammed onto a single label.
+      const ITEMS_PER_PAGE = 10;
+      const pages: Array<{ orderData: any; isContinuation: boolean }> = [];
+      sortedOrders.forEach((orderData) => {
+        const items = orderData.line_items || [];
+        if (items.length <= ITEMS_PER_PAGE) {
+          pages.push({ orderData, isContinuation: false });
+          return;
+        }
+        const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+        for (let i = 0; i < totalPages; i++) {
+          const chunk = items.slice(i * ITEMS_PER_PAGE, (i + 1) * ITEMS_PER_PAGE);
+          pages.push({
+            orderData: {
+              ...orderData,
+              line_items: chunk,
+              _pageIndex: i + 1,
+              _totalPages: totalPages,
+            },
+            isContinuation: i > 0,
+          });
+        }
+      });
+
+      const labelsHTML = pages.map((p, index) => {
+        const isLast = index === pages.length - 1;
+        return createLabelHTML(p.orderData, isLast);
       }).join('');
+
+      // Use sortedOrders (unique orders) for stage updates below
+      const uniqueOrdersToUpdate = sortedOrders;
 
       await printViaIframe(labelsHTML);
 
       // Move orders to packing or tracking stage depending on bypass setting
       const targetStage = bypassPacking ? 'tracking' : 'packing';
       try {
-        for (const orderData of ordersToProcess) {
+        for (const orderData of uniqueOrdersToUpdate) {
           if (orderData._originalSupabaseOrder) {
             await supabaseOrderService.updateOrderStage(orderData._originalSupabaseOrder.id, targetStage);
           } else {
@@ -590,15 +632,18 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 </div>
                 <div className="flex-2" style={{ flex: 2 }}>
                   <div className="font-bold text-sm mb-1 text-gray-700">To</div>
-                  <div className="font-bold" style={{ fontSize: '14px' }}>{toAddress.name}</div>
-                  <div className="font-bold text-gray-800 space-y-0.5 mt-1" style={{ fontSize: '14px' }}>
+                  <div className="font-bold" style={{ fontSize: '17px' }}>{toAddress.name}</div>
+                  <div className="font-bold text-gray-800 space-y-0.5 mt-1" style={{ fontSize: '15px' }}>
                     <div>{toAddress.address1}</div>
                     {toAddress.address2 && <div>{toAddress.address2}</div>}
                     <div>{toAddress.city}</div>
                     <div>{toAddress.state}</div>
                     <div>{toAddress.country}</div>
                     <div>{toAddress.zip}</div>
-                    <div className="text-blue-600 font-extrabold" style={{ fontSize: '15px' }}>Phone: {toAddress.phone}</div>
+                    <div className="text-blue-600" style={{ fontSize: '19px', fontWeight: 900 }}>Phone: {toAddress.phone}</div>
+                    {(displayOrder.customer?.email || displayOrder.email) && (
+                      <div className="font-bold text-gray-700" style={{ fontSize: '14px' }}>Email: {displayOrder.customer?.email || displayOrder.email}</div>
+                    )}
                   </div>
                 </div>
               </div>

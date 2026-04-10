@@ -87,7 +87,9 @@ const Printing = () => {
       _isSupabaseOrder: true,
       _originalSupabaseOrder: order,
     })).sort((a, b) => {
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      const an = parseInt(String(a.order_number || a.name || '').replace(/\D/g, ''), 10) || 0;
+      const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
+      return bn - an;
     });
   }, [printingOrders]);
 
