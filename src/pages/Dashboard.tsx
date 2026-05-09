@@ -10,7 +10,11 @@ import { useOrders } from '@/hooks/useOrders';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { supabase } from '@/integrations/supabase/client';
 
-const Dashboard = () => {
+interface DashboardProps {
+  userRole: string;
+}
+
+const Dashboard = ({ userRole }: DashboardProps) => {
   const navigate = useNavigate();
   const { data: orders = [] } = useOrders();
   const { orders: shopifyOrders = [] } = useShopifyOrders();
@@ -108,9 +112,10 @@ const Dashboard = () => {
       icon: BarChart3,
       color: 'red',
       description: 'Being delivered',
-      route: '/analytics'
+      route: '/analytics',
+      adminOnly: true,
     }
-  ];
+  ].filter((stage) => !stage.adminOnly || userRole === 'admin');
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

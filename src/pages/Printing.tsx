@@ -129,7 +129,7 @@ const Printing = () => {
       );
 
       // 4. Split into: brand-new orders vs pending orders to promote
-      const laterStages = new Set(['printing', 'packing', 'tracking', 'shipped', 'delivered']);
+      const laterStages = new Set(['hold', 'printing', 'packing', 'tracking', 'shipped', 'delivered']);
       const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
       const pendingToPrintIds: string[] = [];
 

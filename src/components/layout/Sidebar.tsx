@@ -37,11 +37,11 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
     { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true },
     { name: 'Tracking', href: '/tracking', icon: Truck },
     { name: 'Shipping', href: '/shipping', icon: Ship },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, adminOnly: true },
   ];
 
   const navigationItems = allNavigationItems.filter(
-    item => !(item.hiddenWhenBypass && bypassPacking)
+    item => !(item.hiddenWhenBypass && bypassPacking) && !(item.adminOnly && user.role !== 'admin')
   );
 
   const adminItems = [
@@ -107,7 +107,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
           );
         })}
 
-        {(user.role === 'admin' || user.role === 'manager') && (
+        {user.role === 'admin' && (
           <>
             <Separator className="my-4" />
             <div className="px-3 py-2">

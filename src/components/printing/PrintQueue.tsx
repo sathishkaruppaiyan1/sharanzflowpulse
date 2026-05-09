@@ -28,7 +28,7 @@ const PrintQueue = ({
   selectedOrderIds = new Set(),
   onSelectAll,
   onUnselectAll,
-  itemsPerPage: defaultItemsPerPage = 10,
+  itemsPerPage: defaultItemsPerPage = 100,
   onAfterPrint
 }: PrintQueueProps) => {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(selectedOrderIds);
@@ -131,6 +131,8 @@ const PrintQueue = ({
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="25">25</SelectItem>
                 <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="250">250</SelectItem>
               </SelectContent>
             </Select>
             <span className="text-sm text-muted-foreground">per page</span>

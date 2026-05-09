@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Truck, CheckCircle, Eye, Printer, MoveRight } from 'lucide-react';
+import { Package, Truck, CheckCircle, Eye, Printer, MoveRight, PauseCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useUpdateOrderStage } from '@/hooks/useOrders';
@@ -31,6 +31,7 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
 
   const stages: { value: OrderStage; label: string; icon: React.ReactNode; color: string }[] = [
     { value: 'pending', label: 'Pending', icon: <Eye className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' },
+    { value: 'hold', label: 'Hold', icon: <PauseCircle className="h-4 w-4" />, color: 'bg-red-100 text-red-800' },
     { value: 'printing', label: 'Printing', icon: <Printer className="h-4 w-4" />, color: 'bg-blue-100 text-blue-800' },
     { value: 'packing', label: 'Packing', icon: <Package className="h-4 w-4" />, color: 'bg-purple-100 text-purple-800' },
     { value: 'tracking', label: 'Tracking', icon: <Truck className="h-4 w-4" />, color: 'bg-orange-100 text-orange-800' },
@@ -38,9 +39,11 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
   ];
 
   const allowedStageMap: Partial<Record<OrderStage, OrderStage[]>> = {
-    printing: ['packing', 'tracking'],
-    packing: ['printing', 'tracking'],
-    tracking: ['printing', 'packing'],
+    pending: ['hold', 'printing'],
+    hold: ['pending', 'printing', 'packing', 'tracking'],
+    printing: ['hold', 'packing', 'tracking'],
+    packing: ['hold', 'printing', 'tracking'],
+    tracking: ['hold', 'printing', 'packing'],
   };
 
   const allowedStages = allowedStageMap[currentStage] ?? stages.map((stage) => stage.value);

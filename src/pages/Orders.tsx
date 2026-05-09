@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Pagination, 
   PaginationContent, 
@@ -16,11 +18,14 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from '@/components/ui/pagination';
-import { Search, RefreshCw, Eye, Package, Clock, Settings } from 'lucide-react';
+import { Search, RefreshCw, Eye, Package, Clock, Pencil } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useToast } from '@/hooks/use-toast';
 import StageChangeControls from '@/components/common/StageChangeControls';
-import { useOrders } from '@/hooks/useOrders';
+import { useBulkUpdateOrderStage, useOrders } from '@/hooks/useOrders';
+import { OrderStage } from '@/types/database';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ORDERS_PER_PAGE = 25;
 
@@ -45,11 +50,17 @@ const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'processing' | 'hold'>('processing');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [openStageDialog, setOpenStageDialog] = useState<string | number | null>(null);
+  const [selectedInternalOrderIds, setSelectedInternalOrderIds] = useState<Set<string>>(new Set());
+  const [bulkTargetStage, setBulkTargetStage] = useState<OrderStage | ''>('');
+  const [syncingEditOrderIds, setSyncingEditOrderIds] = useState<Set<string | number>>(new Set());
   const { toast } = useToast();
+  const bulkUpdateStageMutation = useBulkUpdateOrderStage();
+  const queryClient = useQueryClient();
   
   // Debounce search term to avoid filtering on every keystroke
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -73,9 +84,43 @@ const Orders = () => {
     });
   }, [rawShopifyOrders]);
 
+  const internalOrderMap = useMemo(() => {
+    return new Map(
+      internalOrders
+        .filter(order => order.shopify_order_id)
+        .map(order => [Number(order.shopify_order_id), order])
+    );
+  }, [internalOrders]);
+
+  const tabCounts = useMemo(() => {
+    let processing = 0;
+    let hold = 0;
+
+    shopifyOrders.forEach(order => {
+      const internalOrder = internalOrderMap.get(Number(order.id));
+      if (internalOrder?.stage === 'hold') {
+        hold += 1;
+      } else {
+        processing += 1;
+      }
+    });
+
+    return { processing, hold };
+  }, [shopifyOrders, internalOrderMap]);
+
   // Memoized filter function for better performance
   const filteredOrders = useMemo(() => {
     return shopifyOrders.filter(order => {
+      const internalOrder = internalOrderMap.get(Number(order.id));
+
+      if (activeTab === 'hold') {
+        if (internalOrder?.stage !== 'hold') {
+          return false;
+        }
+      } else if (internalOrder?.stage === 'hold') {
+        return false;
+      }
+
       // Status filter - improved logic with null safety
       if (statusFilter !== 'all') {
         const fulfillmentStatus = order.fulfillment_status || '';
@@ -121,7 +166,7 @@ const Orders = () => {
         (order.id || '').toString().toLowerCase().includes(lowercaseSearch)
       );
     });
-  }, [shopifyOrders, debouncedSearchTerm, statusFilter, dateFilter]);
+  }, [shopifyOrders, internalOrderMap, activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
   // Calculate pagination values - memoized
   const paginationData = useMemo(() => {
@@ -140,10 +185,26 @@ const Orders = () => {
     };
   }, [filteredOrders, currentPage]);
 
+  const selectableCurrentOrders = useMemo(() => {
+    return paginationData.currentOrders.filter((order) => Boolean(internalOrderMap.get(Number(order.id))?.id));
+  }, [paginationData.currentOrders, internalOrderMap]);
+
+  const allCurrentPageSelected =
+    selectableCurrentOrders.length > 0 &&
+    selectableCurrentOrders.every((order) => {
+      const internalOrder = internalOrderMap.get(Number(order.id));
+      return internalOrder ? selectedInternalOrderIds.has(internalOrder.id) : false;
+    });
+
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, statusFilter, dateFilter]);
+  }, [debouncedSearchTerm, statusFilter, dateFilter, activeTab]);
+
+  useEffect(() => {
+    setSelectedInternalOrderIds(new Set());
+    setBulkTargetStage('');
+  }, [activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
   // Memoized status badge function
   const getStatusBadge = useCallback((fulfillmentStatus: string, financialStatus: string) => {
@@ -197,7 +258,93 @@ const Orders = () => {
   };
 
   const getInternalOrder = (shopifyOrderId: string | number) => {
-    return internalOrders.find(order => order.shopify_order_id === Number(shopifyOrderId));
+    return internalOrderMap.get(Number(shopifyOrderId));
+  };
+
+  const handleSelectOrder = (shopifyOrderId: string | number, checked: boolean) => {
+    const internalOrder = getInternalOrder(shopifyOrderId);
+    if (!internalOrder) return;
+
+    setSelectedInternalOrderIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(internalOrder.id);
+      } else {
+        next.delete(internalOrder.id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllCurrentPage = (checked: boolean) => {
+    setSelectedInternalOrderIds((prev) => {
+      const next = new Set(prev);
+      selectableCurrentOrders.forEach((order) => {
+        const internalOrder = internalOrderMap.get(Number(order.id));
+        if (!internalOrder) return;
+        if (checked) {
+          next.add(internalOrder.id);
+        } else {
+          next.delete(internalOrder.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const handleBulkStageChange = async () => {
+    if (!bulkTargetStage || selectedInternalOrderIds.size === 0) {
+      toast({
+        title: 'Bulk update unavailable',
+        description: 'Select orders and choose a status first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await bulkUpdateStageMutation.mutateAsync({
+        orderIds: Array.from(selectedInternalOrderIds),
+        stage: bulkTargetStage,
+      });
+      setSelectedInternalOrderIds(new Set());
+      setBulkTargetStage('');
+    } catch (error) {
+      console.error('Bulk stage change failed:', error);
+    }
+  };
+
+  const bulkStageOptions: OrderStage[] = activeTab === 'hold'
+    ? ['pending', 'printing', 'packing', 'tracking']
+    : ['hold', 'pending', 'printing', 'packing', 'tracking'];
+
+  const handleEditStatus = async (shopifyOrder: any) => {
+    const existingOrder = getInternalOrder(shopifyOrder.id);
+    if (existingOrder) {
+      handleStageChange(shopifyOrder.id);
+      return;
+    }
+
+    setSyncingEditOrderIds((prev) => new Set(prev).add(shopifyOrder.id));
+    try {
+      await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'pending');
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.refetchQueries({ queryKey: ['orders'] });
+      handleStageChange(shopifyOrder.id);
+    } catch (error) {
+      console.error('Failed to sync order before editing status:', error);
+      toast({
+        title: 'Unable to open status editor',
+        description: 'Failed to sync this order into the system.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingEditOrderIds((prev) => {
+        const next = new Set(prev);
+        next.delete(shopifyOrder.id);
+        return next;
+      });
+    }
   };
 
   // Memoized pagination function
@@ -330,7 +477,7 @@ const Orders = () => {
     <div className="flex-1 flex flex-col overflow-hidden">
       <Header title="Orders Management" />
       
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 px-6 pt-6 pb-2">
         <div className="max-w-7xl mx-auto">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -385,8 +532,22 @@ const Orders = () => {
             <CardHeader>
               <CardTitle>Order Filters</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-4">
               <div className="flex flex-col md:flex-row gap-4">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(value) => setActiveTab(value as 'processing' | 'hold')}
+                >
+                  <TabsList className="grid w-full grid-cols-2 md:w-[280px]">
+                    <TabsTrigger value="processing">
+                      Processing ({tabCounts.processing})
+                    </TabsTrigger>
+                    <TabsTrigger value="hold">
+                      Hold ({tabCounts.hold})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
                 <div className="flex-1">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -424,6 +585,34 @@ const Orders = () => {
                   Refresh
                 </Button>
               </div>
+
+              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="text-sm text-gray-600">
+                  {selectedInternalOrderIds.size === 0
+                    ? 'No orders selected'
+                    : `${selectedInternalOrderIds.size} orders selected`}
+                </div>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <Select value={bulkTargetStage} onValueChange={(value) => setBulkTargetStage(value as OrderStage)}>
+                    <SelectTrigger className="w-full md:w-48">
+                      <SelectValue placeholder="Bulk change status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bulkStageOptions.map((stage) => (
+                        <SelectItem key={stage} value={stage}>
+                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handleBulkStageChange}
+                    disabled={selectedInternalOrderIds.size === 0 || !bulkTargetStage || bulkUpdateStageMutation.isPending}
+                  >
+                    {bulkUpdateStageMutation.isPending ? 'Updating...' : 'Update Selected'}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -432,7 +621,7 @@ const Orders = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>
-                  Shopify Orders ({totalOrders} total, showing {startIndex + 1}-{Math.min(endIndex, totalOrders)})
+                  {activeTab === 'hold' ? 'Hold Orders' : 'Processing Orders'} ({totalOrders} total, showing {totalOrders === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, totalOrders)})
                 </CardTitle>
                 <Button onClick={handleSyncFromShopify}>
                   Sync from Shopify
@@ -449,7 +638,11 @@ const Orders = () => {
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
                   <p className="text-gray-500">
-                    {searchTerm || dateFilter || statusFilter !== 'all' ? 'No orders match your search criteria.' : 'No Shopify orders available.'}
+                    {searchTerm || dateFilter || statusFilter !== 'all'
+                      ? 'No orders match your search criteria.'
+                      : activeTab === 'hold'
+                      ? 'No held orders available.'
+                      : 'No processing orders available.'}
                   </p>
                 </div>
               ) : (
@@ -458,6 +651,13 @@ const Orders = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b">
+                          <th className="py-3 px-4">
+                            <Checkbox
+                              checked={allCurrentPageSelected}
+                              onCheckedChange={(checked) => handleSelectAllCurrentPage(checked === true)}
+                              aria-label="Select all orders on page"
+                            />
+                          </th>
                           <th className="text-left py-3 px-4 font-medium">Order Number</th>
                           <th className="text-left py-3 px-4 font-medium">Customer</th>
                           <th className="text-left py-3 px-4 font-medium">Total</th>
@@ -468,8 +668,20 @@ const Orders = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {currentOrders.map((order) => (
+                        {currentOrders.map((order) => {
+                          const internalOrder = getInternalOrder(order.id);
+                          const isSelected = internalOrder ? selectedInternalOrderIds.has(internalOrder.id) : false;
+                          const isSyncingEdit = syncingEditOrderIds.has(order.id);
+                          return (
                           <tr key={order.id} className="border-b hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <Checkbox
+                                checked={isSelected}
+                                disabled={!internalOrder}
+                                onCheckedChange={(checked) => handleSelectOrder(order.id, checked === true)}
+                                aria-label={`Select ${order.order_number || 'order'}`}
+                              />
+                            </td>
                             <td className="py-3 px-4 font-mono text-sm font-medium">{order.order_number || 'N/A'}</td>
                             <td className="py-3 px-4">
                               <div className="font-medium">{order.customer_name || 'N/A'}</div>
@@ -500,44 +712,47 @@ const Orders = () => {
                                   <Eye className="h-4 w-4 mr-1" />
                                   View
                                 </Button>
-                                {(() => {
-                                  const internalOrder = getInternalOrder(order.id);
-                                  return internalOrder ? (
-                                    <Dialog 
-                                       open={openStageDialog === order.id} 
-                                       onOpenChange={(open) => setOpenStageDialog(open ? order.id : null)}
-                                    >
-                                      <DialogTrigger asChild>
-                                        <Button variant="ghost" size="sm">
-                                          <Settings className="h-4 w-4" />
-                                        </Button>
-                                      </DialogTrigger>
-                                      <DialogContent className="sm:max-w-md">
-                                        <DialogHeader>
-                                          <DialogTitle>Change Order Stage</DialogTitle>
-                                        </DialogHeader>
-                                        <StageChangeControls 
-                                          order={internalOrder} 
-                                          currentStage={internalOrder.stage || 'pending'}
-                                          onStageChange={() => {
-                                            setOpenStageDialog(null);
-                                          }}
-                                        />
-                                      </DialogContent>
-                                    </Dialog>
-                                  ) : null;
-                                })()}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleEditStatus(order)}
+                                  disabled={isSyncingEdit}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                {internalOrder && (
+                                  <Dialog 
+                                     open={openStageDialog === order.id} 
+                                     onOpenChange={(open) => setOpenStageDialog(open ? order.id : null)}
+                                  >
+                                    <DialogTrigger asChild>
+                                      <span className="hidden" />
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                      <DialogHeader>
+                                        <DialogTitle>Change Order Stage</DialogTitle>
+                                      </DialogHeader>
+                                      <StageChangeControls 
+                                        order={internalOrder} 
+                                        currentStage={internalOrder.stage || 'pending'}
+                                        onStageChange={() => {
+                                          setOpenStageDialog(null);
+                                        }}
+                                      />
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
                               </div>
                             </td>
                           </tr>
-                        ))}
+                        )})}
                       </tbody>
                     </table>
                   </div>
 
                   {/* Pagination Controls */}
                   {totalPages > 1 && (
-                    <div className="mt-6 flex justify-between items-center">
+                    <div className="mt-4 flex justify-between items-center">
                       <div className="text-sm text-gray-500">
                         Showing {startIndex + 1} to {Math.min(endIndex, totalOrders)} of {totalOrders} orders
                       </div>

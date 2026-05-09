@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import LoginForm from './components/auth/LoginForm';
@@ -20,6 +20,24 @@ import NotFound from './pages/NotFound';
 import Shipping from './pages/Shipping';
 
 const queryClient = new QueryClient();
+
+const normalizeRole = (role: unknown) => role === 'admin' ? 'admin' : 'staff';
+
+const ProtectedRoute = ({
+  allowedRoles,
+  userRole,
+  children,
+}: {
+  allowedRoles: string[];
+  userRole: string;
+  children: React.ReactNode;
+}) => {
+  if (!allowedRoles.includes(userRole)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -54,6 +72,12 @@ const App = () => {
     await supabase.auth.signOut();
   };
 
+  const appUser = user ? {
+    email: user.email || '',
+    role: normalizeRole(user.user_metadata?.role),
+    name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+  } : null;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -85,25 +109,42 @@ const App = () => {
         <BrowserRouter>
           <div className="flex h-screen bg-gray-100">
             <Sidebar 
-              user={{
-                email: user.email || '',
-                role: 'admin',
-                name: user.user_metadata?.name || user.email?.split('@')[0] || 'User'
-              }} 
+              user={appUser!} 
               onLogout={handleLogout} 
             />
             
             <div className="flex-1 flex flex-col overflow-hidden">
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Dashboard userRole={appUser!.role} />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/printing" element={<Printing />} />
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/tracking" element={<Tracking />} />
                 <Route path="/shipping" element={<Shipping />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route
+                  path="/analytics"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']} userRole={appUser!.role}>
+                      <Analytics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/users"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']} userRole={appUser!.role}>
+                      <Users />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']} userRole={appUser!.role}>
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>

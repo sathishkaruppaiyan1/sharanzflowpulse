@@ -96,6 +96,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             emailRedirectTo: `${window.location.origin}/`,
             data: {
               name,
+              role: 'staff',
             }
           }
         });

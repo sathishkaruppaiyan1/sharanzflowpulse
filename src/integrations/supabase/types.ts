@@ -491,6 +491,7 @@ export type Database = {
     Enums: {
       order_stage:
         | "pending"
+        | "hold"
         | "printing"
         | "packing"
         | "tracking"
@@ -626,6 +627,7 @@ export const Constants = {
     Enums: {
       order_stage: [
         "pending",
+        "hold",
         "printing",
         "packing",
         "tracking",
