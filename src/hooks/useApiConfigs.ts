@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export interface InteraktTemplate {
+  name: string;
+  body: string;
+}
+
 export interface ApiConfigs {
   shopify: {
     enabled: boolean;
@@ -15,6 +20,7 @@ export interface ApiConfigs {
     enabled: boolean;
     api_key: string;
     base_url: string;
+    templates: InteraktTemplate[];
   };
   parcel_panel: {
     enabled: boolean;
@@ -35,7 +41,8 @@ const defaultConfigs: ApiConfigs = {
   interakt: {
     enabled: false,
     api_key: '',
-    base_url: 'https://api.interakt.ai'
+    base_url: 'https://api.interakt.ai',
+    templates: []
   },
   parcel_panel: {
     enabled: false,
@@ -73,11 +80,22 @@ export const useApiConfigs = () => {
         let parcelPanelBaseUrl = configData.parcel_panel?.base_url || '';
         console.log('Parcel Panel base URL from database:', parcelPanelBaseUrl);
         
+        const rawTemplates = (configData.interakt as any)?.templates;
+        const normalizedTemplates: InteraktTemplate[] = Array.isArray(rawTemplates)
+          ? rawTemplates.map((t: any) =>
+              typeof t === 'string' ? { name: t, body: '' } : { name: t?.name ?? '', body: t?.body ?? '' }
+            ).filter(t => t.name)
+          : [];
+
         const mergedConfigs: ApiConfigs = {
           shopify: { ...defaultConfigs.shopify, ...configData.shopify },
-          interakt: { ...defaultConfigs.interakt, ...configData.interakt },
-          parcel_panel: { 
-            ...defaultConfigs.parcel_panel, 
+          interakt: {
+            ...defaultConfigs.interakt,
+            ...configData.interakt,
+            templates: normalizedTemplates,
+          },
+          parcel_panel: {
+            ...defaultConfigs.parcel_panel,
             ...configData.parcel_panel,
             // Use the corrected base URL
             base_url: parcelPanelBaseUrl

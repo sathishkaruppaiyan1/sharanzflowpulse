@@ -28,6 +28,8 @@ const Printing = () => {
     orders: shopifyOrders = [],
     loading: isLoadingShopify,
     refetch: refetchShopify,
+    error: shopifyError,
+    isConfigured: isShopifyConfigured,
   } = useShopifyOrders();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,9 +44,44 @@ const Printing = () => {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
+  // ─── Strict unfulfilled gate ──────────────────────────────────────────
+  // `shopifyOrders` is already filtered to fulfillment_status=unfulfilled by
+  // the edge function. Build a Set of their IDs so we can keep ONLY DB
+  // printing rows whose Shopify counterpart is still unfulfilled.
+  const unfulfilledShopifyIds = React.useMemo(() => {
+    const s = new Set<number>();
+    shopifyOrders.forEach((o: any) => {
+      const n = Number(o.id);
+      if (Number.isFinite(n)) s.add(n);
+    });
+    return s;
+  }, [shopifyOrders]);
+
+  // The strict filter only activates when Shopify is the source of truth:
+  // Shopify must be configured, healthy, and we must have received at least
+  // one fetched batch. If any of these are false we fall back to DB-only
+  // display to avoid wiping the screen on a Shopify outage / misconfig.
+  const shopifyStrictMode =
+    isShopifyConfigured && !shopifyError && !isLoadingShopify && shopifyOrders.length >= 0
+    // If Shopify is configured & healthy but query hasn't returned yet, hold off.
+    && (shopifyOrders.length > 0 || (!isLoadingShopify && !shopifyError));
+
   // ─── Format DB printing orders for display ────────────────────────────
   const formattedPrintingOrders = React.useMemo(() => {
-    return printingOrders.map(order => ({
+    const strictlyUnfulfilled = printingOrders.filter(order => {
+      // Manual orders without a Shopify ID can't be cross-checked — they
+      // exist purely in our DB and reaching stage='printing' implies they
+      // are unfulfilled in our pipeline.
+      if (!order.shopify_order_id) return true;
+
+      // Shopify down / disabled / still loading first batch → trust DB stage.
+      if (!shopifyStrictMode) return true;
+
+      const id = Number(order.shopify_order_id);
+      return Number.isFinite(id) && unfulfilledShopifyIds.has(id);
+    });
+
+    return strictlyUnfulfilled.map(order => ({
       id: order.shopify_order_id?.toString() || order.id,
       order_number: order.order_number,
       name: order.order_number,
@@ -91,7 +128,7 @@ const Printing = () => {
       const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
       return bn - an;
     });
-  }, [printingOrders]);
+  }, [printingOrders, unfulfilledShopifyIds, shopifyStrictMode]);
 
   // ─── Background sync: pull new Shopify unfulfilled → DB printing stage ─
   const syncNewOrders = useCallback(async (showToast = true) => {
@@ -183,13 +220,41 @@ const Printing = () => {
         }
       }
 
+      // 6.5. Demote stale rows: any DB order currently at stage='printing'
+      // whose Shopify counterpart is NOT in the unfulfilled set is now
+      // fulfilled / cancelled / on-hold elsewhere and must leave printing.
+      const unfulfilledShopifyIdsForSync = new Set(
+        unfulfilled.map((o: any) => Number(o.id)).filter(Number.isFinite)
+      );
+      const staleIds: string[] = [];
+      existingOrders.forEach((o: any) => {
+        if (o.stage !== 'printing') return;
+        const sid = Number(o.shopify_order_id);
+        if (!Number.isFinite(sid)) return; // manual order — leave alone
+        if (!unfulfilledShopifyIdsForSync.has(sid)) staleIds.push(o.id);
+      });
+
+      let demotedCount = 0;
+      if (staleIds.length > 0) {
+        console.log(`Demoting ${staleIds.length} stale 'printing' rows that are no longer unfulfilled in Shopify`);
+        const { error: demoteError } = await supabase
+          .from('orders')
+          .update({ stage: 'hold', updated_at: new Date().toISOString() })
+          .in('id', staleIds);
+        if (demoteError) {
+          console.error('Failed to demote stale printing rows:', demoteError);
+        } else {
+          demotedCount = staleIds.length;
+        }
+      }
+
       // 7. Refresh DB printing orders (the single source of truth)
-      if (syncedCount > 0 || promotedCount > 0) {
+      if (syncedCount > 0 || promotedCount > 0 || demotedCount > 0) {
         await refetchPrintingOrders();
         if (showToast) {
           toast({
             title: 'Sync Successful',
-            description: `${syncedCount} new orders added, ${promotedCount} promoted to printing.`,
+            description: `${syncedCount} new, ${promotedCount} promoted, ${demotedCount} cleaned up.`,
           });
         }
       } else if (showToast) {

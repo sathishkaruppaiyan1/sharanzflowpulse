@@ -88,7 +88,7 @@ serve(async (req) => {
     let accessToken: string
 
     if (shopifyConfig.access_token?.startsWith('shpat_') ||
-        (shopifyConfig.access_token && !shopifyConfig.client_id)) {
+      (shopifyConfig.access_token && !shopifyConfig.client_id)) {
       // Legacy: use provided access token directly
       accessToken = shopifyConfig.access_token
       console.log('Using provided access token')

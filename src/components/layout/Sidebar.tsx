@@ -15,28 +15,39 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useWorkflowSettings } from '@/hooks/useWorkflowSettings';
+import { useStageCounts, StageCounts } from '@/hooks/useStageCounts';
 
 interface SidebarProps {
   user: { email: string; role: string; name: string };
   onLogout: () => void;
 }
 
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  hiddenWhenBypass?: boolean;
+  adminOnly?: boolean;
+  countKey?: keyof StageCounts;
+};
+
 const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const location = useLocation();
   const { settings } = useWorkflowSettings();
   const [bypassPacking, setBypassPacking] = useState(false);
+  const { data: stageCounts } = useStageCounts();
 
   useEffect(() => {
     setBypassPacking(settings.bypassPacking);
   }, [settings.bypassPacking]);
 
-  const allNavigationItems = [
+  const allNavigationItems: NavItem[] = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Orders', href: '/orders', icon: Package },
-    { name: 'Printing', href: '/printing', icon: Printer },
-    { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true },
-    { name: 'Tracking', href: '/tracking', icon: Truck },
-    { name: 'Shipping', href: '/shipping', icon: Ship },
+    { name: 'Printing', href: '/printing', icon: Printer, countKey: 'printing' },
+    { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true, countKey: 'packing' },
+    { name: 'Tracking', href: '/tracking', icon: Truck, countKey: 'tracking' },
+    { name: 'Shipping', href: '/shipping', icon: Ship, countKey: 'shipped' },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, adminOnly: true },
   ];
 
@@ -90,19 +101,37 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
       <nav className="flex-1 px-4 py-4 space-y-1">
         {navigationItems.map((item) => {
           const Icon = item.icon;
+          const active = isActive(item.href);
+          const count = item.countKey ? stageCounts?.[item.countKey] : undefined;
           return (
             <Link
               key={item.name}
               to={item.href}
               className={cn(
-                'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                isActive(item.href)
+                'flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                active
                   ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               )}
             >
-              <Icon className="mr-3 h-5 w-5" />
-              {item.name}
+              <span className="flex items-center min-w-0">
+                <Icon className="mr-3 h-5 w-5 shrink-0" />
+                <span className="truncate">{item.name}</span>
+              </span>
+              {count !== undefined && (
+                <span
+                  className={cn(
+                    'ml-2 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-xs font-semibold tabular-nums',
+                    active
+                      ? 'bg-blue-600 text-white'
+                      : count > 0
+                        ? 'bg-gray-200 text-gray-700'
+                        : 'bg-gray-100 text-gray-400'
+                  )}
+                >
+                  {count}
+                </span>
+              )}
             </Link>
           );
         })}

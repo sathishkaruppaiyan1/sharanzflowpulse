@@ -4,15 +4,72 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ApiConfigs, useApiConfigs } from '@/hooks/useApiConfigs';
-import { Package } from 'lucide-react';
+import { ApiConfigs, InteraktTemplate, useApiConfigs } from '@/hooks/useApiConfigs';
+import { Package, Plus, Trash2, MessageSquare, Copy } from 'lucide-react';
 import ParcelPanelSync from './ParcelPanelSync';
+
+const EXAMPLE_TEMPLATE_NAME = 'order_tracking_information';
+const EXAMPLE_TEMPLATE_BODY = `Hello {{4}}!
+Your order with us is on its way! Here are the tracking details:
+Order ID: {{1}}
+Tracking ID: {{2}}
+Courier: {{3}}
+Thank you for shopping with us!`;
 
 const ApiConfiguration = () => {
   const { apiConfigs, setApiConfigs, saveConfigs, loading, saving } = useApiConfigs();
   const { toast } = useToast();
   const [tempConfigs, setTempConfigs] = useState<ApiConfigs>(apiConfigs);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateBody, setNewTemplateBody] = useState('');
+
+  const handleAddTemplate = () => {
+    const name = newTemplateName.trim();
+    const body = newTemplateBody.trim();
+    if (!name) {
+      toast({
+        title: "Template name required",
+        description: "Please enter a template name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const existing = tempConfigs.interakt.templates || [];
+    if (existing.some(t => t.name === name)) {
+      toast({
+        title: "Duplicate template",
+        description: `"${name}" already exists.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setTempConfigs(prev => ({
+      ...prev,
+      interakt: {
+        ...prev.interakt,
+        templates: [...(prev.interakt.templates || []), { name, body }]
+      }
+    }));
+    setNewTemplateName('');
+    setNewTemplateBody('');
+  };
+
+  const handleRemoveTemplate = (name: string) => {
+    setTempConfigs(prev => ({
+      ...prev,
+      interakt: {
+        ...prev.interakt,
+        templates: (prev.interakt.templates || []).filter(t => t.name !== name)
+      }
+    }));
+  };
+
+  const handleUseExample = () => {
+    setNewTemplateName(EXAMPLE_TEMPLATE_NAME);
+    setNewTemplateBody(EXAMPLE_TEMPLATE_BODY);
+  };
 
   useEffect(() => {
     setTempConfigs(apiConfigs);
@@ -285,6 +342,102 @@ const ApiConfiguration = () => {
                     }))
                   }
                 />
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="flex items-center mb-2">
+                  <MessageSquare className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <Label className="text-base font-medium">WhatsApp Templates</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Add the templates you have approved in Interakt. Use <code className="bg-muted px-1 rounded">{'{{1}}'}</code>, <code className="bg-muted px-1 rounded">{'{{2}}'}</code>, ... as placeholders for dynamic values (order ID, tracking ID, etc.).
+                </p>
+
+                {/* Example block */}
+                <div className="rounded-md border bg-blue-50 border-blue-200 p-3 mb-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-900">Example template</p>
+                      <p className="text-xs text-blue-800 font-mono">{EXAMPLE_TEMPLATE_NAME}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 h-7 text-xs"
+                      onClick={handleUseExample}
+                    >
+                      <Copy className="mr-1 h-3 w-3" />
+                      Use this example
+                    </Button>
+                  </div>
+                  <pre className="text-xs whitespace-pre-wrap text-blue-900 bg-white/60 rounded p-2 border border-blue-100">{EXAMPLE_TEMPLATE_BODY}</pre>
+                  <p className="text-[11px] text-blue-800 mt-2">
+                    Placeholders → <code>{'{{1}}'}</code> Order ID · <code>{'{{2}}'}</code> Tracking ID · <code>{'{{3}}'}</code> Courier · <code>{'{{4}}'}</code> Customer name
+                  </p>
+                </div>
+
+                <div className="space-y-2 mb-3">
+                  <div>
+                    <Label htmlFor="new-template-name" className="text-sm">Template Name</Label>
+                    <Input
+                      id="new-template-name"
+                      placeholder="e.g. order_tracking_information"
+                      value={newTemplateName}
+                      onChange={(e) => setNewTemplateName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-template-body" className="text-sm">Template Body</Label>
+                    <Textarea
+                      id="new-template-body"
+                      rows={5}
+                      placeholder={EXAMPLE_TEMPLATE_BODY}
+                      value={newTemplateBody}
+                      onChange={(e) => setNewTemplateBody(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Must match exactly what was approved in Interakt.
+                    </p>
+                  </div>
+                  <Button type="button" onClick={handleAddTemplate} className="w-full">
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add Template
+                  </Button>
+                </div>
+
+                {(tempConfigs.interakt.templates || []).length === 0 ? (
+                  <div className="text-sm text-muted-foreground bg-muted/30 rounded-md p-4 text-center">
+                    No templates added yet.
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {(tempConfigs.interakt.templates || []).map((tpl: InteraktTemplate) => (
+                      <li
+                        key={tpl.name}
+                        className="bg-muted/30 rounded-md px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-mono font-medium">{tpl.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveTemplate(tpl.name)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                        {tpl.body && (
+                          <pre className="text-xs whitespace-pre-wrap text-muted-foreground mt-1 bg-white/60 rounded p-2 border">{tpl.body}</pre>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Don't forget to click "Save Changes" below to persist your templates.
+                </p>
               </div>
             </div>
           </CardContent>

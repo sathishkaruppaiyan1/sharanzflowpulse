@@ -156,9 +156,18 @@ export const generateTrackingBarcode = (orderNumber: string) => {
   return clean.length > 30 ? clean.substring(0, 30) : clean;
 };
 
-// Generate Code 128 barcode SVG
-export const generateCode128Barcode = (text: string, barWidth = 2, barHeight = 50) => {
-  // text is already cleaned — use as-is (no double processing)
+// Generate Code 128 barcode SVG — scanner-friendly:
+//  • SVG sized in millimetres (real physical units) so printers don't rasterize
+//    bars inconsistently
+//  • Quiet zones of at least 10× X-dimension on each side (Code 128 standard)
+//  • shape-rendering="crispEdges" so bars stay sharp at any DPI
+//  • X-dimension chosen adaptively to keep the barcode ≤90mm wide while
+//    staying ≥0.25mm (ISO scanner-readable minimum)
+//
+// The legacy (barWidth, barHeight) args are accepted for backward
+// compatibility but ignored — proper dimensions are computed from text length.
+export const generateCode128Barcode = (text: string, _legacyBarWidth = 2, _legacyBarHeight = 50) => {
+  void _legacyBarWidth; void _legacyBarHeight;
   const cleanText = text.replace(/[^\x20-\x7E]/g, '').substring(0, 30);
   console.log('Generating Code 128 barcode for:', cleanText);
 
@@ -166,58 +175,64 @@ export const generateCode128Barcode = (text: string, barWidth = 2, barHeight = 5
     // Calculate checksum
     let checksum = 104; // Start B value
     for (let i = 0; i < cleanText.length; i++) {
-      const charCode = cleanText.charCodeAt(i) - 32; // ASCII to Code 128 value
+      const charCode = cleanText.charCodeAt(i) - 32;
       checksum += charCode * (i + 1);
     }
     checksum = checksum % 103;
 
-    // Build the pattern array
-    const patterns = [];
-
-    // Start B
+    // Build patterns
+    const patterns: number[] = [];
     patterns.push(...CODE128_PATTERNS.START_B);
-
-    // Data characters
     for (let i = 0; i < cleanText.length; i++) {
       const charCode = cleanText.charCodeAt(i) - 32;
       if (charCode >= 0 && charCode < CODE128_PATTERNS.CHARS.length) {
         patterns.push(...CODE128_PATTERNS.CHARS[charCode]);
       }
     }
-
-    // Checksum
     if (checksum < CODE128_PATTERNS.CHARS.length) {
       patterns.push(...CODE128_PATTERNS.CHARS[checksum]);
     }
-
-    // Stop
     patterns.push(...CODE128_PATTERNS.STOP);
 
-    // Generate SVG bars
-    let x = 0;
+    // Total module-units across the symbol (sum of all pattern values).
+    const totalModules = patterns.reduce((s, n) => s + n, 0);
+
+    // Pick X-dimension so symbol+quiet zones fit on a 4-inch thermal label
+    // (printable area ~ 90mm after safe margins), but never narrower than
+    // 0.25mm — below that, consumer scanners struggle.
+    const maxSymbolWidthMm = 88; // leaves room for borders & padding
+    const idealXmm = 0.5;
+    const quietZoneModules = 10; // both sides → 20 modules of blank space
+    const totalUnitsWithQuiet = totalModules + 2 * quietZoneModules;
+    let xMm = Math.min(idealXmm, maxSymbolWidthMm / totalUnitsWithQuiet);
+    if (xMm < 0.25) xMm = 0.25; // floor — accept slight overflow for very long codes
+
+    const heightMm = 18;
+    const textGapMm = 4;
+    const quietMm = quietZoneModules * xMm;
+
+    // Layout bars in mm
+    let cursorMm = quietMm;
     let bars = '';
-
     for (let i = 0; i < patterns.length; i++) {
-      const width = patterns[i] * barWidth;
+      const widthMm = patterns[i] * xMm;
       const isBlack = i % 2 === 0;
-
       if (isBlack) {
-        bars += `<rect x="${x}" y="0" width="${width}" height="${barHeight}" fill="black"/>`;
+        bars += `<rect x="${cursorMm.toFixed(3)}" y="0" width="${widthMm.toFixed(3)}" height="${heightMm}" fill="#000"/>`;
       }
-      x += width;
+      cursorMm += widthMm;
     }
+    const totalWidthMm = cursorMm + quietMm;
+    const totalHeightMm = heightMm + textGapMm;
 
-    const totalWidth = x;
-
-    return `<svg width="${totalWidth}" height="${barHeight + 20}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${totalWidth}" height="${barHeight + 20}" fill="white"/>
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidthMm.toFixed(2)}mm" height="${totalHeightMm.toFixed(2)}mm" viewBox="0 0 ${totalWidthMm.toFixed(2)} ${totalHeightMm.toFixed(2)}" shape-rendering="crispEdges">
+      <rect width="${totalWidthMm.toFixed(2)}" height="${totalHeightMm.toFixed(2)}" fill="#fff"/>
       ${bars}
-      <text x="${totalWidth / 2}" y="${barHeight + 15}" text-anchor="middle" font-family="Arial" font-size="12" fill="black">${cleanText}</text>
+      <text x="${(totalWidthMm / 2).toFixed(2)}" y="${(heightMm + textGapMm - 0.7).toFixed(2)}" text-anchor="middle" font-family="monospace" font-size="3.2" font-weight="bold" fill="#000">${cleanText}</text>
     </svg>`;
 
   } catch (error) {
     console.error('Error generating Code 128 barcode:', error);
-    // Fallback to simple barcode
     return generateBarcodeHTML(cleanText);
   }
 };

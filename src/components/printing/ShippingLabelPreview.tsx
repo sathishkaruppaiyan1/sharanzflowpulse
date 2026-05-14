@@ -154,14 +154,19 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
       };
     })();
 
+    // Safe-area horizontal padding. Most thermal printers have a ~2–3mm
+    // unprintable strip on the left edge — anything within that margin gets
+    // sheared. We push all content 5mm inward to guarantee nothing clips.
+    const sidePad = '5mm';
+
     return `
       <div style="width:4in;height:6in;border:2px solid #000;background:#fff;font-family:Arial,sans-serif;font-size:11px;font-weight:bold;color:#000;margin:0;box-sizing:border-box;display:flex;flex-direction:column;${pageBreak}">
-        <div style="padding:10px;text-align:center;background:#fff;">
-          <div style="background:#fff;border:1px solid #000;padding:8px;margin-bottom:5px;">${barcodeSVG}</div>
-          <div style="font-weight:bold;font-size:14px;margin-top:5px;">${trackingNumber}</div>
+        <div style="padding:10px ${sidePad};text-align:center;background:#fff;">
+          <div style="background:#fff;border:1px solid #000;padding:6px;margin-bottom:5px;display:flex;align-items:center;justify-content:center;">${barcodeSVG}</div>
+          <div style="font-weight:bold;font-size:14px;margin-top:5px;letter-spacing:1px;">${trackingNumber}</div>
         </div>
         <div style="border-bottom:2px solid #000;margin:0;"></div>
-        <div style="padding:8px;">
+        <div style="padding:8px ${sidePad};">
           <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">🔴 TO:</div>
           <div style="padding:8px 0;background:#fff;">
             <div style="font-weight:bold;font-size:16px;margin-bottom:3px;">${addr.name.toUpperCase()}</div>
@@ -173,8 +178,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
         </div>
         <div style="border-bottom:1px solid #000;margin:0;"></div>
-        <div style="padding:8px;display:flex;">
-          <div style="flex:1;margin-right:5px;padding-left:4px;">
+        <div style="padding:8px ${sidePad};display:flex;">
+          <div style="flex:1;margin-right:5px;">
             <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">FROM:</div>
             <div style="padding:6px 4px;background:#fff;font-size:10px;height:60px;">
               <div style="font-weight:bold;">${fromAddress.store_name || 'Store Name'}</div>
@@ -184,7 +189,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             </div>
           </div>
           <div style="width:1px;background:#000;margin:0 5px;"></div>
-          <div style="flex:1;margin-left:5px;padding-right:6px;">
+          <div style="flex:1;margin-left:5px;">
             <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">COURIER DETAILS:</div>
             <div style="padding:6px 4px;background:#fff;font-size:10px;height:60px;">
               <div style="margin-bottom:2px;">Order: <strong>${orderNumber}</strong>${pageLabel}</div>
@@ -195,7 +200,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
         </div>
         <div style="border-bottom:1px solid #000;margin:0;"></div>
-        <div style="flex:1;padding:8px;display:flex;flex-direction:column;">
+        <div style="flex:1;padding:8px ${sidePad};display:flex;flex-direction:column;">
           <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">PRODUCTS:</div>
           <div style="padding:6px 0;flex:1;overflow:hidden;font-size:${productFontSize};line-height:${lineHeight};background:#fff;">
             ${lineItems.length > 0 ? lineItems.map((item: any) =>
@@ -203,7 +208,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
             ).join('') : '<div>• Order Items</div>'}
           </div>
         </div>
-        <div style="text-align:center;border-top:2px solid #000;padding:6px;font-weight:bold;font-size:10px;background:#fff;">
+        <div style="text-align:center;border-top:2px solid #000;padding:6px ${sidePad};font-weight:bold;font-size:10px;background:#fff;">
           PARCEL OPENING VIDEO is MUST For raising complaints
         </div>
       </div>
@@ -688,10 +693,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
               {/* Barcode Footer */}
               <div className="text-center border-t border-gray-100 pt-3">
-                <div style={{ transform: 'scaleX(0.75) scaleY(0.7)', transformOrigin: 'center' }}>
+                <div className="inline-block">
                   {renderBarcode(trackingNumber)}
                 </div>
-                <div className="font-bold text-xs mt-0.5">{trackingNumber}</div>
+                <div className="font-bold text-xs mt-0.5 tracking-widest">{trackingNumber}</div>
               </div>
             </div>
           )}
