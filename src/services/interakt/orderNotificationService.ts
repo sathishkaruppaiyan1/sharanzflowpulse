@@ -68,15 +68,24 @@ export const sendOrderShippedNotification = async (
       return false;
     }
 
+    const trackingTemplateName = (interaktConfig.tracking_template_name || '').trim();
+    if (!trackingTemplateName) {
+      console.error('❌ No tracking notification template configured. Set it in Settings → API Configuration → Interakt → Tracking Notification Template.');
+      return false;
+    }
+
+    const languageCode = (interaktConfig.language_code || 'en').trim();
+
     console.log('✅ Interakt BSP configuration validation passed');
     console.log('🔗 Base URL:', interaktConfig.base_url);
     console.log('🔑 API Key length:', interaktConfig.api_key.length);
+    console.log('📝 Configured tracking template:', trackingTemplateName, 'language:', languageCode);
 
     // trackingUrl and courierName are passed in directly from caller
     const trackingLink = trackingUrl || '';
 
     // Get customer name
-    const customerName = order.customer?.first_name && order.customer?.last_name 
+    const customerName = order.customer?.first_name && order.customer?.last_name
       ? `${order.customer.first_name} ${order.customer.last_name}`
       : order.customer?.first_name || order.customer?.last_name || 'Customer';
 
@@ -85,17 +94,15 @@ export const sendOrderShippedNotification = async (
       courierName,
       trackingLink,
       orderNumber: order.order_number,
-      templateName: 'order_tracking_information'
+      templateName: trackingTemplateName,
+      languageCode
     });
 
-    // Template: "Hello {{4}} !
-    // Your order with us is on its way! Here are the tracking details:
-    // Order ID: {{1}}
-    // Tracking ID: {{2}}
-    // COURIER: {{3}}
-    // Thank you for shopping with us! ..."
+    // Placeholders sent to Interakt (positional):
+    // {{1}} Order ID, {{2}} Tracking ID, {{3}} Courier, {{4}} Customer name
     const template: InteraktMessageTemplate = {
-      templateName: 'order_tracking_information',
+      templateName: trackingTemplateName,
+      languageCode,
       parameters: [
         {
           name: '1', // {{1}} - Order ID

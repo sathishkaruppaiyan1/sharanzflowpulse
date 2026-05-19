@@ -15,7 +15,10 @@
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__get_logs",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 50)",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/update-shopify-fulfillment\" -Method OPTIONS -Headers @{ \"Origin\" = \"https://flowpulse-five.vercel.app\"; \"Access-Control-Request-Method\" = \"POST\"; \"Access-Control-Request-Headers\" = \"content-type,authorization,apikey\" } -UseBasicParsing -ErrorAction Stop; Write-Output \"STATUS: $\\($r.StatusCode\\)\"; Write-Output \"HEADERS:\"; $r.Headers | Format-Table -AutoSize | Out-String | Write-Output } catch { Write-Output \"ERROR STATUS: $\\($_.Exception.Response.StatusCode.value__\\)\"; Write-Output \"ERROR MESSAGE: $\\($_.Exception.Message\\)\"; if \\($_.Exception.Response\\) { $stream = $_.Exception.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); Write-Output \"BODY: $\\($reader.ReadToEnd\\(\\)\\)\" } })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/fetch-shopify-orders\" -Method OPTIONS -Headers @{ \"Origin\" = \"https://flowpulse-five.vercel.app\"; \"Access-Control-Request-Method\" = \"POST\"; \"Access-Control-Request-Headers\" = \"content-type,authorization,apikey\" } -UseBasicParsing -ErrorAction Stop; Write-Output \"STATUS: $\\($r.StatusCode\\)\" } catch { Write-Output \"ERROR STATUS: $\\($_.Exception.Response.StatusCode.value__\\)\"; if \\($_.Exception.Response\\) { $stream = $_.Exception.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); Write-Output \"BODY: $\\($reader.ReadToEnd\\(\\)\\)\" } })",
+      "mcp__claude_ai_Supabase__list_edge_functions"
     ],
     "deny": [],
     "ask": []

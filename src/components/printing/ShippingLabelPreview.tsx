@@ -384,19 +384,35 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         resolve();
       };
 
-      const triggerPrint = () => {
-        // Listen for afterprint — fires when user prints or cancels the dialog
+      // One-shot guard: never call print() twice for the same window. A second
+      // invocation cancels the in-progress spooler job, which is what was
+      // causing 100-label batches to print only 25 / 8 / 10 pages.
+      let printed = false;
+      const triggerPrintOnce = () => {
+        if (printed || printWindow.closed) return;
+        printed = true;
         printWindow.addEventListener('afterprint', closeAndResolve);
         printWindow.focus();
         printWindow.print();
       };
 
-      printWindow.onload = () => setTimeout(triggerPrint, 400);
+      // Scale the settle delay with the payload size so the browser has time
+      // to render all the inline SVG barcodes before the dialog opens.
+      // Roughly 80ms per label, clamped to [800ms, 8000ms].
+      const settleMs = Math.max(800, Math.min(8000, labelsHTML.length / 200));
 
-      // Fallback if onload doesn't fire
-      setTimeout(() => {
-        if (!printWindow.closed) triggerPrint();
-      }, 2000);
+      const fire = () => setTimeout(triggerPrintOnce, settleMs);
+
+      if (printWindow.document.readyState === 'complete') {
+        // document.write often loads synchronously, in which case the onload
+        // event has already fired by the time we attach a listener.
+        fire();
+      } else {
+        printWindow.onload = fire;
+        // Single safety-net timeout in case onload never fires. Guard prevents
+        // double-invocation if onload also runs.
+        setTimeout(triggerPrintOnce, settleMs + 3000);
+      }
     });
   };
 

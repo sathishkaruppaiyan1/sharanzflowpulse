@@ -21,6 +21,8 @@ export interface ApiConfigs {
     api_key: string;
     base_url: string;
     templates: InteraktTemplate[];
+    tracking_template_name: string;
+    language_code: string;
   };
   parcel_panel: {
     enabled: boolean;
@@ -42,7 +44,9 @@ const defaultConfigs: ApiConfigs = {
     enabled: false,
     api_key: '',
     base_url: 'https://api.interakt.ai',
-    templates: []
+    templates: [],
+    tracking_template_name: '',
+    language_code: 'en'
   },
   parcel_panel: {
     enabled: false,

@@ -3,3 +3,6 @@ project_id = "jmqpqgxqhfctyfjtlbbm"
 
 [functions.parcel-panel-webhook]
 verify_jwt = false
+
+[functions.update-shopify-fulfillment]
+verify_jwt = false

@@ -3,6 +3,7 @@ import { formatPhoneForInterakt } from './phoneUtils';
 
 export interface InteraktMessageTemplate {
   templateName: string;
+  languageCode?: string;
   parameters: Array<{
     name: string;
     value: string;
@@ -63,6 +64,8 @@ export const sendWhatsAppMessage = async (
       baseUrl: baseUrl
     });
 
+    const languageCode = (template.languageCode || 'en').trim() || 'en';
+
     // Interakt BSP API request body format - simplified version
     const requestBody = {
       fullPhoneNumber: formattedPhone,
@@ -70,7 +73,7 @@ export const sendWhatsAppMessage = async (
       type: "Template",
       template: {
         name: template.templateName,
-        languageCode: "en",
+        languageCode,
         headerValues: [],
         bodyValues: template.parameters.map(param => param.value), // Map parameter values in correct order
         buttonValues: {}

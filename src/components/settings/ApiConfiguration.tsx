@@ -146,7 +146,8 @@ const ApiConfiguration = () => {
 
     setSendingTest(true);
     try {
-      const ok = await sendWhatsAppMessage(phone, { templateName: tplName, parameters }, apiKey, baseUrl);
+      const languageCode = (tempConfigs.interakt.language_code || 'en').trim() || 'en';
+      const ok = await sendWhatsAppMessage(phone, { templateName: tplName, languageCode, parameters }, apiKey, baseUrl);
       if (ok) {
         toast({
           title: 'Test sent',
@@ -510,6 +511,58 @@ const ApiConfiguration = () => {
                     ))}
                   </ul>
                 )}
+              </div>
+
+              {/* Designate which saved template is used for shipped/tracking notifications */}
+              <div className="pt-4 border-t">
+                <div className="flex items-center mb-2">
+                  <MessageSquare className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <Label className="text-base font-medium">Tracking Notification Template</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Pick which of your saved templates is sent automatically when an order's tracking is updated. The template body must use placeholders <code className="bg-muted px-1 rounded">{'{{1}}'}</code> Order ID, <code className="bg-muted px-1 rounded">{'{{2}}'}</code> Tracking ID, <code className="bg-muted px-1 rounded">{'{{3}}'}</code> Courier, <code className="bg-muted px-1 rounded">{'{{4}}'}</code> Customer name.
+                </p>
+
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="tracking-template" className="text-sm">Template</Label>
+                    {(tempConfigs.interakt.templates || []).length > 0 ? (
+                      <select
+                        id="tracking-template"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        value={tempConfigs.interakt.tracking_template_name || ''}
+                        onChange={(e) => setTempConfigs(prev => ({
+                          ...prev,
+                          interakt: { ...prev.interakt, tracking_template_name: e.target.value }
+                        }))}
+                      >
+                        <option value="">— Pick a saved template —</option>
+                        {(tempConfigs.interakt.templates || []).map(t => (
+                          <option key={t.name} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic mt-1">
+                        Add a template above before selecting one here.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="tracking-template-lang" className="text-sm">Language code</Label>
+                    <Input
+                      id="tracking-template-lang"
+                      placeholder="en, en_US, en_GB, hi…"
+                      value={tempConfigs.interakt.language_code || ''}
+                      onChange={(e) => setTempConfigs(prev => ({
+                        ...prev,
+                        interakt: { ...prev.interakt, language_code: e.target.value }
+                      }))}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Must match the template's language in Interakt.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Test send */}

@@ -11,6 +11,39 @@ const corsHeaders = {
 // Use a recent stable Admin API version with GraphQL fulfillment support
 const SHOPIFY_API_VERSION = '2025-01'
 
+// ── Get access token via OAuth client_credentials grant ──────────────────────
+async function getAccessTokenFromClientCredentials(
+  shopName: string,
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  const url = `https://${shopName}.myshopify.com/admin/oauth/access_token`
+
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+  })
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Shopify OAuth token error (${response.status}): ${text}`)
+  }
+
+  const data = await response.json()
+  if (!data.access_token) {
+    throw new Error('Shopify OAuth response did not include access_token')
+  }
+
+  return data.access_token
+}
+
 Deno.serve(async (req: Request) => {
   console.log('=== EDGE FUNCTION STARTED ===')
 
@@ -66,9 +99,14 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    if (!shopifyConfig?.shop_url || !shopifyConfig?.access_token) {
+    const hasAccessToken = Boolean(shopifyConfig?.access_token)
+    const hasClientCreds = Boolean(shopifyConfig?.client_id && shopifyConfig?.client_secret)
+
+    if (!shopifyConfig?.shop_url || (!hasAccessToken && !hasClientCreds)) {
       return new Response(
-        JSON.stringify({ error: 'Shopify API not properly configured - missing shop_url or access_token' }),
+        JSON.stringify({
+          error: 'Shopify API not properly configured — need shop_url plus either access_token or client_id+client_secret',
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -77,10 +115,31 @@ Deno.serve(async (req: Request) => {
     if (!shopDomain.includes('.')) {
       shopDomain = `${shopDomain}.myshopify.com`
     }
+    // bare shop name (no .myshopify.com) needed for the OAuth endpoint
+    const shopName = shopDomain.replace('.myshopify.com', '')
+
+    // Resolve access token: prefer a stored access_token, otherwise exchange client creds.
+    let accessToken: string
+    if (hasAccessToken) {
+      accessToken = shopifyConfig.access_token
+    } else {
+      try {
+        accessToken = await getAccessTokenFromClientCredentials(
+          shopName,
+          shopifyConfig.client_id,
+          shopifyConfig.client_secret
+        )
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to obtain Shopify access token', details: (e as Error).message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
 
     const graphqlEndpoint = `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`
     const shopifyHeaders = {
-      'X-Shopify-Access-Token': shopifyConfig.access_token,
+      'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     }
