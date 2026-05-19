@@ -170,14 +170,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const existingFulfillments: any[] = order.fulfillments || []
-    console.log('Existing fulfillments:', existingFulfillments.length)
+    console.log('Existing fulfillments:', existingFulfillments.map((f) => ({ id: f.id, status: f.status })))
 
-    // ── Path A: order already has a fulfillment → update its tracking ─────
-    if (existingFulfillments.length > 0) {
-      const activeFulfillment =
-        existingFulfillments.find((f) => f.status === 'SUCCESS') || existingFulfillments[0]
+    // Only fulfillments in SUCCESS status are "live" — CANCELLED / FAILURE / ERROR
+    // / PENDING ones must NOT be updated. Doing so silently succeeds in Shopify
+    // but never actually fulfills the order. Fall through to Path B to create a
+    // fresh fulfillment when no SUCCESS record exists.
+    const activeFulfillment = existingFulfillments.find((f) => f.status === 'SUCCESS')
+
+    // ── Path A: order already has a SUCCESS fulfillment → update its tracking ─
+    if (activeFulfillment) {
       const fulfillmentId = activeFulfillment.id
-      console.log('Updating tracking on existing fulfillment:', fulfillmentId)
+      console.log('Updating tracking on existing SUCCESS fulfillment:', fulfillmentId)
 
       const updateMutation = `
         mutation fulfillmentTrackingInfoUpdate(

@@ -220,41 +220,13 @@ const Printing = () => {
         }
       }
 
-      // 6.5. Demote stale rows: any DB order currently at stage='printing'
-      // whose Shopify counterpart is NOT in the unfulfilled set is now
-      // fulfilled / cancelled / on-hold elsewhere and must leave printing.
-      const unfulfilledShopifyIdsForSync = new Set(
-        unfulfilled.map((o: any) => Number(o.id)).filter(Number.isFinite)
-      );
-      const staleIds: string[] = [];
-      existingOrders.forEach((o: any) => {
-        if (o.stage !== 'printing') return;
-        const sid = Number(o.shopify_order_id);
-        if (!Number.isFinite(sid)) return; // manual order — leave alone
-        if (!unfulfilledShopifyIdsForSync.has(sid)) staleIds.push(o.id);
-      });
-
-      let demotedCount = 0;
-      if (staleIds.length > 0) {
-        console.log(`Demoting ${staleIds.length} stale 'printing' rows that are no longer unfulfilled in Shopify`);
-        const { error: demoteError } = await supabase
-          .from('orders')
-          .update({ stage: 'hold', updated_at: new Date().toISOString() })
-          .in('id', staleIds);
-        if (demoteError) {
-          console.error('Failed to demote stale printing rows:', demoteError);
-        } else {
-          demotedCount = staleIds.length;
-        }
-      }
-
       // 7. Refresh DB printing orders (the single source of truth)
-      if (syncedCount > 0 || promotedCount > 0 || demotedCount > 0) {
+      if (syncedCount > 0 || promotedCount > 0) {
         await refetchPrintingOrders();
         if (showToast) {
           toast({
             title: 'Sync Successful',
-            description: `${syncedCount} new, ${promotedCount} promoted, ${demotedCount} cleaned up.`,
+            description: `${syncedCount} new, ${promotedCount} promoted.`,
           });
         }
       } else if (showToast) {
