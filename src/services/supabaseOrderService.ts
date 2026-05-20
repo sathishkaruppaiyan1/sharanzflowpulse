@@ -113,6 +113,25 @@ export const supabaseOrderService = {
     return data as Order;
   },
 
+  async syncShopifyOrderStage(shopifyOrderId: string | number, targetStage: 'hold' | 'pending' | 'printing' | 'inprogress'): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('sync-shopify-order-stage', {
+      body: {
+        shopify_order_id: String(shopifyOrderId),
+        target_stage: targetStage,
+      },
+    });
+
+    if (error) {
+      console.error('Error invoking sync-shopify-order-stage:', error);
+      throw new Error(error.message || 'Failed to sync Shopify order stage');
+    }
+
+    if (data?.error) {
+      console.error('Shopify order stage sync failed:', data);
+      throw new Error(data.details || data.error);
+    }
+  },
+
   // UPDATED METHOD - carrier is now a free-text display name from courier_partners
   async updateTracking(
     orderId: string,

@@ -11,11 +11,11 @@ import { Package, Plus, Trash2, MessageSquare, Send, Loader2 } from 'lucide-reac
 import ParcelPanelSync from './ParcelPanelSync';
 import { sendWhatsAppMessage } from '@/services/interakt/interaktApiClient';
 
-const EXAMPLE_TEMPLATE_BODY = `Hello {{4}}!
+const EXAMPLE_TEMPLATE_BODY = `Hello {{1}}!
 Your order with us is on its way! Here are the tracking details:
-Order ID: {{1}}
-Tracking ID: {{2}}
-Courier: {{3}}
+Order ID: {{2}}
+Tracking ID: {{3}}
+Courier: {{4}}
 Thank you for shopping with us!`;
 
 // Extract distinct {{N}} placeholders from a template body, sorted ascending.
@@ -520,7 +520,7 @@ const ApiConfiguration = () => {
                   <Label className="text-base font-medium">Tracking Notification Template</Label>
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Pick which of your saved templates is sent automatically when an order's tracking is updated. The template body must use placeholders <code className="bg-muted px-1 rounded">{'{{1}}'}</code> Order ID, <code className="bg-muted px-1 rounded">{'{{2}}'}</code> Tracking ID, <code className="bg-muted px-1 rounded">{'{{3}}'}</code> Courier, <code className="bg-muted px-1 rounded">{'{{4}}'}</code> Customer name.
+                  Pick which of your saved templates is sent automatically when an order's tracking is updated. The template body must use placeholders <code className="bg-muted px-1 rounded">{'{{1}}'}</code> Customer name, <code className="bg-muted px-1 rounded">{'{{2}}'}</code> Order ID, <code className="bg-muted px-1 rounded">{'{{3}}'}</code> Tracking ID, <code className="bg-muted px-1 rounded">{'{{4}}'}</code> Courier name.
                 </p>
 
                 <div className="grid gap-2 md:grid-cols-2">

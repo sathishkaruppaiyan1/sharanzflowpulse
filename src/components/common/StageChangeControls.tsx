@@ -7,6 +7,7 @@ import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabaseOrderService } from '@/services/supabaseOrderService';
 
 interface StageChangeControlsProps {
   order: Order;
@@ -56,6 +57,13 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
     if (newStage === currentStage || !order.id) return;
 
     try {
+      if (
+        order.shopify_order_id &&
+        (newStage === 'hold' || newStage === 'pending' || newStage === 'printing')
+      ) {
+        await supabaseOrderService.syncShopifyOrderStage(order.shopify_order_id, newStage);
+      }
+
       if (newStage === 'packing') {
         await supabase.from('order_items').update({ packed: false }).eq('order_id', order.id);
 

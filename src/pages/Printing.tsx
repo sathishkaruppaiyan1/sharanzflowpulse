@@ -81,49 +81,66 @@ const Printing = () => {
       return Number.isFinite(id) && unfulfilledShopifyIds.has(id);
     });
 
-    return strictlyUnfulfilled.map(order => ({
-      id: order.shopify_order_id?.toString() || order.id,
-      order_number: order.order_number,
-      name: order.order_number,
-      created_at: order.created_at,
-      fulfillment_status: 'unfulfilled',
-      current_total_price: order.total_amount?.toString() || '0',
-      currency: order.currency || 'INR',
-      customer_name: order.customer
-        ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()
-        : '',
-      total_amount: order.total_amount?.toString() || '0',
-      financial_status: 'paid',
-      total_weight: 0,
-      customer: order.customer ? {
-        first_name: order.customer.first_name,
-        last_name: order.customer.last_name,
-        phone: order.customer.phone,
-        email: order.customer.email,
-        id: order.customer.id,
-      } : null,
-      shipping_address: order.shipping_address ? {
-        address1: order.shipping_address.address_line_1,
-        address2: order.shipping_address.address_line_2,
-        city: order.shipping_address.city,
-        province: order.shipping_address.state,
-        zip: order.shipping_address.postal_code,
-        country: order.shipping_address.country,
-        phone: order.customer?.phone,
-      } : null,
-      line_items: order.order_items?.map(item => ({
-        title: item.title,
-        name: item.title,
-        variant_title: item.variant_title,
-        quantity: item.quantity,
-        price: item.price,
-        product_id: item.product_id,
-        variant_id: item.shopify_variant_id,
-        sku: item.sku,
-      })) || [],
-      _isSupabaseOrder: true,
-      _originalSupabaseOrder: order,
-    })).sort((a, b) => {
+    return strictlyUnfulfilled.map(order => {
+      // Build line items with per-item grams from the joined product row.
+      const items = (order.order_items || []).map((item: any) => {
+        const grams = Number(item.product?.weight) || 0;
+        return {
+          title: item.title,
+          name: item.title,
+          variant_title: item.variant_title,
+          quantity: item.quantity,
+          price: item.price,
+          product_id: item.product_id,
+          variant_id: item.shopify_variant_id,
+          sku: item.sku,
+          grams,
+        };
+      });
+
+      // Total weight is the sum of (per-item grams × quantity) — falls back to
+      // whatever the order itself stored (e.g. populated by a Shopify sync).
+      const computedWeight = items.reduce(
+        (sum: number, it: any) => sum + (Number(it.grams) || 0) * (Number(it.quantity) || 1),
+        0
+      );
+      const totalWeight = computedWeight > 0 ? computedWeight : (Number(order.total_weight) || 0);
+
+      return {
+        id: order.shopify_order_id?.toString() || order.id,
+        order_number: order.order_number,
+        name: order.order_number,
+        created_at: order.created_at,
+        fulfillment_status: 'unfulfilled',
+        current_total_price: order.total_amount?.toString() || '0',
+        currency: order.currency || 'INR',
+        customer_name: order.customer
+          ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim()
+          : '',
+        total_amount: order.total_amount?.toString() || '0',
+        financial_status: 'paid',
+        total_weight: totalWeight,
+        customer: order.customer ? {
+          first_name: order.customer.first_name,
+          last_name: order.customer.last_name,
+          phone: order.customer.phone,
+          email: order.customer.email,
+          id: order.customer.id,
+        } : null,
+        shipping_address: order.shipping_address ? {
+          address1: order.shipping_address.address_line_1,
+          address2: order.shipping_address.address_line_2,
+          city: order.shipping_address.city,
+          province: order.shipping_address.state,
+          zip: order.shipping_address.postal_code,
+          country: order.shipping_address.country,
+          phone: order.customer?.phone,
+        } : null,
+        line_items: items,
+        _isSupabaseOrder: true,
+        _originalSupabaseOrder: order,
+      };
+    }).sort((a, b) => {
       const an = parseInt(String(a.order_number || a.name || '').replace(/\D/g, ''), 10) || 0;
       const bn = parseInt(String(b.order_number || b.name || '').replace(/\D/g, ''), 10) || 0;
       return bn - an;

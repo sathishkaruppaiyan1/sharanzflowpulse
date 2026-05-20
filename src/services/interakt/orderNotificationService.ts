@@ -99,26 +99,26 @@ export const sendOrderShippedNotification = async (
     });
 
     // Placeholders sent to Interakt (positional):
-    // {{1}} Order ID, {{2}} Tracking ID, {{3}} Courier, {{4}} Customer name
+    // {{1}} Customer name (greeting), {{2}} Order ID, {{3}} Tracking ID, {{4}} Courier name
     const template: InteraktMessageTemplate = {
       templateName: trackingTemplateName,
       languageCode,
       parameters: [
         {
-          name: '1', // {{1}} - Order ID
+          name: '1', // {{1}} - Customer name (greeting)
+          value: customerName
+        },
+        {
+          name: '2', // {{2}} - Order ID
           value: order.order_number
         },
         {
-          name: '2', // {{2}} - Tracking ID
+          name: '3', // {{3}} - Tracking ID
           value: trackingNumber
         },
         {
-          name: '3', // {{3}} - Courier name
+          name: '4', // {{4}} - Courier name
           value: courierName
-        },
-        {
-          name: '4', // {{4}} - Customer name (greeting)
-          value: customerName
         }
       ]
     };

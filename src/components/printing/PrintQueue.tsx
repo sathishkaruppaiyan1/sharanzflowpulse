@@ -177,7 +177,17 @@ const PrintQueue = ({
                 <div className="col-span-2">
                   <h4 className="text-xs font-medium text-muted-foreground mb-1">Details:</h4>
                   <div className="space-y-0.5 text-xs">
-                    <div className="text-foreground">{order.total_weight ? `${order.total_weight}g` : '750g'}</div>
+                    <div className="text-foreground">
+                      {(() => {
+                        const fromItems = (order.line_items || []).reduce(
+                          (s: number, it: any) => s + (Number(it.grams) || 0) * (Number(it.quantity) || 1),
+                          0
+                        );
+                        const g = fromItems > 0 ? fromItems : (Number(order.total_weight) || 0);
+                        if (!g) return 'N/A';
+                        return g >= 1000 ? `${(g / 1000).toFixed(g % 1000 === 0 ? 0 : 2)} kg` : `${g}g`;
+                      })()}
+                    </div>
                     <div className="font-medium text-foreground">₹{order.total_amount || order.current_total_price}</div>
                     <div className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
                   </div>

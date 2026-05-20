@@ -85,6 +85,26 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
+  // Compute total weight in grams from the line items (per-item grams × qty).
+  // Falls back to whatever's already stored on the order if items don't carry
+  // weight info. Returns 0 when nothing is known.
+  const computeTotalGrams = (orderData: any): number => {
+    const items = orderData?.line_items || [];
+    const fromItems = items.reduce(
+      (sum: number, it: any) => sum + (Number(it.grams) || 0) * (Number(it.quantity) || 1),
+      0
+    );
+    if (fromItems > 0) return fromItems;
+    return Number(orderData?.total_weight) || 0;
+  };
+
+  // Format grams for display: "1.2 kg" if >= 1000g, else "750g".
+  const formatGrams = (grams: number, fallback = 'N/A'): string => {
+    if (!grams || grams <= 0) return fallback;
+    if (grams >= 1000) return `${(grams / 1000).toFixed(grams % 1000 === 0 ? 0 : 2)} kg`;
+    return `${grams}g`;
+  };
+
   const renderBarcode = (text: string) => {
     const trackingNumber = generateTrackingBarcode(text);
     const barcodeSVG = generateCode128Barcode(trackingNumber);
@@ -129,7 +149,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
     const lineItems = orderData.line_items || [];
     const totalItems = lineItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
-    const totalWeight = orderData.total_weight ? `${orderData.total_weight}g` : '750g';
+    const totalWeight = formatGrams(computeTotalGrams(orderData), 'N/A');
     const productFontSize = getProductFontSize(lineItems.length);
     const lineHeight = getLineHeight(productFontSize);
     const pageBreak = !isLast ? 'page-break-after: always;' : '';
@@ -228,7 +248,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
     const lineItems = orderData.line_items || [];
     const totalItems = lineItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
-    const totalWeight = orderData.total_weight ? `${orderData.total_weight / 1000}kg` : '0.5kg';
+    const totalWeight = formatGrams(computeTotalGrams(orderData), 'N/A');
     const pageBreak = !isLast ? 'page-break-after: always;' : '';
     const pageLabel = orderData._totalPages && orderData._totalPages > 1
       ? ` (Page ${orderData._pageIndex}/${orderData._totalPages})`
@@ -251,7 +271,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     })();
 
     const productRows = lineItems.map((item: any, idx: number) => {
-      const weight = item.grams ? `${(item.grams / 1000).toFixed(1)} kg` : `${totalWeight}`;
+      const itemGrams = (Number(item.grams) || 0) * (Number(item.quantity) || 1);
+      const weight = itemGrams > 0 ? formatGrams(itemGrams) : totalWeight;
       return `
         <tr>
           <td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:center;color:#555;font-size:11px;">${idx + 1}</td>
@@ -501,7 +522,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   const trackingNumber = generateTrackingBarcode(orderNumber);
   const lineItems = displayOrder.line_items || [];
   const totalItems = lineItems.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
-  const totalWeight = displayOrder.total_weight ? `${displayOrder.total_weight}g` : '750g';
+  const totalWeight = formatGrams(computeTotalGrams(displayOrder), 'N/A');
   const previewFontSize = getProductFontSize(lineItems.length);
   const orderDate = displayOrder.created_at
     ? new Date(displayOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -698,7 +719,10 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                       </td>
                       <td className="py-2 px-2 text-center">{item.quantity || 1}</td>
                       <td className="py-2 px-2 text-right">
-                        {item.grams ? `${(item.grams / 1000).toFixed(1)} kg` : '0.5 kg'}
+                        {(() => {
+                          const g = (Number(item.grams) || 0) * (Number(item.quantity) || 1);
+                          return g > 0 ? formatGrams(g) : totalWeight;
+                        })()}
                       </td>
                     </tr>
                   )) : (

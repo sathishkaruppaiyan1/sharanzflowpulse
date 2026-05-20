@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import OrderDetailsBasic from '@/components/orders/OrderDetailsBasic';
+import OrderStatusChangeControls from '@/components/orders/OrderStatusChangeControls';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
@@ -20,8 +21,8 @@ import {
 } from '@/components/ui/pagination';
 import { Search, RefreshCw, Eye, Package, Clock, Pencil } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
+import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { useToast } from '@/hooks/use-toast';
-import StageChangeControls from '@/components/common/StageChangeControls';
 import { useBulkUpdateOrderStage, useOrders } from '@/hooks/useOrders';
 import { OrderStage } from '@/types/database';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
@@ -50,11 +51,12 @@ const Orders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'processing' | 'hold'>('processing');
+  const [activeTab, setActiveTab] = useState<'processing' | 'inprogress' | 'hold'>('processing');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [openStageDialog, setOpenStageDialog] = useState<string | number | null>(null);
+  const [openStageDialog, setOpenStageDialog] = useState(false);
+  const [statusDialogOrderId, setStatusDialogOrderId] = useState<string | number | null>(null);
   const [selectedInternalOrderIds, setSelectedInternalOrderIds] = useState<Set<string>>(new Set());
   const [bulkTargetStage, setBulkTargetStage] = useState<OrderStage | ''>('');
   const [syncingEditOrderIds, setSyncingEditOrderIds] = useState<Set<string | number>>(new Set());
@@ -68,21 +70,52 @@ const Orders = () => {
   // Use both Shopify orders and our internal orders
   const { 
     orders: rawShopifyOrders = [], 
-    loading: isLoading, 
-    error, 
+    loading: isLoadingShopifyOrders, 
+    error: shopifyOrdersError, 
     refetch 
   } = useShopifyOrders();
   
   const { data: internalOrders = [] } = useOrders();
+  const {
+    heldIds: shopifyHeldIds,
+    heldOrders: rawHeldShopifyOrders = [],
+    inProgressIds: shopifyInProgressIds,
+    inProgressOrders: rawInProgressShopifyOrders = [],
+    isLoading: isLoadingHeldOrders,
+    error: heldOrdersError,
+    refetch: refetchHeldOrders,
+  } = useShopifyHeldOrderIds();
+  const isLoading = isLoadingShopifyOrders || isLoadingHeldOrders;
+  const error = shopifyOrdersError || heldOrdersError;
 
   // Sort orders by newest first (created_at descending)
   const shopifyOrders = useMemo(() => {
-    return [...rawShopifyOrders].sort((a, b) => {
+    const mergedOrders = new Map<string, any>();
+
+    rawShopifyOrders.forEach((order) => {
+      mergedOrders.set(String(order.id), order);
+    });
+
+    rawHeldShopifyOrders.forEach((order) => {
+      mergedOrders.set(String(order.id), {
+        ...mergedOrders.get(String(order.id)),
+        ...order,
+      });
+    });
+
+    rawInProgressShopifyOrders.forEach((order) => {
+      mergedOrders.set(String(order.id), {
+        ...mergedOrders.get(String(order.id)),
+        ...order,
+      });
+    });
+
+    return Array.from(mergedOrders.values()).sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       return dateB - dateA; // Newest first
     });
-  }, [rawShopifyOrders]);
+  }, [rawHeldShopifyOrders, rawInProgressShopifyOrders, rawShopifyOrders]);
 
   const internalOrderMap = useMemo(() => {
     return new Map(
@@ -92,32 +125,65 @@ const Orders = () => {
     );
   }, [internalOrders]);
 
+  // An order is "held" if EITHER the DB stage is 'hold' OR Shopify reports a
+  // fulfillment hold against it. Used by both tab counts and filtering below.
+  const isOrderHeld = useCallback(
+    (orderId: string | number) => {
+      const internalOrder = internalOrderMap.get(Number(orderId));
+      if (internalOrder?.stage === 'hold') return true;
+      return shopifyHeldIds.has(String(orderId));
+    },
+    [internalOrderMap, shopifyHeldIds]
+  );
+
+  const isOrderInProgress = useCallback(
+    (orderId: string | number) => {
+      if (isOrderHeld(orderId)) return false;
+      return shopifyInProgressIds.has(String(orderId));
+    },
+    [isOrderHeld, shopifyInProgressIds]
+  );
+
+  const getOrderQueueStatus = useCallback(
+    (orderId: string | number): 'processing' | 'hold' | 'inprogress' => {
+      if (isOrderHeld(orderId)) return 'hold';
+      if (isOrderInProgress(orderId)) return 'inprogress';
+      return 'processing';
+    },
+    [isOrderHeld, isOrderInProgress]
+  );
+
   const tabCounts = useMemo(() => {
     let processing = 0;
+    let inprogress = 0;
     let hold = 0;
 
     shopifyOrders.forEach(order => {
-      const internalOrder = internalOrderMap.get(Number(order.id));
-      if (internalOrder?.stage === 'hold') {
+      if (isOrderHeld(order.id)) {
         hold += 1;
+      } else if (isOrderInProgress(order.id)) {
+        inprogress += 1;
       } else {
         processing += 1;
       }
     });
 
-    return { processing, hold };
-  }, [shopifyOrders, internalOrderMap]);
+    return { processing, inprogress, hold };
+  }, [shopifyOrders, isOrderHeld, isOrderInProgress]);
 
   // Memoized filter function for better performance
   const filteredOrders = useMemo(() => {
     return shopifyOrders.filter(order => {
-      const internalOrder = internalOrderMap.get(Number(order.id));
+      const held = isOrderHeld(order.id);
+      const inProgress = isOrderInProgress(order.id);
 
       if (activeTab === 'hold') {
-        if (internalOrder?.stage !== 'hold') {
-          return false;
-        }
-      } else if (internalOrder?.stage === 'hold') {
+        if (!held) return false;
+      } else if (activeTab === 'inprogress') {
+        if (!inProgress) return false;
+      } else if (held) {
+        return false;
+      } else if (inProgress) {
         return false;
       }
 
@@ -166,7 +232,7 @@ const Orders = () => {
         (order.id || '').toString().toLowerCase().includes(lowercaseSearch)
       );
     });
-  }, [shopifyOrders, internalOrderMap, activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
+  }, [shopifyOrders, isOrderHeld, isOrderInProgress, activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
   // Calculate pagination values - memoized
   const paginationData = useMemo(() => {
@@ -206,6 +272,15 @@ const Orders = () => {
     setBulkTargetStage('');
   }, [activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
+  useEffect(() => {
+    if (!heldOrdersError) return;
+    toast({
+      title: 'Hold orders unavailable',
+      description: heldOrdersError,
+      variant: 'destructive',
+    });
+  }, [heldOrdersError, toast]);
+
   // Memoized status badge function
   const getStatusBadge = useCallback((fulfillmentStatus: string, financialStatus: string) => {
     let color = 'bg-blue-100 text-blue-800';
@@ -217,6 +292,12 @@ const Orders = () => {
     if (fulfillment === 'fulfilled') {
       color = 'bg-green-100 text-green-800';
       label = 'Shipped';
+    } else if (fulfillment === 'in_progress') {
+      color = 'bg-amber-100 text-amber-800';
+      label = 'In Progress';
+    } else if (fulfillment === 'on_hold') {
+      color = 'bg-red-100 text-red-800';
+      label = 'Hold';
     } else if (fulfillment === 'partial') {
       color = 'bg-yellow-100 text-yellow-800';
       label = 'Processing';
@@ -234,7 +315,7 @@ const Orders = () => {
 
   const handleSyncFromShopify = async () => {
     try {
-      await refetch();
+      await Promise.all([refetch(), refetchHeldOrders()]);
       toast({
         title: "Orders Synced",
         description: "Successfully synced orders from Shopify",
@@ -254,7 +335,8 @@ const Orders = () => {
   };
 
   const handleStageChange = (orderId: string | number) => {
-    setOpenStageDialog(orderId);
+    setStatusDialogOrderId(orderId);
+    setOpenStageDialog(true);
   };
 
   const getInternalOrder = (shopifyOrderId: string | number) => {
@@ -330,6 +412,10 @@ const Orders = () => {
       await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'pending');
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
       await queryClient.refetchQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
+      await queryClient.refetchQueries({ queryKey: ['shopify-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
+      await queryClient.refetchQueries({ queryKey: ['shopify-held-order-ids'] });
       handleStageChange(shopifyOrder.id);
     } catch (error) {
       console.error('Failed to sync order before editing status:', error);
@@ -453,8 +539,8 @@ const Orders = () => {
 
   const { totalOrders, totalPages, startIndex, endIndex, currentOrders } = paginationData;
 
-  // Handle error state
-  if (error) {
+  // Handle error state for the main Shopify order feed only.
+  if (shopifyOrdersError) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title="Orders Management" />
@@ -536,11 +622,14 @@ const Orders = () => {
               <div className="flex flex-col md:flex-row gap-4">
                 <Tabs
                   value={activeTab}
-                  onValueChange={(value) => setActiveTab(value as 'processing' | 'hold')}
+                  onValueChange={(value) => setActiveTab(value as 'processing' | 'inprogress' | 'hold')}
                 >
-                  <TabsList className="grid w-full grid-cols-2 md:w-[280px]">
+                  <TabsList className="grid w-full grid-cols-3 md:w-[420px]">
                     <TabsTrigger value="processing">
                       Processing ({tabCounts.processing})
+                    </TabsTrigger>
+                    <TabsTrigger value="inprogress">
+                      In Progress ({tabCounts.inprogress})
                     </TabsTrigger>
                     <TabsTrigger value="hold">
                       Hold ({tabCounts.hold})
@@ -586,6 +675,12 @@ const Orders = () => {
                 </Button>
               </div>
 
+              {heldOrdersError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  Hold/In Progress orders could not be fetched from Shopify. These counts may be incomplete.
+                </div>
+              )}
+
               <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-gray-600">
                   {selectedInternalOrderIds.size === 0
@@ -621,7 +716,7 @@ const Orders = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>
-                  {activeTab === 'hold' ? 'Hold Orders' : 'Processing Orders'} ({totalOrders} total, showing {totalOrders === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, totalOrders)})
+                  {activeTab === 'hold' ? 'Hold Orders' : activeTab === 'inprogress' ? 'In Progress Orders' : 'Processing Orders'} ({totalOrders} total, showing {totalOrders === 0 ? 0 : startIndex + 1}-{Math.min(endIndex, totalOrders)})
                 </CardTitle>
                 <Button onClick={handleSyncFromShopify}>
                   Sync from Shopify
@@ -631,7 +726,7 @@ const Orders = () => {
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <LoadingSpinner text="Loading Shopify orders..." />
+                  <LoadingSpinner text={isLoadingHeldOrders ? "Loading Shopify and hold orders..." : "Loading Shopify orders..."} />
                 </div>
               ) : currentOrders.length === 0 ? (
                 <div className="text-center py-8">
@@ -640,6 +735,10 @@ const Orders = () => {
                   <p className="text-gray-500">
                     {searchTerm || dateFilter || statusFilter !== 'all'
                       ? 'No orders match your search criteria.'
+                      : (activeTab === 'hold' || activeTab === 'inprogress') && heldOrdersError
+                      ? `${activeTab === 'hold' ? 'Hold' : 'In Progress'} orders could not be loaded from Shopify.`
+                      : activeTab === 'inprogress'
+                      ? 'No in progress orders available.'
                       : activeTab === 'hold'
                       ? 'No held orders available.'
                       : 'No processing orders available.'}
@@ -720,28 +819,6 @@ const Orders = () => {
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                {internalOrder && (
-                                  <Dialog 
-                                     open={openStageDialog === order.id} 
-                                     onOpenChange={(open) => setOpenStageDialog(open ? order.id : null)}
-                                  >
-                                    <DialogTrigger asChild>
-                                      <span className="hidden" />
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-md">
-                                      <DialogHeader>
-                                        <DialogTitle>Change Order Stage</DialogTitle>
-                                      </DialogHeader>
-                                      <StageChangeControls 
-                                        order={internalOrder} 
-                                        currentStage={internalOrder.stage || 'pending'}
-                                        onStageChange={() => {
-                                          setOpenStageDialog(null);
-                                        }}
-                                      />
-                                    </DialogContent>
-                                  </Dialog>
-                                )}
                               </div>
                             </td>
                           </tr>
@@ -790,6 +867,31 @@ const Orders = () => {
         onClose={() => setShowOrderDetails(false)}
         order={selectedOrder}
       />
+
+      <Dialog
+        open={openStageDialog}
+        onOpenChange={(open) => {
+          setOpenStageDialog(open);
+          if (!open) setStatusDialogOrderId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Order Status</DialogTitle>
+          </DialogHeader>
+          {statusDialogOrderId && getInternalOrder(statusDialogOrderId) && (
+            <OrderStatusChangeControls
+              order={getInternalOrder(statusDialogOrderId)!}
+              shopifyOrderId={statusDialogOrderId}
+              currentStatus={getOrderQueueStatus(statusDialogOrderId)}
+              onStatusChange={() => {
+                setOpenStageDialog(false);
+                setStatusDialogOrderId(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

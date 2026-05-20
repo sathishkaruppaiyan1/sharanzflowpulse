@@ -6,3 +6,9 @@ verify_jwt = false
 
 [functions.update-shopify-fulfillment]
 verify_jwt = false
+
+[functions.shopify-held-orders]
+verify_jwt = false
+
+[functions.sync-shopify-order-stage]
+verify_jwt = false
