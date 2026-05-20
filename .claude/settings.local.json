@@ -23,7 +23,13 @@
       "WebFetch(domain:shopify.dev)",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/fetch-shopify-held-orders?debug=1\" -Method POST -Headers @{ \"Content-Type\" = \"application/json\" } -Body \"{}\" -UseBasicParsing -ErrorAction Stop; Write-Output \"STATUS: $\\($r.StatusCode\\)\"; Write-Output \"BODY: $\\($r.Content\\)\" } catch { Write-Output \"ERROR STATUS: $\\($_.Exception.Response.StatusCode.value__\\)\"; if \\($_.Exception.Response\\) { $stream = $_.Exception.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); Write-Output \"BODY: $\\($reader.ReadToEnd\\(\\)\\)\" } })",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/update-shopify-fulfillment\" -Method OPTIONS -UseBasicParsing -ErrorAction Stop; Write-Output \"update-shopify-fulfillment STATUS: $\\($r.StatusCode\\)\" } catch { Write-Output \"ERROR: $\\($_.Exception.Response.StatusCode.value__\\)\" })",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/shopify-held-orders\" -Method OPTIONS -UseBasicParsing -ErrorAction Stop; Write-Output \"STATUS: $\\($r.StatusCode\\)\" } catch { Write-Output \"ERROR STATUS: $\\($_.Exception.Response.StatusCode.value__\\)\"; if \\($_.Exception.Response\\) { $stream = $_.Exception.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); Write-Output \"BODY: $\\($reader.ReadToEnd\\(\\)\\)\" } })"
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fmhwcnjvlagoilicsmuw.supabase.co/functions/v1/shopify-held-orders\" -Method OPTIONS -UseBasicParsing -ErrorAction Stop; Write-Output \"STATUS: $\\($r.StatusCode\\)\" } catch { Write-Output \"ERROR STATUS: $\\($_.Exception.Response.StatusCode.value__\\)\"; if \\($_.Exception.Response\\) { $stream = $_.Exception.Response.GetResponseStream\\(\\); $reader = New-Object System.IO.StreamReader\\($stream\\); Write-Output \"BODY: $\\($reader.ReadToEnd\\(\\)\\)\" } })",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__get_publishable_keys",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "Bash(curl *)",
+      "Bash(python *)",
+      "mcp__claude_ai_Supabase__execute_sql"
     ],
     "deny": [],
     "ask": []

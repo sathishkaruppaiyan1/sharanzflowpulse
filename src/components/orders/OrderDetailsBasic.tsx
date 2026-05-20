@@ -1,19 +1,65 @@
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Package, User, MapPin, CreditCard, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Package, User, MapPin, CreditCard, Calendar, Pencil } from 'lucide-react';
 
 interface OrderDetailsBasicProps {
   open: boolean;
   onClose: () => void;
   order: any;
+  canEditShippingAddress?: boolean;
+  onSaveShippingAddress?: (address: {
+    address1: string;
+    address2: string;
+    city: string;
+    province: string;
+    zip: string;
+    country: string;
+  }) => Promise<void>;
 }
 
-const OrderDetailsBasic = ({ open, onClose, order }: OrderDetailsBasicProps) => {
+const OrderDetailsBasic = ({
+  open,
+  onClose,
+  order,
+  canEditShippingAddress = false,
+  onSaveShippingAddress,
+}: OrderDetailsBasicProps) => {
   if (!order) return null;
+
+  const displayAddress = useMemo(() => {
+    const shippingAddress = order.shipping_address || {};
+    return {
+      name:
+        shippingAddress.name ||
+        order.customer_name ||
+        `${order.customer?.first_name || ''} ${order.customer?.last_name || ''}`.trim() ||
+        'Guest',
+      address1: shippingAddress.address1 || shippingAddress.address_line_1 || '',
+      address2: shippingAddress.address2 || shippingAddress.address_line_2 || '',
+      city: shippingAddress.city || '',
+      province: shippingAddress.province || shippingAddress.state || '',
+      zip: shippingAddress.zip || shippingAddress.postal_code || '',
+      country: shippingAddress.country || 'India',
+      phone: shippingAddress.phone || order.customer_phone || order.customer?.phone || '',
+    };
+  }, [order]);
+
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState(displayAddress);
+
+  useEffect(() => {
+    setAddressForm(displayAddress);
+    setIsEditingAddress(false);
+    setIsSavingAddress(false);
+  }, [displayAddress, open]);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -29,6 +75,31 @@ const OrderDetailsBasic = ({ open, onClose, order }: OrderDetailsBasicProps) => 
         return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleAddressInputChange =
+    (field: keyof typeof addressForm) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setAddressForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+  const handleSaveAddress = async () => {
+    if (!onSaveShippingAddress || isSavingAddress) return;
+
+    setIsSavingAddress(true);
+    try {
+      await onSaveShippingAddress({
+        address1: addressForm.address1,
+        address2: addressForm.address2,
+        city: addressForm.city,
+        province: addressForm.province,
+        zip: addressForm.zip,
+        country: addressForm.country,
+      });
+      setIsEditingAddress(false);
+    } finally {
+      setIsSavingAddress(false);
     }
   };
 
@@ -109,24 +180,122 @@ const OrderDetailsBasic = ({ open, onClose, order }: OrderDetailsBasicProps) => 
           {order.shipping_address && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>Shipping Address</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1">
-                  <p>{order.shipping_address.name}</p>
-                  <p>{order.shipping_address.address1}</p>
-                  {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
-                  <p>
-                    {order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.zip}
-                  </p>
-                  <p>{order.shipping_address.country}</p>
-                  {order.shipping_address.phone && (
-                    <p className="text-sm text-gray-600">Phone: {order.shipping_address.phone}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>Shipping Address</span>
+                  </CardTitle>
+                  {canEditShippingAddress && onSaveShippingAddress && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAddressForm(displayAddress);
+                        setIsEditingAddress((prev) => !prev);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      {isEditingAddress ? 'Cancel' : 'Edit'}
+                    </Button>
                   )}
                 </div>
+              </CardHeader>
+              <CardContent>
+                {isEditingAddress ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="shipping-address-1">Address Line 1</Label>
+                      <Input
+                        id="shipping-address-1"
+                        value={addressForm.address1}
+                        onChange={handleAddressInputChange('address1')}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="shipping-address-2">Address Line 2</Label>
+                      <Input
+                        id="shipping-address-2"
+                        value={addressForm.address2}
+                        onChange={handleAddressInputChange('address2')}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="shipping-city">City</Label>
+                        <Input
+                          id="shipping-city"
+                          value={addressForm.city}
+                          onChange={handleAddressInputChange('city')}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="shipping-state">State</Label>
+                        <Input
+                          id="shipping-state"
+                          value={addressForm.province}
+                          onChange={handleAddressInputChange('province')}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="shipping-zip">Postal Code</Label>
+                        <Input
+                          id="shipping-zip"
+                          value={addressForm.zip}
+                          onChange={handleAddressInputChange('zip')}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="shipping-country">Country</Label>
+                        <Input
+                          id="shipping-country"
+                          value={addressForm.country}
+                          onChange={handleAddressInputChange('country')}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setAddressForm(displayAddress);
+                          setIsEditingAddress(false);
+                        }}
+                        disabled={isSavingAddress}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => void handleSaveAddress()}
+                        disabled={
+                          isSavingAddress ||
+                          !addressForm.address1.trim() ||
+                          !addressForm.city.trim() ||
+                          !addressForm.country.trim()
+                        }
+                      >
+                        {isSavingAddress ? 'Saving...' : 'Save Address'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p>{displayAddress.name}</p>
+                    <p>{displayAddress.address1}</p>
+                    {displayAddress.address2 && <p>{displayAddress.address2}</p>}
+                    <p>
+                      {displayAddress.city}, {displayAddress.province} {displayAddress.zip}
+                    </p>
+                    <p>{displayAddress.country}</p>
+                    {displayAddress.phone && (
+                      <p className="text-sm text-gray-600">Phone: {displayAddress.phone}</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

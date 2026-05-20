@@ -182,16 +182,25 @@ const Printing = () => {
         order => !order.fulfillment_status || order.fulfillment_status === 'unfulfilled'
       );
 
-      // 4. Split into: brand-new orders vs pending orders to promote
+      // 4. Split into: brand-new orders, pending orders to promote, and
+      //    existing pre-print orders to refresh (so Shopify edits to address /
+      //    items propagate into the DB before they're displayed).
       const laterStages = new Set(['hold', 'printing', 'packing', 'tracking', 'shipped', 'delivered']);
+      const refreshableStages = new Set(['pending', 'printing', 'hold']);
       const newOrders = unfulfilled.filter(order => !existingShopifyIds.has(Number(order.id)));
       const pendingToPrintIds: string[] = [];
+      const ordersToRefresh: any[] = [];
 
       unfulfilled.forEach(order => {
         const rec = existingByShopifyId.get(Number(order.id));
+        if (!rec) return;
         // Only promote if currently pending/null — never touch orders already in printing or later
-        if (rec && !laterStages.has(rec.stage || '')) {
+        if (!laterStages.has(rec.stage || '')) {
           pendingToPrintIds.push(rec.id);
+        }
+        // Refresh pre-print orders so Shopify edits (address, items) flow through
+        if (refreshableStages.has(rec.stage || '')) {
+          ordersToRefresh.push(order);
         }
       });
 
@@ -220,6 +229,28 @@ const Printing = () => {
         }
       }
 
+      // 5b. Refresh existing pre-print orders so Shopify edits (address, items)
+      //     propagate. The RPC itself no-ops for orders past pre-print, but we
+      //     filter client-side too to avoid the round-trip.
+      let refreshedCount = 0;
+      if (ordersToRefresh.length > 0) {
+        const refreshBatch = 5;
+        for (let i = 0; i < ordersToRefresh.length; i += refreshBatch) {
+          const batch = ordersToRefresh.slice(i, i + refreshBatch);
+          await Promise.all(batch.map(async (shopifyOrder) => {
+            try {
+              await supabaseOrderService.refreshOrderFromShopify(shopifyOrder);
+              refreshedCount++;
+            } catch (err) {
+              console.error('Failed to refresh order:', shopifyOrder.id, err);
+            }
+          }));
+          if (i + refreshBatch < ordersToRefresh.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      }
+
       // 6. Promote pending → printing
       let promotedCount = 0;
       if (pendingToPrintIds.length > 0) {
@@ -238,12 +269,12 @@ const Printing = () => {
       }
 
       // 7. Refresh DB printing orders (the single source of truth)
-      if (syncedCount > 0 || promotedCount > 0) {
+      if (syncedCount > 0 || promotedCount > 0 || refreshedCount > 0) {
         await refetchPrintingOrders();
         if (showToast) {
           toast({
             title: 'Sync Successful',
-            description: `${syncedCount} new, ${promotedCount} promoted.`,
+            description: `${syncedCount} new, ${promotedCount} promoted, ${refreshedCount} refreshed.`,
           });
         }
       } else if (showToast) {

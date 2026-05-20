@@ -162,14 +162,31 @@ const SystemConfiguration = () => {
             <p className="text-sm text-muted-foreground">
               This will be pre-selected every time you open the print dialog.
             </p>
-            <Button
-              onClick={() => saveWorkflowSettings(workflowSettings)}
-              disabled={loadingWorkflowSettings || savingWorkflowSettings}
-              className="mt-2"
-            >
-              {savingWorkflowSettings ? 'Saving...' : 'Save Label Settings'}
-            </Button>
           </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base font-medium">Show Products On 4x6 Label</Label>
+              <p className="text-sm text-muted-foreground">
+                Enable product information on the thermal 4x6 shipping label.
+              </p>
+            </div>
+            <Switch
+              checked={workflowSettings.showProductsInThermalLabel}
+              onCheckedChange={(checked) =>
+                setWorkflowSettings((prev) => ({ ...prev, showProductsInThermalLabel: checked }))
+              }
+              disabled={loadingWorkflowSettings}
+            />
+          </div>
+
+          <Button
+            onClick={() => saveWorkflowSettings(workflowSettings)}
+            disabled={loadingWorkflowSettings || savingWorkflowSettings}
+            className="mt-2"
+          >
+            {savingWorkflowSettings ? 'Saving...' : 'Save Label Settings'}
+          </Button>
 
         </CardContent>
       </Card>

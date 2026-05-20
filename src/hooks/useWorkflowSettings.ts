@@ -9,11 +9,13 @@ const SETTINGS_KEY = 'workflow_settings';
 export interface WorkflowSettings {
   labelTemplate: string;
   bypassPacking: boolean;
+  showProductsInThermalLabel: boolean;
 }
 
 const defaultWorkflowSettings: WorkflowSettings = {
   labelTemplate: 'thermal-4x6',
   bypassPacking: false,
+  showProductsInThermalLabel: true,
 };
 
 const syncLocalStorage = (settings: WorkflowSettings) => {
@@ -43,6 +45,7 @@ export const useWorkflowSettings = () => {
         const localSettings = {
           labelTemplate: localStorage.getItem(LABEL_TEMPLATE_KEY) || defaultWorkflowSettings.labelTemplate,
           bypassPacking: localStorage.getItem(BYPASS_PACKING_KEY) === 'true',
+          showProductsInThermalLabel: defaultWorkflowSettings.showProductsInThermalLabel,
         };
         setSettings(localSettings);
         syncLocalStorage(localSettings);
@@ -51,6 +54,7 @@ export const useWorkflowSettings = () => {
       const localSettings = {
         labelTemplate: localStorage.getItem(LABEL_TEMPLATE_KEY) || defaultWorkflowSettings.labelTemplate,
         bypassPacking: localStorage.getItem(BYPASS_PACKING_KEY) === 'true',
+        showProductsInThermalLabel: defaultWorkflowSettings.showProductsInThermalLabel,
       };
       setSettings(localSettings);
       syncLocalStorage(localSettings);

@@ -10,11 +10,14 @@ import {
   BarChart3,
   Settings,
   Home,
-  LogOut
+  LogOut,
+  PauseCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useWorkflowSettings } from '@/hooks/useWorkflowSettings';
+import { useOrders } from '@/hooks/useOrders';
+import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { useStageCounts, StageCounts } from '@/hooks/useStageCounts';
 
 interface SidebarProps {
@@ -36,6 +39,8 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const { settings } = useWorkflowSettings();
   const [bypassPacking, setBypassPacking] = useState(false);
   const { data: stageCounts } = useStageCounts();
+  const { data: internalOrders = [] } = useOrders();
+  const { heldIds: shopifyHeldIds } = useShopifyHeldOrderIds();
 
   useEffect(() => {
     setBypassPacking(settings.bypassPacking);
@@ -44,6 +49,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const allNavigationItems: NavItem[] = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Orders', href: '/orders', icon: Package },
+    { name: 'Hold', href: '/hold', icon: PauseCircle, countKey: 'hold' },
     { name: 'Printing', href: '/printing', icon: Printer, countKey: 'printing' },
     { name: 'Packing', href: '/packing', icon: PackageCheck, hiddenWhenBypass: true, countKey: 'packing' },
     { name: 'Tracking', href: '/tracking', icon: Truck, countKey: 'tracking' },
@@ -54,6 +60,19 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const navigationItems = allNavigationItems.filter(
     item => !(item.hiddenWhenBypass && bypassPacking) && !(item.adminOnly && user.role !== 'admin')
   );
+
+  const sidebarCounts: StageCounts | undefined = stageCounts
+    ? {
+        ...stageCounts,
+        hold:
+          shopifyHeldIds.size +
+          internalOrders.filter(
+            (order) =>
+              order.stage === 'hold' &&
+              (!order.shopify_order_id || !shopifyHeldIds.has(String(order.shopify_order_id)))
+          ).length,
+      }
+    : undefined;
 
   const adminItems = [
     { name: 'Settings', href: '/settings', icon: Settings },
@@ -102,7 +121,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
-          const count = item.countKey ? stageCounts?.[item.countKey] : undefined;
+          const count = item.countKey ? sidebarCounts?.[item.countKey] : undefined;
           return (
             <Link
               key={item.name}

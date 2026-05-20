@@ -39,10 +39,12 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
     { value: 'delivered', label: 'Delivered', icon: <CheckCircle className="h-4 w-4" />, color: 'bg-green-100 text-green-800' },
   ];
 
+  // Stage transitions: orders must flow through printing before tracking.
+  // hold and printing cannot jump directly to tracking — printed_at must be set first.
   const allowedStageMap: Partial<Record<OrderStage, OrderStage[]>> = {
     pending: ['hold', 'printing'],
-    hold: ['pending', 'printing', 'packing', 'tracking'],
-    printing: ['hold', 'packing', 'tracking'],
+    hold: ['pending', 'printing'],
+    printing: ['hold', 'packing'],
     packing: ['hold', 'printing', 'tracking'],
     tracking: ['hold', 'printing', 'packing'],
   };

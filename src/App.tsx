@@ -117,6 +117,7 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Dashboard userRole={appUser!.role} />} />
                 <Route path="/orders" element={<Orders />} />
+                <Route path="/hold" element={<Orders />} />
                 <Route path="/printing" element={<Printing />} />
                 <Route path="/packing" element={<Packing />} />
                 <Route path="/tracking" element={<Tracking />} />

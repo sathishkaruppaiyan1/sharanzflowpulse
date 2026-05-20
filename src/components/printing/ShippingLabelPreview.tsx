@@ -48,6 +48,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
     name: '', address1: '', address2: '', city: '', state: '', zip: '', country: '', phone: ''
   });
   const bypassPacking = workflowSettings.bypassPacking;
+  const showProductsInThermalLabel = workflowSettings.showProductsInThermalLabel;
 
   const displayOrder = isBulkPrint ? ordersToProcess[0] : order;
 
@@ -210,15 +211,17 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
           </div>
           <div style="width:1px;background:#000;margin:0 5px;"></div>
           <div style="flex:1;margin-left:5px;">
-            <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">COURIER DETAILS:</div>
+            <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">ORDER DETAILS:</div>
             <div style="padding:6px 4px;background:#fff;font-size:10px;height:60px;">
               <div style="margin-bottom:2px;">Order: <strong>${orderNumber}</strong>${pageLabel}</div>
+              <div style="margin-bottom:2px;">Date: ${orderDate}</div>
               <div style="margin-bottom:2px;">Weight: ${totalWeight}</div>
               <div style="margin-bottom:2px;">Items: ${totalItems}</div>
               <div>Total: &#8377;${orderData.total_amount || orderData.current_total_price}</div>
             </div>
           </div>
         </div>
+        ${showProductsInThermalLabel ? `
         <div style="border-bottom:1px solid #000;margin:0;"></div>
         <div style="flex:1;padding:8px ${sidePad};display:flex;flex-direction:column;">
           <div style="font-weight:bold;margin-bottom:5px;font-size:12px;">PRODUCTS:</div>
@@ -227,7 +230,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
               `<div style="margin-bottom:2px;word-wrap:break-word;overflow:hidden;">• ${formatProductWithVariation(item)} (Qty: ${item.quantity || 1})</div>`
             ).join('') : '<div>• Order Items</div>'}
           </div>
-        </div>
+        </div>` : ''}
         <div style="text-align:center;border-top:2px solid #000;padding:6px ${sidePad};font-weight:bold;font-size:10px;background:#fff;">
           PARCEL OPENING VIDEO is MUST For raising complaints
         </div>
@@ -620,24 +623,25 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
                 </div>
                 <Separator orientation="vertical" className="bg-black w-px mx-1" />
                 <div className="flex-1 ml-1 pr-2">
-                  <div className="font-bold mb-1 text-xs">COURIER DETAILS:</div>
+                  <div className="font-bold mb-1 text-xs">ORDER DETAILS:</div>
                   <div className="py-1 px-1 bg-white text-xs h-16">
                     <div className="mb-0.5">Order: <strong>{orderNumber}</strong></div>
+                    <div className="mb-0.5">Date: {orderDate}</div>
                     <div className="mb-0.5">Weight: {totalWeight}</div>
                     <div className="mb-0.5">Items: {totalItems}</div>
                     <div>Total: ₹{displayOrder.total_amount || displayOrder.current_total_price}</div>
                   </div>
                 </div>
               </div>
-              <Separator className="bg-black h-px" />
-              <div className="flex-1 p-2 flex flex-col">
+              {showProductsInThermalLabel && <Separator className="bg-black h-px" />}
+              {showProductsInThermalLabel && <div className="flex-1 p-2 flex flex-col">
                 <div className="font-bold mb-1 text-xs">PRODUCTS:</div>
                 <div className="py-1 flex-1 overflow-hidden bg-white" style={{ fontSize: previewFontSize, lineHeight: getLineHeight(previewFontSize) }}>
                   {lineItems.length > 0 ? lineItems.map((item: any, index: number) => (
                     <div key={index} className="mb-0.5 break-words">• {formatProductWithVariation(item)} (Qty: {item.quantity || 1})</div>
                   )) : <div>• Order Items</div>}
                 </div>
-              </div>
+              </div>}
               <div className="text-center border-t-2 border-black p-1 font-bold text-xs bg-white">
                 PARCEL OPENING VIDEO is MUST For raising complaints
               </div>

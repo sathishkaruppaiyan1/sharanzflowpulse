@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink, CheckSquare, Square, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Settings, ExternalLink, CheckSquare, Square, ArrowRight, Search, X } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Order, OrderStage } from '@/types/database';
 import { useCourierPartners, detectCourierByPrefix, buildTrackingUrl } from '@/hooks/useCourierPartners';
+import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { toast } from 'sonner';
 import StageChangeControls from '@/components/common/StageChangeControls';
 import { getPhoneNumber } from '@/lib/utils';
@@ -23,10 +24,17 @@ const Tracking = () => {
   const updateTrackingMutation = useUpdateTracking();
   const bulkUpdateStageMutation = useBulkUpdateOrderStage();
   const { data: couriers = [] } = useCourierPartners();
+  const { heldIds: shopifyHeldIds } = useShopifyHeldOrderIds();
   const { playErrorSound, playSuccessSound, playWarningSound, playCompleteSound } = useSoundNotifications();
-  
-  // Filter orders to only show those without tracking numbers (waiting for tracking assignment)
-  const trackingOrders = allTrackingOrders.filter(order => !order.tracking_number);
+
+  // Filter orders:
+  // 1. must not have a tracking number yet (waiting for assignment)
+  // 2. must not be flagged as on-hold by Shopify (hold lives in Shopify, not DB stage)
+  const trackingOrders = allTrackingOrders.filter((order) => {
+    if (order.tracking_number) return false;
+    if (order.shopify_order_id && shopifyHeldIds.has(String(order.shopify_order_id))) return false;
+    return true;
+  });
   
   const [orderIdInput, setOrderIdInput] = useState('');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
@@ -48,6 +56,24 @@ const Tracking = () => {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [bulkTargetStage, setBulkTargetStage] = useState<OrderStage | ''>('');
+
+  // Search state for the waiting orders list
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredTrackingOrders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return trackingOrders;
+    return trackingOrders.filter((order) => {
+      const fullName = `${order.customer?.first_name ?? ''} ${order.customer?.last_name ?? ''}`.toLowerCase();
+      return (
+        order.order_number?.toLowerCase().includes(q) ||
+        fullName.includes(q) ||
+        (order.customer?.email ?? '').toLowerCase().includes(q) ||
+        (order.customer?.phone ?? '').toLowerCase().includes(q) ||
+        (order.shipping_address?.city ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [trackingOrders, searchQuery]);
 
   const orderInputRef = useRef<HTMLInputElement>(null);
   const trackingInputRef = useRef<HTMLInputElement>(null);
@@ -352,13 +378,13 @@ const Tracking = () => {
       newSelectedIds.delete(orderId);
     }
     setSelectedOrderIds(newSelectedIds);
-    setSelectAll(newSelectedIds.size === trackingOrders.length);
+    setSelectAll(newSelectedIds.size === filteredTrackingOrders.length);
   };
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(trackingOrders.map(order => order.id));
+      const allIds = new Set(filteredTrackingOrders.map(order => order.id));
       setSelectedOrderIds(allIds);
       setSelectAll(true);
     } else {
@@ -830,8 +856,31 @@ const Tracking = () => {
                 </div>
               </div>
               <p className="text-sm text-gray-600">
-                {trackingOrders.length} orders completed packing and waiting for tracking assignment
+                {searchQuery
+                  ? `${filteredTrackingOrders.length} of ${trackingOrders.length} orders match "${searchQuery}"`
+                  : `${trackingOrders.length} orders completed packing and waiting for tracking assignment`}
               </p>
+              {trackingOrders.length > 0 && (
+                <div className="relative mt-3">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search by order #, customer, phone, email or city"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-9"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {trackingOrders.length > 0 && (
@@ -866,7 +915,7 @@ const Tracking = () => {
                         <span>
                           {selectedOrderIds.size === 0
                             ? 'No orders selected'
-                            : `${selectedOrderIds.size} of ${trackingOrders.length} selected`}
+                            : `${selectedOrderIds.size} of ${filteredTrackingOrders.length} selected`}
                         </span>
                       </div>
                     </div>
@@ -896,8 +945,8 @@ const Tracking = () => {
                   </div>
                 </div>
               )}
-              <TrackingQueue 
-                orders={trackingOrders} 
+              <TrackingQueue
+                orders={filteredTrackingOrders}
                 selectedOrderIds={selectedOrderIds}
                 onOrderSelect={handleOrderSelect}
               />

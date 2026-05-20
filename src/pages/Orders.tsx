@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import OrderDetailsBasic from '@/components/orders/OrderDetailsBasic';
@@ -48,10 +49,22 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const Orders = () => {
+  const location = useLocation();
+  const isHoldRoute = location.pathname === '/hold';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'processing' | 'inprogress' | 'hold'>('processing');
+  const [activeTab, setActiveTab] = useState<'processing' | 'inprogress' | 'hold'>(
+    isHoldRoute ? 'hold' : 'processing'
+  );
+
+  // Lock tab to 'hold' whenever the user lands on /hold so the page stays focused.
+  useEffect(() => {
+    if (isHoldRoute && activeTab !== 'hold') {
+      setActiveTab('hold');
+    }
+  }, [isHoldRoute, activeTab]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
@@ -334,6 +347,78 @@ const Orders = () => {
     setShowOrderDetails(true);
   };
 
+  const handleSaveShippingAddress = async (address: {
+    address1: string;
+    address2: string;
+    city: string;
+    province: string;
+    zip: string;
+    country: string;
+  }) => {
+    if (!selectedOrder) return;
+
+    try {
+      let internalOrder = getInternalOrder(selectedOrder.id);
+
+      if (!internalOrder) {
+        const newOrderId = await supabaseOrderService.createOrderFromShopify(selectedOrder, 'pending');
+        await queryClient.invalidateQueries({ queryKey: ['orders'] });
+        await queryClient.refetchQueries({ queryKey: ['orders'] });
+        internalOrder = queryClient
+          .getQueryData<any[]>(['orders'])
+          ?.find((order) => order.id === newOrderId) || null;
+      }
+
+      if (!internalOrder) {
+        throw new Error('Order could not be synced into the database for address editing.');
+      }
+
+      await supabaseOrderService.updateShippingAddress(internalOrder.id, {
+        address_line_1: address.address1,
+        address_line_2: address.address2 || null,
+        city: address.city,
+        state: address.province || null,
+        postal_code: address.zip || null,
+        country: address.country,
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.refetchQueries({ queryKey: ['orders'] }),
+      ]);
+
+      setSelectedOrder((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              shipping_address: {
+                ...prev.shipping_address,
+                address1: address.address1,
+                address2: address.address2,
+                city: address.city,
+                province: address.province,
+                zip: address.zip,
+                country: address.country,
+              },
+            }
+          : prev
+      );
+
+      toast({
+        title: 'Address updated',
+        description: 'Shipping address saved to the database.',
+      });
+    } catch (error) {
+      console.error('Failed to update shipping address:', error);
+      toast({
+        title: 'Address update failed',
+        description: error instanceof Error ? error.message : 'Failed to save the shipping address.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const handleStageChange = (orderId: string | number) => {
     setStatusDialogOrderId(orderId);
     setOpenStageDialog(true);
@@ -396,8 +481,10 @@ const Orders = () => {
     }
   };
 
+  // Hold orders can only be bulk-moved back into the workflow at printing or pending.
+  // tracking/packing are blocked — orders must flow through printing first.
   const bulkStageOptions: OrderStage[] = activeTab === 'hold'
-    ? ['pending', 'printing', 'packing', 'tracking']
+    ? ['pending', 'printing']
     : ['hold', 'pending', 'printing', 'packing', 'tracking'];
 
   const handleEditStatus = async (shopifyOrder: any) => {
@@ -543,7 +630,7 @@ const Orders = () => {
   if (shopifyOrdersError) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title="Orders Management" />
+        <Header title={isHoldRoute ? 'Hold Orders' : 'Orders Management'} />
         <main className="flex-1 flex items-center justify-center bg-gray-50">
           <div className="text-center">
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -620,22 +707,25 @@ const Orders = () => {
             </CardHeader>
             <CardContent className="pb-4">
               <div className="flex flex-col md:flex-row gap-4">
-                <Tabs
-                  value={activeTab}
-                  onValueChange={(value) => setActiveTab(value as 'processing' | 'inprogress' | 'hold')}
-                >
-                  <TabsList className="grid w-full grid-cols-3 md:w-[420px]">
-                    <TabsTrigger value="processing">
-                      Processing ({tabCounts.processing})
-                    </TabsTrigger>
-                    <TabsTrigger value="inprogress">
-                      In Progress ({tabCounts.inprogress})
-                    </TabsTrigger>
-                    <TabsTrigger value="hold">
-                      Hold ({tabCounts.hold})
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                {isHoldRoute ? (
+                  <div className="inline-flex items-center rounded-md bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 border border-red-200">
+                    Hold Orders ({tabCounts.hold})
+                  </div>
+                ) : (
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as 'processing' | 'inprogress' | 'hold')}
+                  >
+                    <TabsList className="grid w-full grid-cols-2 md:w-[280px]">
+                      <TabsTrigger value="processing">
+                        Processing ({tabCounts.processing})
+                      </TabsTrigger>
+                      <TabsTrigger value="inprogress">
+                        In Progress ({tabCounts.inprogress})
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
 
                 <div className="flex-1">
                   <div className="relative">
@@ -866,6 +956,8 @@ const Orders = () => {
         open={showOrderDetails}
         onClose={() => setShowOrderDetails(false)}
         order={selectedOrder}
+        canEditShippingAddress={Boolean(selectedOrder)}
+        onSaveShippingAddress={handleSaveShippingAddress}
       />
 
       <Dialog

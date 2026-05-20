@@ -3,6 +3,15 @@ import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
 import { ParcelPanelService } from '@/services/parcelPanelService';
 
+type ShippingAddressUpdateInput = {
+  address_line_1: string;
+  address_line_2?: string | null;
+  city: string;
+  state?: string | null;
+  postal_code?: string | null;
+  country: string;
+};
+
 export const supabaseOrderService = {
   async fetchOrders(): Promise<Order[]> {
     console.log('Fetching all orders with order items and variation details...');
@@ -111,6 +120,46 @@ export const supabaseOrderService = {
 
     console.log(`Successfully updated order ${orderId} to stage ${stage}`);
     return data as Order;
+  },
+
+  async updateShippingAddress(orderId: string, address: ShippingAddressUpdateInput) {
+    const { data: orderRecord, error: orderError } = await supabase
+      .from('orders')
+      .select('shipping_address_id')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError) {
+      console.error('Error fetching order shipping address id:', orderError);
+      throw orderError;
+    }
+
+    if (!orderRecord?.shipping_address_id) {
+      throw new Error('This order does not have a shipping address record yet.');
+    }
+
+    const payload = {
+      address_line_1: address.address_line_1.trim(),
+      address_line_2: address.address_line_2?.trim() || null,
+      city: address.city.trim(),
+      state: address.state?.trim() || null,
+      postal_code: address.postal_code?.trim() || null,
+      country: address.country.trim(),
+    };
+
+    const { data, error } = await supabase
+      .from('addresses')
+      .update(payload)
+      .eq('id', orderRecord.shipping_address_id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating shipping address:', error);
+      throw error;
+    }
+
+    return data;
   },
 
   async syncShopifyOrderStage(shopifyOrderId: string | number, targetStage: 'hold' | 'pending' | 'printing' | 'inprogress'): Promise<void> {
@@ -267,6 +316,14 @@ export const supabaseOrderService = {
     }
 
     return data as Order[] || [];
+  },
+
+  async refreshOrderFromShopify(shopifyOrder: any): Promise<string> {
+    const { data: orderId, error } = await (supabase as any).rpc('sync_shopify_order_to_db', {
+      shopify_order_data: shopifyOrder
+    });
+    if (error) throw error;
+    return orderId as string;
   },
 
   async createOrderFromShopify(shopifyOrder: any, targetStage: OrderStage = 'packing'): Promise<string> {
