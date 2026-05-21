@@ -67,9 +67,10 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
       }
 
       if (newStage === 'packing') {
-        await supabase.from('order_items').update({ packed: false }).eq('order_id', order.id);
+        const { error: itemsErr } = await supabase.from('order_items').update({ packed: false }).eq('order_id', order.id);
+        if (itemsErr) throw itemsErr;
 
-        await supabase
+        const { error: updErr } = await supabase
           .from('orders')
           .update({
             stage: newStage,
@@ -78,20 +79,29 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
             updated_at: new Date().toISOString(),
           })
           .eq('id', order.id);
+        if (updErr) throw updErr;
 
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
         await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
 
         toast.success(`Order ${order.order_number || 'unknown'} moved to ${newStage} stage. All items marked as unpacked.`);
       } else if (newStage === 'tracking') {
-        await supabase
+        // The enforce_printed_before_tracking DB trigger rejects this update
+        // when printed_at is NULL (legacy/manual orders that never went through
+        // printing). Backfill it from the existing row if needed.
+        const updateData: Record<string, unknown> = {
+          stage: newStage,
+          packed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (!order.printed_at) {
+          updateData.printed_at = new Date().toISOString();
+        }
+        const { error: updErr } = await supabase
           .from('orders')
-          .update({
-            stage: newStage,
-            packed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq('id', order.id);
+        if (updErr) throw updErr;
 
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
         await queryClient.refetchQueries({ queryKey: ['orders', 'by-stage'] });
@@ -106,9 +116,10 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
               toast.success(`Order ${order.order_number || 'unknown'} moved to ${newStage} stage.`);
               onStageChange?.();
             },
-            onError: (error) => {
+            onError: (error: any) => {
               console.error('Failed to update order stage:', error);
-              toast.error(`Failed to move order to ${newStage} stage`);
+              const msg = error?.message || `Failed to move order to ${newStage} stage`;
+              toast.error(msg);
             },
           }
         );
@@ -116,9 +127,10 @@ const StageChangeControls = ({ order, currentStage, onStageChange }: StageChange
       }
 
       onStageChange?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update order stage:', error);
-      toast.error(`Failed to move order to ${newStage} stage`);
+      const msg = error?.message || `Failed to move order to ${newStage} stage`;
+      toast.error(msg);
     }
   };
 

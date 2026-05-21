@@ -488,22 +488,23 @@ const Orders = () => {
     : ['hold', 'pending', 'printing', 'packing', 'tracking'];
 
   const handleEditStatus = async (shopifyOrder: any) => {
+    // Open the dialog IMMEDIATELY so the user gets instant feedback. If the
+    // order isn't in the local DB yet, the dialog renders a loading state
+    // while the sync runs in the background.
+    handleStageChange(shopifyOrder.id);
+
     const existingOrder = getInternalOrder(shopifyOrder.id);
-    if (existingOrder) {
-      handleStageChange(shopifyOrder.id);
-      return;
-    }
+    if (existingOrder) return;
 
     setSyncingEditOrderIds((prev) => new Set(prev).add(shopifyOrder.id));
     try {
       await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'pending');
-      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate in parallel; do not block on shopify-orders / held-ids
+      // refetches — those are heavy and not required to render the dialog.
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
       await queryClient.refetchQueries({ queryKey: ['orders'] });
-      await queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
-      await queryClient.refetchQueries({ queryKey: ['shopify-orders'] });
-      await queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
-      await queryClient.refetchQueries({ queryKey: ['shopify-held-order-ids'] });
-      handleStageChange(shopifyOrder.id);
     } catch (error) {
       console.error('Failed to sync order before editing status:', error);
       toast({
@@ -511,6 +512,8 @@ const Orders = () => {
         description: 'Failed to sync this order into the system.',
         variant: 'destructive',
       });
+      setOpenStageDialog(false);
+      setStatusDialogOrderId(null);
     } finally {
       setSyncingEditOrderIds((prev) => {
         const next = new Set(prev);
@@ -971,17 +974,24 @@ const Orders = () => {
           <DialogHeader>
             <DialogTitle>Change Order Status</DialogTitle>
           </DialogHeader>
-          {statusDialogOrderId && getInternalOrder(statusDialogOrderId) && (
-            <OrderStatusChangeControls
-              order={getInternalOrder(statusDialogOrderId)!}
-              shopifyOrderId={statusDialogOrderId}
-              currentStatus={getOrderQueueStatus(statusDialogOrderId)}
-              onStatusChange={() => {
-                setOpenStageDialog(false);
-                setStatusDialogOrderId(null);
-              }}
-            />
-          )}
+          {statusDialogOrderId ? (
+            getInternalOrder(statusDialogOrderId) ? (
+              <OrderStatusChangeControls
+                order={getInternalOrder(statusDialogOrderId)!}
+                shopifyOrderId={statusDialogOrderId}
+                currentStatus={getOrderQueueStatus(statusDialogOrderId)}
+                onStatusChange={() => {
+                  setOpenStageDialog(false);
+                  setStatusDialogOrderId(null);
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-5 w-5 mr-2 animate-spin text-gray-400" />
+                <span className="text-sm text-gray-500">Syncing order from Shopify…</span>
+              </div>
+            )
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

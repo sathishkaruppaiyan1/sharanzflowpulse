@@ -193,6 +193,20 @@ export const useBulkUpdateOrderStage = () => {
         updateData.printed_at = new Date().toISOString();
       } else if (stage === 'tracking') {
         updateData.packed_at = new Date().toISOString();
+        // The enforce_printed_before_tracking DB trigger blocks rows whose
+        // printed_at is NULL. Stamp it for the subset that's missing it so
+        // bulk transitions don't fail partway through a batch.
+        const { data: missing } = await supabase
+          .from('orders')
+          .select('id')
+          .in('id', orderIds)
+          .is('printed_at', null);
+        if (missing && missing.length > 0) {
+          await supabase
+            .from('orders')
+            .update({ printed_at: new Date().toISOString() })
+            .in('id', missing.map((r) => r.id));
+        }
       } else if (stage === 'shipped') {
         updateData.shipped_at = new Date().toISOString();
       } else if (stage === 'delivered') {
