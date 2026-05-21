@@ -6,6 +6,7 @@ import PrintQueue from '@/components/printing/PrintQueue';
 import PrintingFilters from '@/components/printing/PrintingFilters';
 import ShippingLabelPreview from '@/components/printing/ShippingLabelPreview';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
+import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { useOrdersByStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,10 @@ const Printing = () => {
     isConfigured: isShopifyConfigured,
   } = useShopifyOrders();
 
+  // IN_PROGRESS fulfillmentOrders still report fulfillment_status=unfulfilled
+  // at the order level, so we need this side-channel to exclude them.
+  const { inProgressIds: shopifyInProgressIds } = useShopifyHeldOrderIds();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(true);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -48,14 +53,19 @@ const Printing = () => {
   // `shopifyOrders` is already filtered to fulfillment_status=unfulfilled by
   // the edge function. Build a Set of their IDs so we can keep ONLY DB
   // printing rows whose Shopify counterpart is still unfulfilled.
+  // IN_PROGRESS fulfillmentOrders are excluded — they show fulfillment_status
+  // as "unfulfilled" at the order level but should NOT appear on the printing
+  // queue.
   const unfulfilledShopifyIds = React.useMemo(() => {
     const s = new Set<number>();
     shopifyOrders.forEach((o: any) => {
       const n = Number(o.id);
-      if (Number.isFinite(n)) s.add(n);
+      if (!Number.isFinite(n)) return;
+      if (shopifyInProgressIds.has(String(n))) return;
+      s.add(n);
     });
     return s;
-  }, [shopifyOrders]);
+  }, [shopifyOrders, shopifyInProgressIds]);
 
   // The strict filter only activates when Shopify is the source of truth:
   // Shopify must be configured, healthy, and we must have received at least
@@ -177,9 +187,12 @@ const Printing = () => {
           .filter((id: number) => Number.isFinite(id))
       );
 
-      // 3. Filter Shopify unfulfilled orders
+      // 3. Filter Shopify unfulfilled orders, excluding IN_PROGRESS ones —
+      //    those should never be auto-promoted into the printing queue.
       const unfulfilled = latestShopifyOrders.filter(
-        order => !order.fulfillment_status || order.fulfillment_status === 'unfulfilled'
+        order =>
+          (!order.fulfillment_status || order.fulfillment_status === 'unfulfilled') &&
+          !shopifyInProgressIds.has(String(order.id))
       );
 
       // 4. Split into: brand-new orders, pending orders to promote, and
@@ -297,7 +310,7 @@ const Printing = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [shopifyOrders, isSyncing, refetchPrintingOrders, refetchShopify]);
+  }, [shopifyOrders, shopifyInProgressIds, isSyncing, refetchPrintingOrders, refetchShopify]);
 
   // ─── Stable ref for timers ─────────────────────────────────────────────
   const syncRef = React.useRef(syncNewOrders);

@@ -281,15 +281,28 @@ Deno.serve(async (req: Request) => {
       if (targetStageValue === 'inprogress') {
         if (fulfillmentOrder.status === 'IN_PROGRESS') continue
 
-        if (fulfillmentOrder.status === 'ON_HOLD' && supportedActions.has('RELEASE_HOLD')) {
+        // Release hold first if needed. After this, supportedActions captured
+        // from the initial query is stale (ON_HOLD orders only list
+        // RELEASE_HOLD), so we cannot use it to gate REPORT_PROGRESS below.
+        if (fulfillmentOrder.status === 'ON_HOLD') {
+          if (!supportedActions.has('RELEASE_HOLD')) continue
           const releaseJson = await gql(releaseHoldMutation, { id: fulfillmentOrder.id })
           const releaseErrors = releaseJson?.data?.fulfillmentOrderReleaseHold?.userErrors || []
           if (releaseErrors.length > 0) {
             throw new Error(`Failed to release hold for fulfillment order ${fulfillmentOrder.id}: ${JSON.stringify(releaseErrors)}`)
           }
-        }
 
-        if (!supportedActions.has('REPORT_PROGRESS')) continue
+          performedActions.push({
+            fulfillmentOrderId: fulfillmentOrder.id,
+            action: 'RELEASE_HOLD',
+            resultStatus: releaseJson?.data?.fulfillmentOrderReleaseHold?.fulfillmentOrder?.status,
+          })
+        } else {
+          // For non-held orders, REPORT_PROGRESS must be in supportedActions
+          // for the call to succeed. Held orders skip this gate since they're
+          // now OPEN post-release.
+          if (!supportedActions.has('REPORT_PROGRESS')) continue
+        }
 
         const progressJson = await gql(reportProgressMutation, {
           id: fulfillmentOrder.id,
@@ -299,14 +312,19 @@ Deno.serve(async (req: Request) => {
         })
         const userErrors = progressJson?.data?.fulfillmentOrderReportProgress?.userErrors || []
         if (userErrors.length > 0) {
-          throw new Error(`Failed to report progress for fulfillment order ${fulfillmentOrder.id}: ${JSON.stringify(userErrors)}`)
+          // Surface as warning rather than throwing — the release hold above
+          // already succeeded and we don't want to roll that back.
+          console.warn(
+            `REPORT_PROGRESS failed for ${fulfillmentOrder.id}:`,
+            JSON.stringify(userErrors)
+          )
+        } else {
+          performedActions.push({
+            fulfillmentOrderId: fulfillmentOrder.id,
+            action: 'REPORT_PROGRESS',
+            resultStatus: progressJson?.data?.fulfillmentOrderReportProgress?.fulfillmentOrder?.status,
+          })
         }
-
-        performedActions.push({
-          fulfillmentOrderId: fulfillmentOrder.id,
-          action: 'REPORT_PROGRESS',
-          resultStatus: progressJson?.data?.fulfillmentOrderReportProgress?.fulfillmentOrder?.status,
-        })
         continue
       }
 

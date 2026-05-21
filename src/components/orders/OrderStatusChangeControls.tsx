@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, MoveRight, PauseCircle, RefreshCw } from 'lucide-react';
+import { MoveRight, PauseCircle, PlayCircle, RefreshCw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -11,32 +10,31 @@ import type { Order } from '@/types/database';
 type OrderQueueStatus = 'processing' | 'hold' | 'inprogress';
 
 interface OrderStatusChangeControlsProps {
-  order: Order;
+  internalOrder: Order | null;
+  shopifyOrder?: any;
   shopifyOrderId: string | number;
   currentStatus: OrderQueueStatus;
   onStatusChange?: () => void;
 }
 
-const statusMeta: Record<OrderQueueStatus, { label: string; color: string; icon: React.ReactNode }> = {
+const statusMeta: Record<OrderQueueStatus, { label: string; icon: React.ReactNode }> = {
   processing: {
     label: 'Processing',
-    color: 'bg-yellow-100 text-yellow-800',
     icon: <RefreshCw className="h-4 w-4" />,
   },
   hold: {
     label: 'Hold',
-    color: 'bg-red-100 text-red-800',
     icon: <PauseCircle className="h-4 w-4" />,
   },
   inprogress: {
     label: 'In Progress',
-    color: 'bg-amber-100 text-amber-800',
-    icon: <Loader2 className="h-4 w-4" />,
+    icon: <PlayCircle className="h-4 w-4" />,
   },
 };
 
 const OrderStatusChangeControls = ({
-  order,
+  internalOrder,
+  shopifyOrder,
   shopifyOrderId,
   currentStatus,
   onStatusChange,
@@ -44,6 +42,12 @@ const OrderStatusChangeControls = ({
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<OrderQueueStatus | ''>('');
+
+  const orderNumber =
+    internalOrder?.order_number ||
+    shopifyOrder?.order_number ||
+    shopifyOrder?.name ||
+    String(shopifyOrderId);
 
   const availableStatuses = useMemo(() => {
     switch (currentStatus) {
@@ -63,32 +67,46 @@ const OrderStatusChangeControls = ({
 
     setIsSubmitting(true);
     try {
-      if (newStatus === 'hold') {
-        await supabaseOrderService.syncShopifyOrderStage(shopifyOrderId, 'hold');
-        await supabaseOrderService.updateOrderStage(order.id, 'hold');
-      } else if (newStatus === 'inprogress') {
-        await supabaseOrderService.syncShopifyOrderStage(shopifyOrderId, 'inprogress');
-        await supabaseOrderService.updateOrderStage(order.id, 'pending');
-      } else if (newStatus === 'processing') {
-        await supabaseOrderService.syncShopifyOrderStage(shopifyOrderId, 'pending');
-        await supabaseOrderService.updateOrderStage(order.id, 'pending');
+      const localStage = newStatus === 'hold' ? 'hold' : 'pending';
+      const shopifyTarget =
+        newStatus === 'hold' ? 'hold' : newStatus === 'inprogress' ? 'inprogress' : 'pending';
+
+      // Ensure the order exists locally so we can persist the stage. If the
+      // user is editing a Shopify-only order (never touched by us yet), the
+      // RPC upserts it on the fly.
+      let dbOrderId = internalOrder?.id ?? null;
+      if (!dbOrderId) {
+        if (!shopifyOrder) {
+          throw new Error('Order is not synced locally and no Shopify data was provided.');
+        }
+        dbOrderId = await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'pending');
       }
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['orders'] }),
-        queryClient.invalidateQueries({ queryKey: ['shopify-orders'] }),
-        queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] }),
-        queryClient.refetchQueries({ queryKey: ['orders'] }),
-        queryClient.refetchQueries({ queryKey: ['shopify-orders'] }),
-        queryClient.refetchQueries({ queryKey: ['shopify-held-order-ids'] }),
-      ]);
+      const localPromise = supabaseOrderService.updateOrderStage(dbOrderId, localStage);
+      const shopifyPromise = supabaseOrderService.syncShopifyOrderStage(shopifyOrderId, shopifyTarget);
 
-      toast.success(`Order ${order.order_number || 'unknown'} moved to ${statusMeta[newStatus].label}.`);
+      shopifyPromise
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
+          queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
+        })
+        .catch((err: unknown) => {
+          console.error('Background Shopify sync failed:', err);
+          toast.error(err instanceof Error ? err.message : 'Shopify sync failed');
+          queryClient.invalidateQueries({ queryKey: ['orders'] });
+          queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
+          queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
+        });
+
+      await localPromise;
+
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(`Order ${orderNumber} moved to ${statusMeta[newStatus].label}.`);
       setSelectedStatus('');
       onStatusChange?.();
     } catch (error) {
-      console.error('Failed to update Shopify order status:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update Shopify order status');
+      console.error('Failed to update order status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update order status');
     } finally {
       setIsSubmitting(false);
     }
@@ -96,15 +114,8 @@ const OrderStatusChangeControls = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-700">Current:</span>
-          <Badge className={`${statusMeta[currentStatus].color} flex items-center gap-1`}>
-            {statusMeta[currentStatus].icon}
-            <span>{statusMeta[currentStatus].label}</span>
-          </Badge>
-        </div>
-        <span className="text-xs text-gray-400">{order.order_number || 'Unknown'}</span>
+      <div className="flex items-center justify-end">
+        <span className="text-xs text-gray-400">{orderNumber}</span>
       </div>
 
       <div className="space-y-1.5">
@@ -139,12 +150,6 @@ const OrderStatusChangeControls = ({
       >
         {isSubmitting ? 'Updating...' : 'Update Status'}
       </Button>
-
-      {currentStatus === 'inprogress' && (
-        <p className="text-xs text-gray-500">
-          In Progress comes from Shopify fulfillment state. From here you can release it back to Processing.
-        </p>
-      )}
 
       {isSubmitting && (
         <p className="text-xs text-blue-600 font-medium animate-pulse">Updating Shopify and local order status...</p>

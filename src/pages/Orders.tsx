@@ -70,9 +70,13 @@ const Orders = () => {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [openStageDialog, setOpenStageDialog] = useState(false);
   const [statusDialogOrderId, setStatusDialogOrderId] = useState<string | number | null>(null);
-  const [selectedInternalOrderIds, setSelectedInternalOrderIds] = useState<Set<string>>(new Set());
-  const [bulkTargetStage, setBulkTargetStage] = useState<OrderStage | ''>('');
-  const [syncingEditOrderIds, setSyncingEditOrderIds] = useState<Set<string | number>>(new Set());
+  // Track selection by Shopify order ID — works for orders not yet synced to
+  // the local DB (e.g. fresh InProgress orders). We lazy-sync them on bulk
+  // submit.
+  const [selectedShopifyOrderIds, setSelectedShopifyOrderIds] = useState<Set<string>>(new Set());
+  type BulkTarget = OrderStage | 'inprogress';
+  const [bulkTargetStage, setBulkTargetStage] = useState<BulkTarget | ''>('');
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const { toast } = useToast();
   const bulkUpdateStageMutation = useBulkUpdateOrderStage();
   const queryClient = useQueryClient();
@@ -264,16 +268,9 @@ const Orders = () => {
     };
   }, [filteredOrders, currentPage]);
 
-  const selectableCurrentOrders = useMemo(() => {
-    return paginationData.currentOrders.filter((order) => Boolean(internalOrderMap.get(Number(order.id))?.id));
-  }, [paginationData.currentOrders, internalOrderMap]);
-
   const allCurrentPageSelected =
-    selectableCurrentOrders.length > 0 &&
-    selectableCurrentOrders.every((order) => {
-      const internalOrder = internalOrderMap.get(Number(order.id));
-      return internalOrder ? selectedInternalOrderIds.has(internalOrder.id) : false;
-    });
+    paginationData.currentOrders.length > 0 &&
+    paginationData.currentOrders.every((order) => selectedShopifyOrderIds.has(String(order.id)));
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -281,7 +278,7 @@ const Orders = () => {
   }, [debouncedSearchTerm, statusFilter, dateFilter, activeTab]);
 
   useEffect(() => {
-    setSelectedInternalOrderIds(new Set());
+    setSelectedShopifyOrderIds(new Set());
     setBulkTargetStage('');
   }, [activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
@@ -429,30 +426,27 @@ const Orders = () => {
   };
 
   const handleSelectOrder = (shopifyOrderId: string | number, checked: boolean) => {
-    const internalOrder = getInternalOrder(shopifyOrderId);
-    if (!internalOrder) return;
-
-    setSelectedInternalOrderIds((prev) => {
+    setSelectedShopifyOrderIds((prev) => {
       const next = new Set(prev);
+      const key = String(shopifyOrderId);
       if (checked) {
-        next.add(internalOrder.id);
+        next.add(key);
       } else {
-        next.delete(internalOrder.id);
+        next.delete(key);
       }
       return next;
     });
   };
 
   const handleSelectAllCurrentPage = (checked: boolean) => {
-    setSelectedInternalOrderIds((prev) => {
+    setSelectedShopifyOrderIds((prev) => {
       const next = new Set(prev);
-      selectableCurrentOrders.forEach((order) => {
-        const internalOrder = internalOrderMap.get(Number(order.id));
-        if (!internalOrder) return;
+      paginationData.currentOrders.forEach((order) => {
+        const key = String(order.id);
         if (checked) {
-          next.add(internalOrder.id);
+          next.add(key);
         } else {
-          next.delete(internalOrder.id);
+          next.delete(key);
         }
       });
       return next;
@@ -460,7 +454,7 @@ const Orders = () => {
   };
 
   const handleBulkStageChange = async () => {
-    if (!bulkTargetStage || selectedInternalOrderIds.size === 0) {
+    if (!bulkTargetStage || selectedShopifyOrderIds.size === 0) {
       toast({
         title: 'Bulk update unavailable',
         description: 'Select orders and choose a status first.',
@@ -469,58 +463,153 @@ const Orders = () => {
       return;
     }
 
+    setIsBulkSyncing(true);
     try {
-      await bulkUpdateStageMutation.mutateAsync({
-        orderIds: Array.from(selectedInternalOrderIds),
-        stage: bulkTargetStage,
-      });
-      setSelectedInternalOrderIds(new Set());
-      setBulkTargetStage('');
-    } catch (error) {
-      console.error('Bulk stage change failed:', error);
-    }
-  };
+      // 1. Resolve internal DB IDs for every selected Shopify order. Anything
+      //    that isn't synced yet is upserted via createOrderFromShopify so the
+      //    bulk DB stage update can target it.
+      const selectedShopifyArr = Array.from(selectedShopifyOrderIds);
+      const internalIds: string[] = [];
+      const syncFailures: string[] = [];
 
-  // Hold orders can only be bulk-moved back into the workflow at printing or pending.
-  // tracking/packing are blocked — orders must flow through printing first.
-  const bulkStageOptions: OrderStage[] = activeTab === 'hold'
-    ? ['pending', 'printing']
-    : ['hold', 'pending', 'printing', 'packing', 'tracking'];
+      await Promise.all(
+        selectedShopifyArr.map(async (shopifyId) => {
+          const existing = internalOrderMap.get(Number(shopifyId));
+          if (existing) {
+            internalIds.push(existing.id);
+            return;
+          }
+          const shopifyOrder = shopifyOrders.find(
+            (o) => String(o.id) === String(shopifyId)
+          );
+          if (!shopifyOrder) {
+            syncFailures.push(shopifyId);
+            return;
+          }
+          try {
+            const newId = await supabaseOrderService.createOrderFromShopify(
+              shopifyOrder,
+              'pending'
+            );
+            internalIds.push(newId);
+          } catch (err) {
+            console.error(`Failed to sync Shopify order ${shopifyId} to DB:`, err);
+            syncFailures.push(shopifyId);
+          }
+        })
+      );
 
-  const handleEditStatus = async (shopifyOrder: any) => {
-    // Open the dialog IMMEDIATELY so the user gets instant feedback. If the
-    // order isn't in the local DB yet, the dialog renders a loading state
-    // while the sync runs in the background.
-    handleStageChange(shopifyOrder.id);
+      if (internalIds.length === 0) {
+        toast({
+          title: 'Bulk update failed',
+          description: 'No orders could be synced to the local database.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    const existingOrder = getInternalOrder(shopifyOrder.id);
-    if (existingOrder) return;
+      // 2. DB stage update (skip for inprogress — it's a Shopify-only status,
+      //    not a pipeline stage).
+      if (bulkTargetStage !== 'inprogress') {
+        await bulkUpdateStageMutation.mutateAsync({
+          orderIds: internalIds,
+          stage: bulkTargetStage,
+        });
+      }
 
-    setSyncingEditOrderIds((prev) => new Set(prev).add(shopifyOrder.id));
-    try {
-      await supabaseOrderService.createOrderFromShopify(shopifyOrder, 'pending');
-      // Invalidate in parallel; do not block on shopify-orders / held-ids
-      // refetches — those are heavy and not required to render the dialog.
+      // 3. Shopify side-effect per selected order:
+      //    - hold        → put Shopify on_hold
+      //    - inprogress  → mark Shopify in_progress (release hold if needed)
+      //    - printing/packing/tracking → release hold + mark open → unfulfilled
+      //    - pending     → leave Shopify alone (parked locally only)
+      const stageToShopifyTarget: Partial<
+        Record<BulkTarget, 'hold' | 'inprogress' | 'pending'>
+      > = {
+        hold: 'hold',
+        inprogress: 'inprogress',
+        printing: 'pending',
+        packing: 'pending',
+        tracking: 'pending',
+      };
+      const shopifyTarget = stageToShopifyTarget[bulkTargetStage];
+
+      if (shopifyTarget) {
+        const failed: string[] = [];
+        await Promise.all(
+          selectedShopifyArr.map(async (sid) => {
+            try {
+              await supabaseOrderService.syncShopifyOrderStage(sid, shopifyTarget);
+            } catch (err) {
+              console.error(`Shopify sync failed for ${sid}:`, err);
+              failed.push(sid);
+            }
+          })
+        );
+
+        if (failed.length > 0) {
+          toast({
+            title: 'Shopify sync partially failed',
+            description: `${failed.length} of ${selectedShopifyArr.length} orders failed to sync to Shopify.`,
+            variant: 'destructive',
+          });
+        }
+      }
+
+      if (syncFailures.length > 0) {
+        toast({
+          title: 'Some orders not synced',
+          description: `${syncFailures.length} order(s) could not be synced from Shopify into the DB.`,
+          variant: 'destructive',
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['shopify-orders'] });
       queryClient.invalidateQueries({ queryKey: ['shopify-held-order-ids'] });
-      await queryClient.refetchQueries({ queryKey: ['orders'] });
+
+      setSelectedShopifyOrderIds(new Set());
+      setBulkTargetStage('');
     } catch (error) {
-      console.error('Failed to sync order before editing status:', error);
+      console.error('Bulk stage change failed:', error);
       toast({
-        title: 'Unable to open status editor',
-        description: 'Failed to sync this order into the system.',
+        title: 'Bulk update failed',
+        description: error instanceof Error ? error.message : 'Unexpected error during bulk update.',
         variant: 'destructive',
       });
-      setOpenStageDialog(false);
-      setStatusDialogOrderId(null);
     } finally {
-      setSyncingEditOrderIds((prev) => {
-        const next = new Set(prev);
-        next.delete(shopifyOrder.id);
-        return next;
-      });
+      setIsBulkSyncing(false);
     }
+  };
+
+  // Bulk dropdown shows both Shopify statuses (hold/inprogress) and pipeline
+  // stages. Each option handles BOTH the DB stage update AND the Shopify
+  // side-effect (see stageToShopifyTarget above). Hide the option that matches
+  // the currently active tab so we don't show no-op moves.
+  const bulkStageOptions: BulkTarget[] = (
+    ['hold', 'inprogress', 'printing', 'packing', 'tracking'] as BulkTarget[]
+  ).filter((opt) => {
+    if (activeTab === 'hold' && opt === 'hold') return false;
+    if (activeTab === 'inprogress' && opt === 'inprogress') return false;
+    return true;
+  });
+
+  const bulkOptionLabels: Record<BulkTarget, string> = {
+    hold: 'Hold (status)',
+    inprogress: 'In Progress (status)',
+    pending: 'Pending',
+    printing: 'Printing',
+    packing: 'Packing',
+    tracking: 'Tracking',
+    shipped: 'Shipped',
+    delivered: 'Delivered',
+    delivery: 'Delivery',
+  };
+
+  const handleEditStatus = (shopifyOrder: any) => {
+    // Open the dialog immediately. The dropdown renders right away using the
+    // Shopify order data, and any required local DB sync happens lazily on
+    // submit inside OrderStatusChangeControls.
+    handleStageChange(shopifyOrder.id);
   };
 
   // Memoized pagination function
@@ -776,28 +865,33 @@ const Orders = () => {
 
               <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="text-sm text-gray-600">
-                  {selectedInternalOrderIds.size === 0
+                  {selectedShopifyOrderIds.size === 0
                     ? 'No orders selected'
-                    : `${selectedInternalOrderIds.size} orders selected`}
+                    : `${selectedShopifyOrderIds.size} orders selected`}
                 </div>
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                  <Select value={bulkTargetStage} onValueChange={(value) => setBulkTargetStage(value as OrderStage)}>
+                  <Select value={bulkTargetStage} onValueChange={(value) => setBulkTargetStage(value as BulkTarget)}>
                     <SelectTrigger className="w-full md:w-48">
                       <SelectValue placeholder="Bulk change status" />
                     </SelectTrigger>
                     <SelectContent>
                       {bulkStageOptions.map((stage) => (
                         <SelectItem key={stage} value={stage}>
-                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                          {bulkOptionLabels[stage]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Button
                     onClick={handleBulkStageChange}
-                    disabled={selectedInternalOrderIds.size === 0 || !bulkTargetStage || bulkUpdateStageMutation.isPending}
+                    disabled={
+                      selectedShopifyOrderIds.size === 0 ||
+                      !bulkTargetStage ||
+                      bulkUpdateStageMutation.isPending ||
+                      isBulkSyncing
+                    }
                   >
-                    {bulkUpdateStageMutation.isPending ? 'Updating...' : 'Update Selected'}
+                    {bulkUpdateStageMutation.isPending || isBulkSyncing ? 'Updating...' : 'Update Selected'}
                   </Button>
                 </div>
               </div>
@@ -861,15 +955,12 @@ const Orders = () => {
                       </thead>
                       <tbody>
                         {currentOrders.map((order) => {
-                          const internalOrder = getInternalOrder(order.id);
-                          const isSelected = internalOrder ? selectedInternalOrderIds.has(internalOrder.id) : false;
-                          const isSyncingEdit = syncingEditOrderIds.has(order.id);
+                          const isSelected = selectedShopifyOrderIds.has(String(order.id));
                           return (
                           <tr key={order.id} className="border-b hover:bg-gray-50 transition-colors">
                             <td className="py-3 px-4">
                               <Checkbox
                                 checked={isSelected}
-                                disabled={!internalOrder}
                                 onCheckedChange={(checked) => handleSelectOrder(order.id, checked === true)}
                                 aria-label={`Select ${order.order_number || 'order'}`}
                               />
@@ -907,8 +998,7 @@ const Orders = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => void handleEditStatus(order)}
-                                  disabled={isSyncingEdit}
+                                  onClick={() => handleEditStatus(order)}
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
@@ -975,22 +1065,18 @@ const Orders = () => {
             <DialogTitle>Change Order Status</DialogTitle>
           </DialogHeader>
           {statusDialogOrderId ? (
-            getInternalOrder(statusDialogOrderId) ? (
-              <OrderStatusChangeControls
-                order={getInternalOrder(statusDialogOrderId)!}
-                shopifyOrderId={statusDialogOrderId}
-                currentStatus={getOrderQueueStatus(statusDialogOrderId)}
-                onStatusChange={() => {
-                  setOpenStageDialog(false);
-                  setStatusDialogOrderId(null);
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-5 w-5 mr-2 animate-spin text-gray-400" />
-                <span className="text-sm text-gray-500">Syncing order from Shopify…</span>
-              </div>
-            )
+            <OrderStatusChangeControls
+              internalOrder={getInternalOrder(statusDialogOrderId) ?? null}
+              shopifyOrder={shopifyOrders.find(
+                (o) => String(o.id) === String(statusDialogOrderId)
+              )}
+              shopifyOrderId={statusDialogOrderId}
+              currentStatus={getOrderQueueStatus(statusDialogOrderId)}
+              onStatusChange={() => {
+                setOpenStageDialog(false);
+                setStatusDialogOrderId(null);
+              }}
+            />
           ) : null}
         </DialogContent>
       </Dialog>
