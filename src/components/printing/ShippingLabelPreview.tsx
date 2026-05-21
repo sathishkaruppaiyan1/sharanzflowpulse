@@ -47,6 +47,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   const [toAddress, setToAddress] = useState<AddressFields>({
     name: '', address1: '', address2: '', city: '', state: '', zip: '', country: '', phone: ''
   });
+  const [isPrinting, setIsPrinting] = useState(false);
   const bypassPacking = workflowSettings.bypassPacking;
   const showProductsInThermalLabel = workflowSettings.showProductsInThermalLabel;
 
@@ -441,6 +442,8 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   };
 
   const handlePrint = async () => {
+    if (isPrinting) return;
+    setIsPrinting(true);
     try {
       // 1. Sort orders descending by numeric order_number (newest first) so print sequence is predictable
       const sortedOrders = [...ordersToProcess].sort((a, b) => {
@@ -484,27 +487,51 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
       await printViaIframe(labelsHTML);
 
-      // Move orders to packing or tracking stage depending on bypass setting
-      const targetStage = bypassPacking ? 'tracking' : 'packing';
+      // Move orders to packing or tracking stage depending on bypass setting.
+      // Split into two paths: orders already in Supabase (fast bulk update) vs.
+      // orders that still need to be synced from Shopify first (parallel batches).
+      const targetStage: 'packing' | 'tracking' = bypassPacking ? 'tracking' : 'packing';
+      const existingSupabaseIds: string[] = [];
+      const needsSync: any[] = [];
+      for (const orderData of uniqueOrdersToUpdate) {
+        if (orderData._originalSupabaseOrder?.id) {
+          existingSupabaseIds.push(orderData._originalSupabaseOrder.id);
+        } else {
+          needsSync.push(orderData);
+        }
+      }
+
+      let stageUpdateFailed = false;
       try {
-        for (const orderData of uniqueOrdersToUpdate) {
-          if (orderData._originalSupabaseOrder) {
-            await supabaseOrderService.updateOrderStage(orderData._originalSupabaseOrder.id, targetStage);
-          } else {
-            // Shopify order not yet in Supabase – sync it first, then update stage
-            try {
-              const newOrderId = await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
-              if (newOrderId) {
-                await supabaseOrderService.updateOrderStage(newOrderId, targetStage);
+        // Single round-trip for every order already in Supabase
+        if (existingSupabaseIds.length > 0) {
+          await supabaseOrderService.bulkMarkAsPrinted(existingSupabaseIds, targetStage);
+        }
+
+        // Parallel sync (in small batches) for orders that aren't in Supabase yet
+        if (needsSync.length > 0) {
+          const SYNC_BATCH = 5;
+          for (let i = 0; i < needsSync.length; i += SYNC_BATCH) {
+            const batch = needsSync.slice(i, i + SYNC_BATCH);
+            const syncedIds = await Promise.all(batch.map(async (orderData) => {
+              try {
+                return await supabaseOrderService.syncShopifyOrderToSupabase(orderData);
+              } catch (syncErr) {
+                console.error('Failed to sync Shopify order:', syncErr);
+                return null;
               }
-            } catch (syncErr) {
-              console.error('Failed to sync & move Shopify order:', syncErr);
+            }));
+            const validIds = syncedIds.filter((id): id is string => !!id);
+            if (validIds.length > 0) {
+              await supabaseOrderService.bulkMarkAsPrinted(validIds, targetStage);
             }
           }
         }
+
         queryClient.invalidateQueries({ queryKey: ['orders'] });
       } catch (stageError) {
-        toast({ title: 'Partial Success', description: 'Labels printed but some orders may not have moved to packing.', variant: 'default' });
+        console.error('Stage update failed:', stageError);
+        stageUpdateFailed = true;
       }
 
       if (onPrintComplete) {
@@ -512,10 +539,23 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         onPrintComplete(orderIds);
       }
 
-      toast({ title: 'Success', description: `${ordersToProcess.length} label(s) printed and moved to ${bypassPacking ? 'tracking' : 'packing'}!` });
+      if (stageUpdateFailed) {
+        toast({
+          title: 'Printed, but stage update failed',
+          description: `Labels printed. Some orders may still show as "printing" — refresh to retry.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `${ordersToProcess.length} label(s) printed and moved to ${bypassPacking ? 'tracking' : 'packing'}!`,
+        });
+      }
       onClose();
     } catch (error: any) {
       toast({ title: 'Printing Failed', description: `Error: ${error.message}`, variant: 'destructive' });
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -534,16 +574,16 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !isPrinting) onClose(); }}>
       <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Print Preview</DialogTitle>
           <div className="flex items-center space-x-2">
-            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white" disabled={updateOrderStage.isPending}>
-              <Printer className="h-4 w-4 mr-2" />
-              {updateOrderStage.isPending ? 'Processing...' : bypassPacking ? 'Print & Skip to Tracking' : 'Print & Move to Packing'}
+            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white" disabled={isPrinting}>
+              <Printer className={`h-4 w-4 mr-2 ${isPrinting ? 'animate-pulse' : ''}`} />
+              {isPrinting ? 'Processing...' : bypassPacking ? 'Print & Skip to Tracking' : 'Print & Move to Packing'}
             </Button>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} disabled={isPrinting}>
               <X className="h-4 w-4" />
             </Button>
           </div>

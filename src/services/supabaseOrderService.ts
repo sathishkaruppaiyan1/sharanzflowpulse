@@ -92,6 +92,17 @@ export const supabaseOrderService = {
       updateData.printed_at = new Date().toISOString();
     } else if (stage === 'tracking') {
       updateData.packed_at = new Date().toISOString();
+      // When packing is bypassed (print → tracking directly), printed_at was
+      // never set. The enforce_printed_before_tracking DB trigger blocks the
+      // transition if printed_at is NULL, so backfill it here when missing.
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('printed_at')
+        .eq('id', orderId)
+        .single();
+      if (!existing?.printed_at) {
+        updateData.printed_at = new Date().toISOString();
+      }
     } else if (stage === 'shipped') {
       updateData.shipped_at = new Date().toISOString();
     } else if (stage === 'delivered') {
@@ -120,6 +131,21 @@ export const supabaseOrderService = {
 
     console.log(`Successfully updated order ${orderId} to stage ${stage}`);
     return data as Order;
+  },
+
+  // Bulk transition used right after a print batch. One round-trip moves every
+  // order to packing (or tracking when bypass is on) and stamps printed_at —
+  // and packed_at when bypassing — in a single SQL UPDATE.
+  async bulkMarkAsPrinted(orderIds: string[], targetStage: 'packing' | 'tracking'): Promise<void> {
+    if (orderIds.length === 0) return;
+    const now = new Date().toISOString();
+    const updateData: any = { stage: targetStage, printed_at: now };
+    if (targetStage === 'tracking') updateData.packed_at = now;
+    const { error } = await supabase.from('orders').update(updateData).in('id', orderIds);
+    if (error) {
+      console.error('Bulk mark-as-printed failed:', error);
+      throw error;
+    }
   },
 
   async updateShippingAddress(orderId: string, address: ShippingAddressUpdateInput) {
