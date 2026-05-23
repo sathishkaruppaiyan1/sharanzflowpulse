@@ -36,7 +36,7 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
   const updateOrderStage = useUpdateOrderStage();
   const queryClient = useQueryClient();
   const { fromAddress } = useFromAddress();
-  const { settings: workflowSettings } = useWorkflowSettings();
+  const { settings: workflowSettings, loading: workflowSettingsLoading } = useWorkflowSettings();
 
   const isBulkPrint = orders && orders.length > 0;
   const ordersToProcess = isBulkPrint ? orders : [order].filter(Boolean);
@@ -443,6 +443,13 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
 
   const handlePrint = async () => {
     if (isPrinting) return;
+    // Guard against firing before workflow settings have loaded — otherwise
+    // bypassPacking can be its default `false` and bulk prints land in
+    // packing instead of tracking.
+    if (workflowSettingsLoading) {
+      toast({ title: 'Loading settings…', description: 'Please wait a moment and click Print again.' });
+      return;
+    }
     setIsPrinting(true);
     try {
       // 1. Sort orders descending by numeric order_number (newest first) so print sequence is predictable
@@ -579,9 +586,15 @@ const ShippingLabelPreview = ({ open, onClose, order, orders, onPrintComplete }:
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Print Preview</DialogTitle>
           <div className="flex items-center space-x-2">
-            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white" disabled={isPrinting}>
+            <Button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white" disabled={isPrinting || workflowSettingsLoading}>
               <Printer className={`h-4 w-4 mr-2 ${isPrinting ? 'animate-pulse' : ''}`} />
-              {isPrinting ? 'Processing...' : bypassPacking ? 'Print & Skip to Tracking' : 'Print & Move to Packing'}
+              {isPrinting
+                ? 'Processing...'
+                : workflowSettingsLoading
+                  ? 'Loading settings…'
+                  : bypassPacking
+                    ? 'Print & Skip to Tracking'
+                    : 'Print & Move to Packing'}
             </Button>
             <Button variant="ghost" size="sm" onClick={onClose} disabled={isPrinting}>
               <X className="h-4 w-4" />

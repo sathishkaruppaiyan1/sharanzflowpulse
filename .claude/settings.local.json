@@ -31,7 +31,10 @@
       "Bash(python *)",
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(echo \"EXITCODE=$?\")",
-      "mcp__claude_ai_Supabase__deploy_edge_function"
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "Bash(bun run *)",
+      "PowerShell(npx tsc --noEmit; \"Exit: $LASTEXITCODE\")",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 30)"
     ],
     "deny": [],
     "ask": []
