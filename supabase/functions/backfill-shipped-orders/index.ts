@@ -12,8 +12,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MAX_PAGES_PER_CALL = 5
-const PAGE_SIZE = 250
+const MAX_PAGES_PER_CALL = 1
+const PAGE_SIZE = 100
+const PER_ORDER_TIMEOUT_MS = 10000
 
 async function getAccessTokenFromClientCredentials(
   shopName: string,
@@ -147,8 +148,14 @@ serve(async (req) => {
       }
 
       for (const order of orders) {
+        const orderLabel = order.name || String(order.id)
         try {
-          await ingestOrder(supabase, order)
+          await Promise.race([
+            ingestOrder(supabase, order),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('per-order timeout')), PER_ORDER_TIMEOUT_MS),
+            ),
+          ])
           totals.inserted++
         } catch (e) {
           const msg = (e as Error).message || String(e)
@@ -156,10 +163,12 @@ serve(async (req) => {
             totals.skipped++
           } else {
             totals.failed++
-            errors.push({ order: order.name || String(order.id), message: msg })
+            errors.push({ order: orderLabel, message: msg })
+            console.error(`Failed ${orderLabel}: ${msg}`)
           }
         }
       }
+      console.log(`Page ${pagesProcessed}: fetched=${orders.length} inserted=${totals.inserted} skipped=${totals.skipped} failed=${totals.failed}`)
 
       lastSeenId = String(orders[orders.length - 1].id)
       sinceId = lastSeenId
@@ -169,7 +178,7 @@ serve(async (req) => {
         break
       }
 
-      await new Promise(r => setTimeout(r, 400))
+      await new Promise(r => setTimeout(r, 200))
     }
 
     return new Response(
