@@ -126,7 +126,7 @@ const Dashboard = ({ userRole }: DashboardProps) => {
           {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome to Flow Pulse OFS
+              Welcome to Perfect Collections OFS
             </h2>
             <p className="text-gray-600">
               Real-time order fulfillment system - Manage your operations efficiently

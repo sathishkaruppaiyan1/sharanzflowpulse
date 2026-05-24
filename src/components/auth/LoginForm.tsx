@@ -140,7 +140,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
         } else if (data.user) {
           toast({
             title: "Sign In Successful",
-            description: "Welcome back to Flow Pulse!",
+            description: "Welcome back to Perfect Collections!",
           });
           // The onAuthStateChange in App.tsx will handle the login
         }
@@ -185,7 +185,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             </div>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Flow Pulse
+            Perfect Collections
           </h1>
           <p className="text-gray-600 mt-2">Order Fulfillment System</p>
         </div>

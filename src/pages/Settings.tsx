@@ -36,7 +36,7 @@ const Settings = () => {
               <h2 className="text-xl font-semibold text-gray-900">System Settings</h2>
             </div>
             <p className="text-gray-600">
-              Configure your Flow Pulse OFS fulfillment system and manage integrations.
+              Configure your Perfect Collections OFS fulfillment system and manage integrations.
             </p>
           </div>
 

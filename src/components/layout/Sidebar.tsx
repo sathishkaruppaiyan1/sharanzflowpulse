@@ -95,7 +95,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
           </div>
           <div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Flow Pulse OFS
+              Perfect Collections OFS
             </h1>
           </div>
         </div>

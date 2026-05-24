@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
           id: fulfillmentOrder.id,
           fulfillmentHold: {
             reason: 'OTHER',
-            reasonNotes: 'Moved to hold from Sharanz Flow Pulse orders page',
+            reasonNotes: 'Moved to hold from Perfect Collections orders page',
           },
         })
         const userErrors = holdJson?.data?.fulfillmentOrderHold?.userErrors || []
@@ -307,7 +307,7 @@ Deno.serve(async (req: Request) => {
         const progressJson = await gql(reportProgressMutation, {
           id: fulfillmentOrder.id,
           progressReport: {
-            reasonNotes: 'Moved to in progress from Sharanz Flow Pulse orders page',
+            reasonNotes: 'Moved to in progress from Perfect Collections orders page',
           },
         })
         const userErrors = progressJson?.data?.fulfillmentOrderReportProgress?.userErrors || []
