@@ -12,6 +12,7 @@ import SystemConfiguration from '@/components/settings/SystemConfiguration';
 import ApiConfiguration from '@/components/settings/ApiConfiguration';
 import CourierSettings from '@/components/settings/CourierSettings';
 import UserManagement from '@/components/settings/UserManagement';
+import BackfillShippedOrders from '@/components/settings/BackfillShippedOrders';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -41,11 +42,12 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="system" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="system">System</TabsTrigger>
               <TabsTrigger value="api">API</TabsTrigger>
               <TabsTrigger value="couriers">Couriers</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="backfill">Backfill</TabsTrigger>
               <TabsTrigger value="password">Password</TabsTrigger>
               <TabsTrigger value="logs">Logs</TabsTrigger>
             </TabsList>
@@ -64,6 +66,10 @@ const Settings = () => {
 
             <TabsContent value="users" className="space-y-6">
               <UserManagement />
+            </TabsContent>
+
+            <TabsContent value="backfill" className="space-y-6">
+              <BackfillShippedOrders />
             </TabsContent>
 
             <TabsContent value="password" className="space-y-6">
