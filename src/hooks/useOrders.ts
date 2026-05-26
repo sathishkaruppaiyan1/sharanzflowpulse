@@ -176,6 +176,71 @@ export const useUpdateTracking = () => {
   });
 };
 
+// Optimistic-UI variant of useUpdateTracking: only awaits the DB update
+// (the step that actually moves the order to 'shipped'). WhatsApp, Shopify
+// fulfillment, and Parcel Panel run in the background and emit per-order
+// toasts when they finish. Use this on scan-heavy pages where perceived
+// latency must stay under ~300ms.
+export const useUpdateTrackingFast = () => {
+  const queryClient = useQueryClient();
+  const { service: parcelPanelService, isConfigured: parcelPanelConfigured } = useParcelPanelService();
+
+  return useMutation({
+    mutationFn: async ({
+      order,
+      trackingNumber,
+      carrierName,
+      trackingUrl = '',
+    }: {
+      order: Order;
+      trackingNumber: string;
+      carrierName: string;
+      trackingUrl?: string;
+    }) => {
+      const updated = await supabaseOrderService.updateTrackingFast(
+        order.id,
+        trackingNumber,
+        carrierName,
+        trackingUrl,
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+
+      void (async () => {
+        const result = await supabaseOrderService.syncTrackingNotifications(
+          order,
+          trackingNumber,
+          carrierName,
+          trackingUrl,
+        );
+
+        if (result.whatsappSuccess && result.shopifySuccess) {
+          toast.success(`${updated.order_number}: WhatsApp & Shopify synced`);
+        } else {
+          if (!result.whatsappSuccess) toast.warning(`${updated.order_number} — WhatsApp: ${result.whatsappError ?? 'failed'}`);
+          if (!result.shopifySuccess && order.shopify_order_id) {
+            toast.warning(`${updated.order_number} — Shopify: ${result.shopifyError ?? 'failed'}`);
+          }
+        }
+
+        if (parcelPanelConfigured && parcelPanelService) {
+          try {
+            await parcelPanelService.fetchAndStoreTrackingDetails(trackingNumber, order.id);
+          } catch (e) {
+            console.error('Parcel Panel auto-fetch failed:', e);
+          }
+        }
+      })();
+
+      return updated;
+    },
+    onError: (error) => {
+      console.error('Fast tracking update failed:', error);
+      toast.error('Failed to save tracking — order not moved to shipped');
+    },
+  });
+};
+
 export const useBulkUpdateOrderStage = () => {
   const queryClient = useQueryClient();
   

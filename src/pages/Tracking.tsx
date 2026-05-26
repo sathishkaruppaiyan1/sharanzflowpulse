@@ -3,7 +3,7 @@ import { Truck, Scan, Package, MapPin, CheckCircle, XCircle, MessageCircle, Sett
 import Header from '@/components/layout/Header';
 import TrackingQueue from '@/components/tracking/TrackingQueue';
 import TrackingStats from '@/components/tracking/TrackingStats';
-import { useOrdersByStage, useUpdateTracking, useBulkUpdateOrderStage } from '@/hooks/useOrders';
+import { useOrdersByStage, useUpdateTrackingFast, useBulkUpdateOrderStage } from '@/hooks/useOrders';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { useSoundNotifications } from '@/hooks/useSoundNotifications';
 
 const Tracking = () => {
   const { data: allTrackingOrders = [], isLoading, error } = useOrdersByStage('tracking');
-  const updateTrackingMutation = useUpdateTracking();
+  const updateTrackingMutation = useUpdateTrackingFast();
   const bulkUpdateStageMutation = useBulkUpdateOrderStage();
   const { data: couriers = [] } = useCourierPartners();
   const { heldIds: shopifyHeldIds } = useShopifyHeldOrderIds();
@@ -297,39 +297,23 @@ const Tracking = () => {
     const carrierDisplayName = detectedCourier?.name || 'Unknown Courier';
 
     setDetectedCarrier(carrierDisplayName);
-    setWhatsappStatus('pending');
-    setShopifyStatus('pending');
     setIsProcessingTracking(true);
     setLastProcessedTrackingNumber(trackingNumber);
     lastScanTimeRef.current = currentTime;
-    
-    try {
-      console.log('🚀 Starting tracking update process...');
 
-      // Update tracking information (this automatically moves order to shipped stage)
+    try {
+      // Only the DB update is awaited. WhatsApp + Shopify + Parcel Panel
+      // run in the background; their per-order results surface as toasts.
       const detectedCourierForSubmit = detectCourierByPrefix(trackingNumber, couriers);
-      const result = await updateTrackingMutation.mutateAsync({
-        orderId: currentOrder.id,
-        trackingNumber: trackingNumber,
+      await updateTrackingMutation.mutateAsync({
+        order: currentOrder,
+        trackingNumber,
         carrierName: detectedCourierForSubmit?.name || carrierDisplayName,
-        trackingUrl: buildTrackingUrl(trackingNumber, detectedCourierForSubmit?.tracking_url ?? null)
+        trackingUrl: buildTrackingUrl(trackingNumber, detectedCourierForSubmit?.tracking_url ?? null),
       });
 
-      // Play success sound for successful tracking update
       playCompleteSound();
 
-      // Use actual API results for status indicators
-      setWhatsappStatus(result.whatsappSuccess ? 'success' : 'failed');
-      setShopifyStatus(result.shopifySuccess ? 'success' : 'failed');
-
-      if (!result.whatsappSuccess) {
-        console.log('❌ WhatsApp failed:', result.whatsappError);
-      }
-      if (!result.shopifySuccess) {
-        console.log('❌ Shopify failed:', result.shopifyError);
-      }
-
-      // Reset form after successful update
       setOrderIdInput('');
       setTrackingNumberInput('');
       setCurrentOrder(null);
@@ -337,20 +321,10 @@ const Tracking = () => {
       setIsOrderLocked(false);
       setIsProcessingTracking(false);
       setLastProcessedTrackingNumber('');
-
-      // Reset status indicators after a delay
-      setTimeout(() => {
-        setWhatsappStatus(null);
-        setShopifyStatus(null);
-      }, 5000);
-
     } catch (error) {
-      console.error('❌ Error updating tracking:', error);
+      console.error('Tracking DB update failed:', error);
       playErrorSound();
-      setWhatsappStatus('failed');
-      setShopifyStatus('failed');
       setIsProcessingTracking(false);
-      toast.error('Failed to update tracking information');
     }
   };
 
@@ -658,18 +632,14 @@ const Tracking = () => {
                             setDetectedCarrier('');
                           }
 
-                          // Auto-submit debounce — fires 400ms after typing stops
-                          // Barcode scanners type very fast then stop; this handles both
-                          // scanners (no Enter) and manual entry (waits for pause)
+                          // Auto-submit 100ms after typing stops — catches scanners that don't send Enter.
                           if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
                           if (val.trim().length >= 6) {
                             scanDebounceRef.current = setTimeout(() => {
-                              // Only auto-submit if still focused on tracking input
-                              // and not already processing
                               if (!isProcessingTracking && val.trim()) {
                                 handleTrackingNumberScan();
                               }
-                            }, 400);
+                            }, 100);
                           }
                         }}
                         onKeyDown={(e) => {

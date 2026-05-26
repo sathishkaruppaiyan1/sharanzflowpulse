@@ -289,6 +289,75 @@ export const supabaseOrderService = {
     return { order, whatsappSuccess, shopifySuccess, whatsappError: whatsappErrorMsg, shopifyError: shopifyErrorMsg };
   },
 
+  // Fast path: DB update only. No joins, no WhatsApp, no Shopify.
+  // Returns the lean updated row so the UI can release immediately.
+  // Pair with syncTrackingNotifications() to fan out the slow external calls in the background.
+  async updateTrackingFast(
+    orderId: string,
+    trackingNumber: string,
+    carrierName: string,
+    trackingUrl: string = '',
+  ): Promise<{ id: string; order_number: string; stage: OrderStage; shopify_order_id: number | null }> {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        tracking_number: trackingNumber,
+        carrier: carrierName,
+        tracking_url: trackingUrl,
+        stage: 'shipped' as OrderStage,
+        shipped_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .select('id, order_number, stage, shopify_order_id')
+      .single();
+
+    if (error) throw error;
+    return data as { id: string; order_number: string; stage: OrderStage; shopify_order_id: number | null };
+  },
+
+  // Slow path: WhatsApp + Shopify (and optional Parcel Panel handled by caller).
+  // Designed to be fired in the background after updateTrackingFast resolves.
+  async syncTrackingNotifications(
+    order: Order,
+    trackingNumber: string,
+    carrierName: string,
+    trackingUrl: string = '',
+  ): Promise<{ whatsappSuccess: boolean; whatsappError?: string; shopifySuccess: boolean; shopifyError?: string }> {
+    let whatsappSuccess = false;
+    let whatsappErrorMsg: string | undefined;
+    let shopifySuccess = false;
+    let shopifyErrorMsg: string | undefined;
+
+    const whatsappPromise = (async () => {
+      try {
+        if (!order.customer?.phone) {
+          whatsappErrorMsg = 'No phone number available';
+          return;
+        }
+        whatsappSuccess = await sendOrderShippedNotification(order, trackingNumber, carrierName, trackingUrl);
+        if (!whatsappSuccess) whatsappErrorMsg = 'Interakt API returned failure';
+      } catch (e) {
+        whatsappErrorMsg = e instanceof Error ? e.message : String(e);
+      }
+    })();
+
+    const shopifyPromise = (async () => {
+      if (!order.shopify_order_id) {
+        shopifyErrorMsg = 'No Shopify order ID found';
+        return;
+      }
+      try {
+        await this.updateShopifyOrderFulfillment(order.shopify_order_id.toString(), trackingNumber, carrierName, trackingUrl);
+        shopifySuccess = true;
+      } catch (e) {
+        shopifyErrorMsg = e instanceof Error ? e.message : String(e);
+      }
+    })();
+
+    await Promise.all([whatsappPromise, shopifyPromise]);
+    return { whatsappSuccess, whatsappError: whatsappErrorMsg, shopifySuccess, shopifyError: shopifyErrorMsg };
+  },
+
   async updateShopifyOrderFulfillment(shopifyOrderId: string, trackingNumber: string, carrierName: string, trackingUrl: string = ''): Promise<void> {
     console.log(`🔄 Shopify fulfillment update — Order: ${shopifyOrderId}, Tracking: ${trackingNumber}, Carrier: ${carrierName}`);
 
