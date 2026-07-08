@@ -85,6 +85,29 @@ export const useOrders = () => {
   });
 };
 
+// Lightweight hook for the always-mounted Sidebar: it only needs the id /
+// stage / shopify_order_id of orders in the "hold" stage to compute the hold
+// badge count. Fetching the full orders table with all relations here (as
+// useOrders does) was a major source of egress, so keep this query minimal.
+export const useHoldOrderRefs = () => {
+  return useQuery({
+    queryKey: ['orders', 'hold-refs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, stage, shopify_order_id')
+        .eq('stage', 'hold');
+
+      if (error) {
+        console.error('Error fetching hold order refs:', error);
+        throw error;
+      }
+
+      return data || [];
+    },
+  });
+};
+
 export const useUpdateOrderStage = () => {
   const queryClient = useQueryClient();
   

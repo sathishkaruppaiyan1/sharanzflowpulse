@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useWorkflowSettings } from '@/hooks/useWorkflowSettings';
-import { useOrders } from '@/hooks/useOrders';
+import { useHoldOrderRefs } from '@/hooks/useOrders';
 import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { useStageCounts, StageCounts } from '@/hooks/useStageCounts';
 
@@ -39,7 +39,7 @@ const Sidebar = ({ user, onLogout }: SidebarProps) => {
   const { settings } = useWorkflowSettings();
   const [bypassPacking, setBypassPacking] = useState(false);
   const { data: stageCounts } = useStageCounts();
-  const { data: internalOrders = [] } = useOrders();
+  const { data: internalOrders = [] } = useHoldOrderRefs();
   const { heldIds: shopifyHeldIds } = useShopifyHeldOrderIds();
 
   useEffect(() => {

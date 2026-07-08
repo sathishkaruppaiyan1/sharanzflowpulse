@@ -19,7 +19,17 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Shipping from './pages/Shipping';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Treat data as fresh for 1 minute to dedupe rapid refetches and cut egress.
+      staleTime: 60 * 1000,
+      // Don't refetch every query on every tab focus. Hooks that need this
+      // still opt in explicitly via refetchOnWindowFocus: true.
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const normalizeRole = (role: unknown) => role === 'admin' ? 'admin' : 'staff';
 

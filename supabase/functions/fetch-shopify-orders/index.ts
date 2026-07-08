@@ -194,6 +194,51 @@ serve(async (req) => {
     const allOrders = await fetchAllOrders()
     console.log(`FINAL RESULT - Total orders fetched: ${allOrders.length}`)
 
+    // Slim each nested object down to only the fields the client UI
+    // (ShopifyOrder) and the sync_shopify_order_to_db RPC actually read. Raw
+    // Shopify line items/customer/address carry a lot of unused bulk
+    // (tax_lines, discount_allocations, price_set, default_address, tags, …)
+    // that would otherwise be transferred on every 5-minute refetch. Keeping
+    // only the used fields cuts this response substantially with no behavior
+    // change downstream.
+    const slimCustomer = (c: any) =>
+      c
+        ? {
+            id: c.id,
+            first_name: c.first_name,
+            last_name: c.last_name,
+            email: c.email,
+            phone: c.phone,
+          }
+        : c
+    const slimAddress = (a: any) =>
+      a
+        ? {
+            address1: a.address1,
+            address2: a.address2,
+            city: a.city,
+            province: a.province,
+            zip: a.zip,
+            country: a.country,
+            phone: a.phone,
+          }
+        : a
+    const slimLineItem = (li: any) => ({
+      // UI fields
+      title: li.title,
+      name: li.name,
+      quantity: li.quantity,
+      variant_title: li.variant_title,
+      price: li.price,
+      sku: li.sku,
+      variant_id: li.variant_id,
+      // Fields consumed by the DB sync RPC / UI weight & product logic
+      product_id: li.product_id,
+      grams: li.grams,
+      properties: li.properties,
+      variant_details: li.variant_details,
+    })
+
     const transformedOrders = allOrders.map((order: any) => {
       const customerPhone = order.customer?.phone
       const shippingPhone = order.shipping_address?.phone
@@ -205,14 +250,14 @@ serve(async (req) => {
         customer_name: order.customer
           ? `${order.customer.first_name || ''} ${order.customer.last_name || ''}`.trim() || 'Guest'
           : 'Guest',
-        customer: order.customer,
+        customer: slimCustomer(order.customer),
         total_amount: order.current_total_price,
         currency: order.currency,
         created_at: order.created_at,
         financial_status: order.financial_status || 'pending',
         fulfillment_status: order.fulfillment_status || 'unfulfilled',
-        line_items: order.line_items || [],
-        shipping_address: order.shipping_address,
+        line_items: (order.line_items || []).map(slimLineItem),
+        shipping_address: slimAddress(order.shipping_address),
         total_weight: order.total_weight,
         current_total_price: order.current_total_price,
         phone: orderPhone,

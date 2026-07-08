@@ -50,7 +50,7 @@ export const useTrackingOrders = () => {
       const orderIds = orders.map(order => order.id);
       const { data: trackingDetails, error: trackingError } = await supabase
         .from('order_tracking_details')
-        .select('*')
+        .select('order_id, tracking_number, courier_name, status, sub_status, last_updated')
         .in('order_id', orderIds);
 
       if (trackingError) {

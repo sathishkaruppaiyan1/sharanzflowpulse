@@ -41,7 +41,7 @@ export const useParcelPanelAnalytics = () => {
       // Since we only have tracking functionality, we'll generate basic analytics from stored data
       const { data: trackingData, error } = await supabase
         .from('delivery_tracking_details')
-        .select('*')
+        .select('status')
         .order('last_updated', { ascending: false })
         .limit(100);
 

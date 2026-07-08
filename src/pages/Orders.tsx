@@ -142,6 +142,23 @@ const Orders = () => {
     );
   }, [internalOrders]);
 
+  // An order that has already been imported into the internal workflow (any
+  // stage past "new/pending") lives on its stage page — Printing, Packing,
+  // Tracking, Shipping. Such orders stay "unfulfilled" on Shopify until they
+  // ship, so without this guard they'd appear on the Orders (new) page AND in
+  // their workflow stage, i.e. the same order duplicated across stages.
+  const WORKFLOW_STAGES = useMemo(
+    () => new Set(['printing', 'packing', 'tracking', 'shipped', 'delivered']),
+    []
+  );
+  const isOrderInWorkflow = useCallback(
+    (orderId: string | number) => {
+      const internalOrder = internalOrderMap.get(Number(orderId));
+      return internalOrder ? WORKFLOW_STAGES.has(String(internalOrder.stage)) : false;
+    },
+    [internalOrderMap, WORKFLOW_STAGES]
+  );
+
   // An order is "held" if EITHER the DB stage is 'hold' OR Shopify reports a
   // fulfillment hold against it. Used by both tab counts and filtering below.
   const isOrderHeld = useCallback(
@@ -176,6 +193,8 @@ const Orders = () => {
     let hold = 0;
 
     shopifyOrders.forEach(order => {
+      // Already advanced into a workflow stage — counted on its stage page, not here.
+      if (isOrderInWorkflow(order.id)) return;
       if (isOrderHeld(order.id)) {
         hold += 1;
       } else if (isOrderInProgress(order.id)) {
@@ -186,11 +205,15 @@ const Orders = () => {
     });
 
     return { processing, inprogress, hold };
-  }, [shopifyOrders, isOrderHeld, isOrderInProgress]);
+  }, [shopifyOrders, isOrderHeld, isOrderInProgress, isOrderInWorkflow]);
 
   // Memoized filter function for better performance
   const filteredOrders = useMemo(() => {
     return shopifyOrders.filter(order => {
+      // Hide orders that have already entered a workflow stage — they belong to
+      // their stage page (Printing/Packing/Tracking/Shipping), not this list.
+      if (isOrderInWorkflow(order.id)) return false;
+
       const held = isOrderHeld(order.id);
       const inProgress = isOrderInProgress(order.id);
 
@@ -249,7 +272,7 @@ const Orders = () => {
         (order.id || '').toString().toLowerCase().includes(lowercaseSearch)
       );
     });
-  }, [shopifyOrders, isOrderHeld, isOrderInProgress, activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
+  }, [shopifyOrders, isOrderHeld, isOrderInProgress, isOrderInWorkflow, activeTab, debouncedSearchTerm, statusFilter, dateFilter]);
 
   // Calculate pagination values - memoized
   const paginationData = useMemo(() => {
