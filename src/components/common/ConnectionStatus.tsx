@@ -25,10 +25,6 @@ const ConnectionStatus = () => {
       name: 'Interakt BSP',
       enabled: apiConfigs.interakt?.enabled && apiConfigs.interakt?.api_key,
     },
-    {
-      name: 'Parcel Panel',
-      enabled: apiConfigs.parcel_panel?.enabled && apiConfigs.parcel_panel?.api_key,
-    }
   ];
 
   const connectedCount = connections.filter(conn => conn.enabled).length;

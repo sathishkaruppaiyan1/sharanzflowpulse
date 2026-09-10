@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useParcelPanelService } from '@/services/parcelPanelService';
 
 export interface TrackingOrder {
   id: string;
@@ -19,25 +18,21 @@ export const useTrackingOrders = () => {
   const [trackingOrders, setTrackingOrders] = useState<TrackingOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { service, isConfigured } = useParcelPanelService();
 
-  // Fetch orders in tracking stage with their tracking details
+  // Read orders in the tracking stage and join whatever tracking rows we
+  // already hold. This is now database-only — the Parcel Panel integration
+  // that used to back-fill missing rows has been removed.
   const fetchTrackingOrders = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // First get orders in tracking stage
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          order_number,
-          stage,
-          updated_at
-        `)
+        .select('id, order_number, stage, updated_at')
         .eq('stage', 'tracking')
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .limit(500);
 
       if (ordersError) throw ordersError;
 
@@ -46,7 +41,6 @@ export const useTrackingOrders = () => {
         return;
       }
 
-      // Get tracking details for these orders
       const orderIds = orders.map(order => order.id);
       const { data: trackingDetails, error: trackingError } = await supabase
         .from('order_tracking_details')
@@ -58,9 +52,12 @@ export const useTrackingOrders = () => {
         // Continue without tracking details if there's an error
       }
 
-      // Combine orders with their tracking details
+      const byOrderId = new Map(
+        (trackingDetails || []).map(t => [t.order_id, t])
+      );
+
       const combinedOrders: TrackingOrder[] = orders.map(order => {
-        const tracking = trackingDetails?.find(t => t.order_id === order.id);
+        const tracking = byOrderId.get(order.id);
         return {
           id: order.id,
           order_number: order.order_number,
@@ -70,17 +67,11 @@ export const useTrackingOrders = () => {
           courier_name: tracking?.courier_name,
           tracking_status: tracking?.status,
           tracking_sub_status: tracking?.sub_status,
-          tracking_last_updated: tracking?.last_updated
+          tracking_last_updated: tracking?.last_updated,
         };
       });
 
       setTrackingOrders(combinedOrders);
-
-      // Auto-fetch tracking details for orders that don't have them yet
-      if (service && isConfigured) {
-        await autoFetchMissingTracking(combinedOrders);
-      }
-
     } catch (err: any) {
       console.error('Error fetching tracking orders:', err);
       setError(err.message || 'Failed to fetch tracking orders');
@@ -89,83 +80,24 @@ export const useTrackingOrders = () => {
     }
   };
 
-  // Auto-fetch tracking details for orders without tracking information
-  const autoFetchMissingTracking = async (orders: TrackingOrder[]) => {
-    const ordersWithoutTracking = orders.filter(order => !order.tracking_status);
-    
-    if (ordersWithoutTracking.length === 0) return;
-
-    console.log(`🔄 Auto-fetching tracking for ${ordersWithoutTracking.length} orders without tracking data`);
-
-    for (const order of ordersWithoutTracking) {
-      try {
-        await service!.fetchAndStoreTrackingDetails(order.order_number, order.id);
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.error(`Failed to auto-fetch tracking for order ${order.order_number}:`, error);
-      }
-    }
-
-    // Refresh the list after auto-fetching
-    setTimeout(() => {
-      fetchTrackingOrders();
-    }, 2000);
-  };
-
-  // Refresh tracking data for all orders
+  // "Refresh" is now just a re-read of what's stored.
   const refreshTracking = async () => {
-    if (!service || !isConfigured) {
-      setError('Parcel Panel API is not configured');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, order_number')
-        .eq('stage', 'tracking');
-
-      if (ordersError) throw ordersError;
-
-      if (orders && orders.length > 0) {
-        console.log(`🔄 Refreshing tracking for ${orders.length} orders`);
-        
-        for (const order of orders) {
-          try {
-            await service.fetchAndStoreTrackingDetails(order.order_number, order.id);
-            // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (error) {
-            console.error(`Failed to refresh tracking for order ${order.order_number}:`, error);
-          }
-        }
-      }
-
-      // Refresh the displayed data
-      await fetchTrackingOrders();
-    } catch (err: any) {
-      console.error('Error refreshing tracking:', err);
-      setError(err.message || 'Failed to refresh tracking data');
-    } finally {
-      setIsLoading(false);
-    }
+    await fetchTrackingOrders();
   };
 
-  // Load tracking orders on component mount
   useEffect(() => {
     fetchTrackingOrders();
   }, []);
 
-  // Auto-refresh every 5 minutes
+  // Re-read every 5 minutes, but only while the tab is actually visible —
+  // background tabs used to keep polling and burn request quota for nothing.
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchTrackingOrders();
-    }, 5 * 60 * 1000); // 5 minutes
-
+    const tick = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTrackingOrders();
+      }
+    };
+    const interval = setInterval(tick, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -174,6 +106,6 @@ export const useTrackingOrders = () => {
     isLoading,
     error,
     fetchTrackingOrders,
-    refreshTracking
+    refreshTracking,
   };
 };

@@ -10,6 +10,8 @@ export interface ShopifyOrder {
   total_amount: string;
   currency: string;
   created_at: string;
+  /** Shopify's own last-modified stamp; used to skip unchanged orders on sync. */
+  updated_at?: string;
   financial_status: string;
   fulfillment_status: string;
   phone?: string | null;

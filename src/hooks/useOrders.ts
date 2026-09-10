@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStage } from '@/types/database';
 import { toast } from 'sonner';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
-import { useParcelPanelService } from '@/services/parcelPanelService';
 
 export const useOrdersByStage = (stages: string | string[]) => {
   const stageArray = Array.isArray(stages) ? stages : [stages];
@@ -31,59 +30,17 @@ export const useOrdersByStage = (stages: string | string[]) => {
       }
 
       console.log(`Fetched ${data?.length || 0} orders for stage ${stageArray.join(', ')}`);
-      console.log('Successfully fetched', data?.length || 0, 'orders for stage', stageArray.join(', '));
-
-      // Debug log for each order
-      data?.forEach(order => {
-        console.log(`\n--- Order ${order.order_number} Debug ---`);
-        console.log('Stage:', order.stage);
-        console.log('Order items count:', order.order_items?.length || 0);
-        console.log('Customer phone:', order.customer?.phone);
-        console.log('Shipping address exists:', !!order.shipping_address);
-        
-        order.order_items?.forEach(item => {
-          console.log(`  Item: ${item.title}, qty: ${item.quantity}, packed: ${item.packed}, SKU: ${item.sku || 'N/A'}`);
-        });
-        
-        const totalQty = order.order_items?.length || 0;
-        const packedQty = order.order_items?.filter(item => item.packed).length || 0;
-        console.log(`  Total qty: ${totalQty}, Packed qty: ${packedQty}`);
-      });
-
-      console.log('Total unique orders fetched:', data?.length || 0);
-      
       return (data as Order[]) || [];
     },
   });
 };
 
-// Add the missing useOrders export that other components depend on
-export const useOrders = () => {
-  return useQuery({
-    queryKey: ['orders'],
-    queryFn: async () => {
-      console.log('Fetching all orders');
-      
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          customer:customers(*),
-          shipping_address:addresses!orders_shipping_address_id_fkey(*),
-          order_items(*)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching all orders:', error);
-        throw error;
-      }
-
-      console.log(`Fetched ${data?.length || 0} total orders`);
-      return (data as Order[]) || [];
-    },
-  });
-};
+// NOTE: the old `useOrders()` hook was removed. It selected the entire orders
+// table with customer, address and order_items embedded and no limit, which
+// PostgREST silently truncated at 1000 rows — so it was both the single
+// largest source of egress on this project and quietly wrong. Use
+// `useOrdersInRange` (analytics/shipping), `useShopifyOrderRefs` (id/stage
+// lookups), `useOrdersByStage` (queues) or `useStageCounts` (totals) instead.
 
 // Lightweight hook for the always-mounted Sidebar: it only needs the id /
 // stage / shopify_order_id of orders in the "hold" stage to compute the hold
@@ -147,7 +104,6 @@ export const useUpdateOrderStage = () => {
 
 export const useUpdateTracking = () => {
   const queryClient = useQueryClient();
-  const { service: parcelPanelService, isConfigured } = useParcelPanelService();
 
   return useMutation({
     mutationFn: async ({
@@ -164,17 +120,6 @@ export const useUpdateTracking = () => {
       console.log(`🚀 Starting tracking update for order ${orderId}: ${trackingNumber} via ${carrierName}`);
 
       const result = await supabaseOrderService.updateTracking(orderId, trackingNumber, carrierName, trackingUrl);
-
-      // Auto-fetch tracking details from Parcel Panel if configured
-      if (isConfigured && parcelPanelService) {
-        try {
-          console.log('🔄 Auto-fetching tracking details from Parcel Panel...');
-          await parcelPanelService.fetchAndStoreTrackingDetails(trackingNumber, orderId);
-          console.log('✅ Tracking details auto-fetched and stored');
-        } catch (error) {
-          console.error('❌ Error auto-fetching tracking details:', error);
-        }
-      }
 
       console.log(`✅ Successfully updated tracking for order ${orderId}`);
       return result;
@@ -267,5 +212,94 @@ export const useBulkUpdateOrderStage = () => {
       console.error('Error bulk updating order stages:', error);
       toast.error('Failed to bulk update order stages');
     },
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Analytics / Shipping: a bounded window instead of the whole table.
+//
+// Those pages used to call useOrders() — every order, with customer, address
+// and order_items embedded — and then filter by date and search string in the
+// browser. That was ~2 MB per page visit and, because PostgREST caps rows at
+// 1000, it silently discarded most of the table so the numbers were wrong too.
+//
+// This pushes the date window to the server and selects only the columns the
+// two screens actually render. Search stays client-side, which is fine now
+// that the window it searches is bounded.
+// ---------------------------------------------------------------------------
+
+/** Columns actually rendered by CompletedOrdersList and PerformanceMetrics. */
+const ANALYTICS_COLUMNS =
+  'id, order_number, created_at, shipped_at, stage, carrier, tracking_number, total_amount, shopify_order_id, customer:customers(first_name, last_name, phone)';
+
+const DEFAULT_WINDOW_DAYS = 90;
+const MAX_ROWS = 1000;
+
+export interface OrdersRange {
+  from?: Date;
+  to?: Date;
+}
+
+export const useOrdersInRange = (range: OrdersRange) => {
+  const to = range.to ?? new Date();
+  const from =
+    range.from ?? new Date(to.getTime() - DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
+
+  return useQuery({
+    queryKey: ['orders', 'range', fromIso, toIso],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(ANALYTICS_COLUMNS)
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: false })
+        .limit(MAX_ROWS);
+
+      if (error) {
+        console.error('Error fetching orders in range:', error);
+        throw error;
+      }
+
+      return (data as unknown as Order[]) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+/**
+ * Lightweight lookup used by the Orders page to decide which Shopify orders
+ * already exist internally and what stage they're in.
+ *
+ * This replaces a useOrders() call that pulled the entire orders table with
+ * customer, address and order_items embedded — the page only ever read four
+ * scalar columns off each row.
+ */
+export const useShopifyOrderRefs = () => {
+  return useQuery({
+    queryKey: ['orders', 'shopify-refs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, stage, shopify_order_id')
+        .not('shopify_order_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(2000);
+
+      if (error) {
+        console.error('Error fetching shopify order refs:', error);
+        throw error;
+      }
+
+      return (data as unknown as Order[]) || [];
+    },
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 };

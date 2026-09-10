@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Order, OrderStage, CarrierType } from '@/types/database';
 import { sendOrderShippedNotification } from '@/services/interakt/orderNotificationService';
-import { ParcelPanelService } from '@/services/parcelPanelService';
 
 type ShippingAddressUpdateInput = {
   address_line_1: string;

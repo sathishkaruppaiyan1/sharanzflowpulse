@@ -5,13 +5,12 @@ import Header from '@/components/layout/Header';
 import PerformanceMetrics from '@/components/analytics/PerformanceMetrics';
 import CompletedOrdersList from '@/components/analytics/CompletedOrdersList';
 import DateRangePicker from '@/components/analytics/DateRangePicker';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrdersInRange } from '@/hooks/useOrders';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Order } from '@/types/database';
 
 const Analytics = () => {
-  const { data: orders = [], isLoading, error } = useOrders();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
@@ -20,6 +19,9 @@ const Analytics = () => {
     from: undefined,
     to: undefined,
   });
+
+  // Only the selected window is fetched (defaults to the last 90 days).
+  const { data: orders = [], isLoading, error } = useOrdersInRange(dateRange);
 
   const filteredOrders = useMemo(() => {
     let filtered = orders;
@@ -35,26 +37,10 @@ const Analytics = () => {
       );
     }
 
-    // Apply date range filter
-    if (dateRange.from || dateRange.to) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at);
-        const from = dateRange.from;
-        const to = dateRange.to;
-        
-        if (from && to) {
-          return orderDate >= from && orderDate <= to;
-        } else if (from) {
-          return orderDate >= from;
-        } else if (to) {
-          return orderDate <= to;
-        }
-        return true;
-      });
-    }
-
+    // The date window is applied server-side by useOrdersInRange, so there is
+    // nothing left to filter by date here.
     return filtered;
-  }, [orders, searchQuery, dateRange]);
+  }, [orders, searchQuery]);
 
   if (isLoading) {
     return (

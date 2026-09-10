@@ -46,6 +46,15 @@ const Printing = () => {
   const [todayPrintedCount, setTodayPrintedCount] = useState(0);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Remembers, per Shopify order id, the version we last pushed into the DB
+  // and when. The sync used to re-upsert every pre-print order on every tick
+  // regardless of whether anything had changed; this lets it skip the ones
+  // that are already up to date.
+  const syncedOrderVersions = React.useRef(
+    new Map<number, { stamp: string; at: number }>()
+  );
+  const REFRESH_TTL_MS = 30 * 60 * 1000;
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [syncStats, setSyncStats] = useState({ total: 0, synced: 0, inDb: 0 });
 
@@ -167,13 +176,38 @@ const Printing = () => {
       const shopifyResult = await refetchShopify();
       const latestShopifyOrders = shopifyResult.data ?? shopifyOrders;
 
-      // 2. Get all orders already in Supabase
-      const { data: existingOrders, error: fetchError } = await supabase
-        .from('orders')
-        .select('shopify_order_id, id, stage')
-        .not('shopify_order_id', 'is', null);
+      // 2. Look up which of *these* Shopify orders we already hold.
+      //
+      //    This used to be `.not('shopify_order_id', 'is', null)` with no
+      //    filter, which PostgREST silently capped at 1000 rows. With ~38k
+      //    orders in the table that meant the map below was missing ~97% of
+      //    them, every unfulfilled Shopify order looked brand new, and the
+      //    sync re-upserted the whole batch every two minutes — tens of
+      //    thousands of wasted writes a day.
+      //
+      //    Querying by the ids we actually care about is bounded, correct,
+      //    and returns a few hundred bytes instead of a megabyte.
+      const shopifyIdsToCheck = Array.from(
+        new Set(
+          latestShopifyOrders
+            .map(order => Number(order.id))
+            .filter((id): id is number => Number.isFinite(id))
+        )
+      );
 
-      if (fetchError) throw fetchError;
+      const existingOrders: Array<{ shopify_order_id: number | null; id: string; stage: string | null }> = [];
+      const LOOKUP_CHUNK = 200; // keep the request URL well under any length limit
+
+      for (let i = 0; i < shopifyIdsToCheck.length; i += LOOKUP_CHUNK) {
+        const chunk = shopifyIdsToCheck.slice(i, i + LOOKUP_CHUNK);
+        const { data, error: fetchError } = await supabase
+          .from('orders')
+          .select('shopify_order_id, id, stage')
+          .in('shopify_order_id', chunk);
+
+        if (fetchError) throw fetchError;
+        if (data) existingOrders.push(...(data as typeof existingOrders));
+      }
 
       const existingByShopifyId = new Map<number, { id: string; stage: string | null }>();
       existingOrders.forEach((o: any) => {
@@ -213,7 +247,19 @@ const Printing = () => {
         }
         // Refresh pre-print orders so Shopify edits (address, items) flow through
         if (refreshableStages.has(rec.stage || '')) {
-          ordersToRefresh.push(order);
+          // Only refresh when Shopify says the order changed since we last
+          // pushed it (or when our record of it has gone stale). Orders whose
+          // `updated_at` is unchanged are already in sync, so re-upserting
+          // them is pure waste.
+          const shopifyId = Number(order.id);
+          const stamp = String(order.updated_at ?? '');
+          const seen = syncedOrderVersions.current.get(shopifyId);
+          const isUnchanged =
+            seen && seen.stamp === stamp && Date.now() - seen.at < REFRESH_TTL_MS;
+
+          if (!isUnchanged) {
+            ordersToRefresh.push(order);
+          }
         }
       });
 
@@ -253,6 +299,11 @@ const Printing = () => {
           await Promise.all(batch.map(async (shopifyOrder) => {
             try {
               await supabaseOrderService.refreshOrderFromShopify(shopifyOrder);
+              // Record the version we just pushed so the next tick can skip it.
+              syncedOrderVersions.current.set(Number(shopifyOrder.id), {
+                stamp: String(shopifyOrder.updated_at ?? ''),
+                at: Date.now(),
+              });
               refreshedCount++;
             } catch (err) {
               console.error('Failed to refresh order:', shopifyOrder.id, err);
@@ -319,7 +370,13 @@ const Printing = () => {
   // Sync on mount + every 2 minutes
   useEffect(() => {
     const initialTimer = setTimeout(() => syncRef.current(false), 1000);
-    const intervalTimer = setInterval(() => syncRef.current(false), 2 * 60 * 1000);
+    // Only sync while the tab is actually being looked at. Background tabs
+    // left open overnight were syncing every 2 minutes all night.
+    const intervalTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncRef.current(false);
+      }
+    }, 2 * 60 * 1000);
     return () => { clearTimeout(initialTimer); clearInterval(intervalTimer); };
   }, []);
 

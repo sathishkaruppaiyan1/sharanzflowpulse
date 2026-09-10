@@ -24,7 +24,7 @@ import { Search, RefreshCw, Eye, Package, Clock, Pencil } from 'lucide-react';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
 import { useShopifyHeldOrderIds } from '@/hooks/useShopifyHeldOrderIds';
 import { useToast } from '@/hooks/use-toast';
-import { useBulkUpdateOrderStage, useOrders } from '@/hooks/useOrders';
+import { useBulkUpdateOrderStage, useShopifyOrderRefs } from '@/hooks/useOrders';
 import { OrderStage } from '@/types/database';
 import { supabaseOrderService } from '@/services/supabaseOrderService';
 import { useQueryClient } from '@tanstack/react-query';
@@ -92,7 +92,7 @@ const Orders = () => {
     refetch 
   } = useShopifyOrders();
   
-  const { data: internalOrders = [] } = useOrders();
+  const { data: internalOrders = [] } = useShopifyOrderRefs();
   const {
     heldIds: shopifyHeldIds,
     heldOrders: rawHeldShopifyOrders = [],
@@ -383,9 +383,9 @@ const Orders = () => {
       if (!internalOrder) {
         const newOrderId = await supabaseOrderService.createOrderFromShopify(selectedOrder, 'pending');
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
-        await queryClient.refetchQueries({ queryKey: ['orders'] });
+        await queryClient.refetchQueries({ queryKey: ['orders', 'shopify-refs'] });
         internalOrder = queryClient
-          .getQueryData<any[]>(['orders'])
+          .getQueryData<any[]>(['orders', 'shopify-refs'])
           ?.find((order) => order.id === newOrderId) || null;
       }
 

@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ApiConfigs, InteraktTemplate, useApiConfigs } from '@/hooks/useApiConfigs';
 import { Package, Plus, Trash2, MessageSquare, Send, Loader2 } from 'lucide-react';
-import ParcelPanelSync from './ParcelPanelSync';
 import { sendWhatsAppMessage } from '@/services/interakt/interaktApiClient';
 
 const EXAMPLE_TEMPLATE_BODY = `Hello {{1}}!
@@ -202,12 +201,6 @@ const ApiConfiguration = () => {
         title: "Interakt Test",
         description: "Interakt test is not implemented yet.",
       });
-    } else if (configType === 'parcel_panel') {
-      // Implement Parcel Panel test logic here
-      toast({
-        title: "Parcel Panel Test",
-        description: "Parcel Panel test is not implemented yet.",
-      });
     }
   };
 
@@ -324,72 +317,6 @@ const ApiConfiguration = () => {
           </CardContent>
         </Card>
 
-        {/* Parcel Panel Configuration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Package className="mr-2 h-5 w-5" />
-              Parcel Panel Configuration
-            </CardTitle>
-            <CardDescription>
-              Configure Parcel Panel API for package tracking and delivery management.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="parcel-panel-enabled"
-                checked={tempConfigs.parcel_panel.enabled}
-                onCheckedChange={(checked) =>
-                  setTempConfigs(prev => ({
-                    ...prev,
-                    parcel_panel: { ...prev.parcel_panel, enabled: checked }
-                  }))
-                }
-              />
-              <Label htmlFor="parcel-panel-enabled">Enable Parcel Panel Integration</Label>
-            </div>
-            
-            <div className="grid gap-4">
-              <div>
-                <Label htmlFor="parcel-panel-api-key">API Key</Label>
-                <Input
-                  id="parcel-panel-api-key"
-                  type="password"
-                  placeholder="Enter your Parcel Panel API key (default: 873f13e0-846d-4274-b401-8fdce3ff5e6c)"
-                  value={tempConfigs.parcel_panel.api_key}
-                  onChange={(e) =>
-                    setTempConfigs(prev => ({
-                      ...prev,
-                      parcel_panel: { ...prev.parcel_panel, api_key: e.target.value }
-                    }))
-                  }
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="parcel-panel-base-url">Base URL</Label>
-                <Input
-                  id="parcel-panel-base-url"
-                  placeholder="https://open.parcelpanel.com"
-                  value={tempConfigs.parcel_panel.base_url}
-                  onChange={(e) =>
-                    setTempConfigs(prev => ({
-                      ...prev,
-                      parcel_panel: { ...prev.parcel_panel, base_url: e.target.value }
-                    }))
-                  }
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Default endpoint: /api/v2/tracking/order (GET method)
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* NEW: Parcel Panel Data Sync */}
-        <ParcelPanelSync />
 
         {/* Interakt Configuration */}
         <Card>

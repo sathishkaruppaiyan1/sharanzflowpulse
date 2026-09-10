@@ -24,11 +24,6 @@ export interface ApiConfigs {
     tracking_template_name: string;
     language_code: string;
   };
-  parcel_panel: {
-    enabled: boolean;
-    api_key: string;
-    base_url: string;
-  };
 }
 
 const defaultConfigs: ApiConfigs = {
@@ -47,11 +42,6 @@ const defaultConfigs: ApiConfigs = {
     templates: [],
     tracking_template_name: '',
     language_code: 'en'
-  },
-  parcel_panel: {
-    enabled: false,
-    api_key: '873f13e0-846d-4274-b401-8fdce3ff5e6c',
-    base_url: 'https://open.parcelpanel.com'
   }
 };
 
@@ -80,10 +70,6 @@ export const useApiConfigs = () => {
         // Merge with defaults to ensure all properties exist
         const configData = data.value as unknown as Partial<ApiConfigs>;
         
-        // Use the base URL from database or empty string
-        let parcelPanelBaseUrl = configData.parcel_panel?.base_url || '';
-        console.log('Parcel Panel base URL from database:', parcelPanelBaseUrl);
-        
         const rawTemplates = (configData.interakt as any)?.templates;
         const normalizedTemplates: InteraktTemplate[] = Array.isArray(rawTemplates)
           ? rawTemplates.map((t: any) =>
@@ -98,12 +84,6 @@ export const useApiConfigs = () => {
             ...configData.interakt,
             templates: normalizedTemplates,
           },
-          parcel_panel: {
-            ...defaultConfigs.parcel_panel,
-            ...configData.parcel_panel,
-            // Use the corrected base URL
-            base_url: parcelPanelBaseUrl
-          }
         };
         console.log('Loaded API configs from database:', mergedConfigs);
         setApiConfigs(mergedConfigs);

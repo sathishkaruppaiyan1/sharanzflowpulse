@@ -6,9 +6,8 @@ import ShopifyOrdersCard from '@/components/dashboard/ShopifyOrdersCard';
 import Header from '@/components/layout/Header';
 import { Package, Printer, PackageCheck, Truck, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useOrders } from '@/hooks/useOrders';
+import { useStageCounts } from '@/hooks/useStageCounts';
 import { useShopifyOrders } from '@/hooks/useShopifyOrders';
-import { supabase } from '@/integrations/supabase/client';
 
 interface DashboardProps {
   userRole: string;
@@ -16,7 +15,7 @@ interface DashboardProps {
 
 const Dashboard = ({ userRole }: DashboardProps) => {
   const navigate = useNavigate();
-  const { data: orders = [] } = useOrders();
+  const { data: stageCounts } = useStageCounts();
   const { orders: shopifyOrders = [] } = useShopifyOrders();
   const [realtimeData, setRealtimeData] = useState({
     newOrders: 0,
@@ -27,51 +26,37 @@ const Dashboard = ({ userRole }: DashboardProps) => {
   });
 
   useEffect(() => {
-    // Calculate real-time statistics from both Shopify orders and internal orders
-    const calculateStats = () => {
-      // Count new orders from Shopify (unfulfilled orders)
-      const newOrdersCount = shopifyOrders.filter(order => 
-        (order.fulfillment_status || '') === 'unfulfilled'
-      ).length;
+    // Stage totals come from a single server-side aggregate (get_stage_counts).
+    // This screen used to call useOrders(), which downloaded the orders table
+    // with customer / address / order_items embedded just to run .filter()
+    // over it in the browser — several megabytes per visit, and capped at
+    // 1000 rows by PostgREST so the totals below were wrong anyway.
+    const newOrdersCount = shopifyOrders.filter(
+      order => (order.fulfillment_status || '') === 'unfulfilled'
+    ).length;
 
-      // Count ready to print from internal orders (pending stage)
-      const readyToPrintCount = orders.filter(order => 
-        order.stage === 'pending'
-      ).length;
+    setRealtimeData({
+      newOrders: newOrdersCount,
+      readyToPrint: stageCounts?.pending ?? 0,
+      readyToPack: stageCounts?.packing ?? 0,
+      readyToShip: stageCounts?.tracking ?? 0,
+      inTransit: stageCounts?.shipped ?? 0,
+    });
+  }, [stageCounts, shopifyOrders]);
 
-      const stats = {
-        newOrders: newOrdersCount,
-        readyToPrint: readyToPrintCount,
-        readyToPack: orders.filter(order => order.stage === 'packing').length,
-        readyToShip: orders.filter(order => order.stage === 'tracking').length,
-        inTransit: orders.filter(order => order.stage === 'shipped').length
-      };
-      setRealtimeData(stats);
-    };
-
-    calculateStats();
-
-    // Set up real-time subscription for orders
-    const channel = supabase
-      .channel('orders-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders'
-        },
-        () => {
-          // Refetch data when orders change
-          calculateStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [orders, shopifyOrders]);
+  // Derived totals, all from the aggregate rather than a downloaded table.
+  const totalOrders = stageCounts
+    ? stageCounts.pending + stageCounts.hold + stageCounts.printing +
+      stageCounts.packing + stageCounts.tracking + stageCounts.shipped +
+      stageCounts.delivered
+    : 0;
+  const inProgressOrders = stageCounts
+    ? stageCounts.hold + stageCounts.printing + stageCounts.packing +
+      stageCounts.tracking + stageCounts.shipped
+    : 0;
+  const processingRate = totalOrders > 0
+    ? Math.round(((totalOrders - (stageCounts?.pending ?? 0)) / totalOrders) * 100)
+    : 0;
 
   const stageData = [
     {
@@ -188,24 +173,24 @@ const Dashboard = ({ userRole }: DashboardProps) => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Total Orders</span>
-                  <span className="text-xl font-bold text-blue-600">{orders.length}</span>
+                  <span className="text-xl font-bold text-blue-600">{totalOrders}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Completed Orders</span>
                   <span className="text-xl font-bold text-green-600">
-                    {orders.filter(order => order.stage === 'delivered').length}
+                    {stageCounts?.delivered ?? 0}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">In Progress</span>
                   <span className="text-xl font-bold text-orange-600">
-                    {orders.filter(order => !['delivered', 'pending'].includes(order.stage || '')).length}
+                    {inProgressOrders}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Processing Rate</span>
                   <span className="text-xl font-bold text-purple-600">
-                    {orders.length > 0 ? Math.round((orders.filter(order => order.stage !== 'pending').length / orders.length) * 100) : 0}%
+                    {processingRate}%
                   </span>
                 </div>
               </div>

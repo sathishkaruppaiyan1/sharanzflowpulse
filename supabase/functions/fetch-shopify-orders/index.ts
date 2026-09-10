@@ -254,6 +254,10 @@ serve(async (req) => {
         total_amount: order.current_total_price,
         currency: order.currency,
         created_at: order.created_at,
+        // Passed through so the client can tell whether an order actually
+        // changed since it was last synced, instead of re-upserting every
+        // order on every sync cycle.
+        updated_at: order.updated_at,
         financial_status: order.financial_status || 'pending',
         fulfillment_status: order.fulfillment_status || 'unfulfilled',
         line_items: (order.line_items || []).map(slimLineItem),
