@@ -1,0 +1,20 @@
+name = "flowpulse-sync"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "283163dbd6ea47cb9400dcb530e23c54"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+[vars]
+SHOPIFY_SHOP = "sharanz-2"
+SHOPIFY_API_VERSION = "2024-01"
+SHOPIFY_CLIENT_ID = "a5f49040e8a9adb61cf51de88b8ce626"
+
+# secrets (set with `npx wrangler secret put <NAME>`), never in this file:
+#   SHOPIFY_CLIENT_SECRET   the shpss_ value
+#   SYNC_KEY                any long random string; protects the manual /run trigger

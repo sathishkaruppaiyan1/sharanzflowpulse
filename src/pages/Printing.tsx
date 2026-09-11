@@ -363,35 +363,9 @@ const Printing = () => {
     }
   }, [shopifyOrders, shopifyInProgressIds, isSyncing, refetchPrintingOrders, refetchShopify]);
 
-  // ─── Stable ref for timers ─────────────────────────────────────────────
-  const syncRef = React.useRef(syncNewOrders);
-  React.useEffect(() => { syncRef.current = syncNewOrders; }, [syncNewOrders]);
-
-  // Sync on mount + every 2 minutes
-  useEffect(() => {
-    const initialTimer = setTimeout(() => syncRef.current(false), 1000);
-    // Only sync while the tab is actually being looked at. Background tabs
-    // left open overnight were syncing every 2 minutes all night.
-    const intervalTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        syncRef.current(false);
-      }
-    }, 2 * 60 * 1000);
-    return () => { clearTimeout(initialTimer); clearInterval(intervalTimer); };
-  }, []);
-
-  // Window focus sync (debounced — at most once per 30s)
-  useEffect(() => {
-    let lastFocusSync = 0;
-    const handleWindowFocus = () => {
-      const now = Date.now();
-      if (now - lastFocusSync < 30_000) return;
-      lastFocusSync = now;
-      syncRef.current(false);
-    };
-    window.addEventListener('focus', handleWindowFocus);
-    return () => window.removeEventListener('focus', handleWindowFocus);
-  }, []);
+  // Automatic Shopify sync now runs server-side (Cloudflare Worker cron,
+  // worker/src/index.ts) every 2 minutes. The browser no longer polls;
+  // the Sync button below remains as a manual fallback.
 
   // ─── Today's printed count ─────────────────────────────────────────────
   useEffect(() => {
